@@ -4,7 +4,7 @@
 //! are stored as integers in **cents** (e.g., $10.00 = 1000).
 
 use serde::{Deserialize, Serialize};
-use serde_repr::Serialize_repr;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use super::{bool_from_int_default_false, deserialize_optional_amount, deserialize_optional_i32, DateMmyy, DateYmd, PayrixId};
 
@@ -216,9 +216,8 @@ pub struct Transaction {
     pub frozen: bool,
 }
 
-/// Transaction types.
-/// NOTE: API may return values as strings (e.g., "1") instead of integers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
+/// Transaction types per OpenAPI spec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum TransactionType {
     /// Credit card sale (auth + capture)
@@ -242,21 +241,8 @@ pub enum TransactionType {
     ECheckAccountVerification = 12,
 }
 
-crate::impl_flexible_i32_enum_deserialize!(TransactionType, [
-    (1, CreditCardSale),
-    (2, CreditCardAuth),
-    (3, CreditCardCapture),
-    (4, CreditCardReverseAuth),
-    (5, CreditCardRefund),
-    (7, ECheckSale),
-    (8, ECheckRefund),
-    (11, ECheckRedeposit),
-    (12, ECheckAccountVerification),
-]);
-
-/// Transaction status values.
-/// NOTE: API may return values as strings (e.g., "1") instead of integers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
+/// Transaction status values per OpenAPI spec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum TransactionStatus {
     /// Gateway awaiting processor confirmation
@@ -274,18 +260,8 @@ pub enum TransactionStatus {
     Returned = 5,
 }
 
-crate::impl_flexible_i32_enum_deserialize!(TransactionStatus, [
-    (0, Pending),
-    (1, Approved),
-    (2, Failed),
-    (3, Captured),
-    (4, Settled),
-    (5, Returned),
-]);
-
-/// Transaction origin values.
-/// NOTE: API may return values as strings (e.g., "2") instead of integers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
+/// Transaction origin values per OpenAPI spec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum TransactionOrigin {
     /// Unknown origin
@@ -310,19 +286,6 @@ pub enum TransactionOrigin {
     /// Google Pay transaction
     GooglePay = 9,
 }
-
-crate::impl_flexible_i32_enum_deserialize!(TransactionOrigin, [
-    (0, Unknown),
-    (1, Terminal),
-    (2, Ecommerce),
-    (3, MailOrTelephoneOrder),
-    (4, ApplePay),
-    (5, Success3DS),
-    (6, Attempted3DS),
-    (7, Recurring),
-    (8, Payframe),
-    (9, GooglePay),
-]);
 
 /// Transaction platform values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -371,9 +334,8 @@ pub enum CardOnFileType {
     Unscheduled,
 }
 
-/// Terminal capability values.
-/// NOTE: API may return values as strings (e.g., "1") instead of integers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
+/// Terminal capability values per OpenAPI spec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum TerminalCapability {
     /// Key entry only
@@ -385,15 +347,8 @@ pub enum TerminalCapability {
     IntegratedCircuitReader = 3,
 }
 
-crate::impl_flexible_i32_enum_deserialize!(TerminalCapability, [
-    (1, KeyEntryOnly),
-    (2, MagneticStripe),
-    (3, IntegratedCircuitReader),
-]);
-
-/// Entry mode values for how payment information was entered.
-/// NOTE: API may return values as strings (e.g., "1") instead of integers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
+/// Entry mode values per OpenAPI spec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum EntryMode {
     /// Terminal used with key entry
@@ -408,14 +363,6 @@ pub enum EntryMode {
     /// EMV chip read
     EmvChipRead = 5,
 }
-
-crate::impl_flexible_i32_enum_deserialize!(EntryMode, [
-    (1, TerminalUsedWithKey),
-    (2, Track1Read),
-    (3, Track2Read),
-    (4, CompleteMagneticStripeRead),
-    (5, EmvChipRead),
-]);
 
 /// Unauthorized transaction reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -439,9 +386,8 @@ pub enum UnauthReason {
     SuspectedFraud,
 }
 
-/// Transaction result type.
-/// NOTE: API may return values as strings (e.g., "1") instead of integers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
+/// Transaction result type per OpenAPI spec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum TxnResultType {
     /// General result
@@ -463,20 +409,8 @@ pub enum TxnResultType {
     ThreeDsAlert = 8,
 }
 
-crate::impl_flexible_i32_enum_deserialize!(TxnResultType, [
-    (1, General),
-    (2, FraudPrevention),
-    (3, Processor),
-    (4, CvvMismatch),
-    (5, AvsCheck),
-    (6, AavsCheck),
-    (7, NetworkError),
-    (8, ThreeDsAlert),
-]);
-
-/// Transaction result code.
-/// NOTE: API may return values as strings (e.g., "0") instead of integers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
+/// Transaction result code per OpenAPI spec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum TxnResultCode {
     /// Transaction approved
@@ -547,42 +481,6 @@ pub enum TxnResultCode {
     /// 3DS passed but liability not shifted
     ThreeDsAuthPassedLiabilityShifted = 32,
 }
-
-crate::impl_flexible_i32_enum_deserialize!(TxnResultCode, [
-    (0, Approved),
-    (1, PartiallyApproved),
-    (2, Declined),
-    (3, VerificationSuccessful),
-    (4, VerificationUnsuccessful),
-    (5, ZipCodeMismatch),
-    (6, AddressMismatch),
-    (7, NameMismatch),
-    (8, NameAndPhoneMismatch),
-    (9, NameAndEmailMismatch),
-    (10, PhoneMismatch),
-    (11, PhoneAndEmailMismatch),
-    (12, EmailMismatch),
-    (13, NameNotInTxnData),
-    (14, NameAndPhoneNotInTxnData),
-    (15, NameAndEmailNotInTxnData),
-    (16, PhoneNotInTxnData),
-    (17, PhoneAndEmailNotInTxnData),
-    (18, EmailNotInTxnData),
-    (19, CustomerNotInTxnData),
-    (20, NonSufficientFunds),
-    (21, AccountInvalid),
-    (22, AccountUnauthorized),
-    (23, GeneralError),
-    (24, ZipNotInTxnData),
-    (25, ZipAndAddressNotInTxnData),
-    (26, AddressNotInTxnData),
-    (27, NotCaptured),
-    (28, ThreeDsPassed),
-    (29, ThreeDsInvalid),
-    (30, ThreeDsFailed),
-    (31, ThreeDsNotValidated),
-    (32, ThreeDsAuthPassedLiabilityShifted),
-]);
 
 /// Custom data stored in transaction description field.
 ///

@@ -38,17 +38,17 @@ pub struct DisbursementEntry {
     #[serde(default)]
     pub status: Option<DisbursementStatus>,
 
-    /// Entry amount (may be float due to API inconsistencies)
+    /// Entry amount in cents per OpenAPI spec
     #[serde(default)]
-    pub amount: Option<f64>,
+    pub amount: Option<i64>,
 
-    /// Fee amount (may be float due to API inconsistencies)
+    /// Fee amount in cents per OpenAPI spec
     #[serde(default)]
-    pub fee: Option<f64>,
+    pub fee: Option<i64>,
 
-    /// Net amount after fees (may be float due to API inconsistencies)
+    /// Net amount after fees in cents per OpenAPI spec
     #[serde(default)]
-    pub net: Option<f64>,
+    pub net: Option<i64>,
 
     /// Currency code (e.g., "USD")
     #[serde(default)]
@@ -123,9 +123,9 @@ mod tests {
         assert_eq!(entry.merchant.unwrap().as_str(), "t1_mer_12345678901234567890123");
         assert_eq!(entry.fund.unwrap().as_str(), "t1_fnd_12345678901234567890123");
         assert_eq!(entry.status, Some(DisbursementStatus::Processed));
-        assert_eq!(entry.amount, Some(10000.0));
-        assert_eq!(entry.fee, Some(100.0));
-        assert_eq!(entry.net, Some(9900.0));
+        assert_eq!(entry.amount, Some(10000));
+        assert_eq!(entry.fee, Some(100));
+        assert_eq!(entry.net, Some(9900));
         assert_eq!(entry.currency, Some("USD".to_string()));
         assert_eq!(entry.entry_type, Some("payment".to_string()));
         assert_eq!(entry.txn.unwrap().as_str(), "t1_txn_12345678901234567890123");

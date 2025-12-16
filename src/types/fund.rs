@@ -201,21 +201,21 @@ pub struct Fund {
     #[serde(default, rename = "type")]
     pub fund_type: Option<FundType>,
 
-    /// Available balance (may be in dollars with fractional cents from API)
+    /// Available balance in cents per OpenAPI spec
     #[serde(default)]
-    pub available: Option<f64>,
+    pub available: Option<i64>,
 
-    /// Pending balance (not yet available)
+    /// Pending balance in cents per OpenAPI spec
     #[serde(default)]
-    pub pending: Option<f64>,
+    pub pending: Option<i64>,
 
-    /// Reserved/held balance
+    /// Reserved/held balance in cents per OpenAPI spec
     #[serde(default)]
-    pub reserved: Option<f64>,
+    pub reserved: Option<i64>,
 
-    /// Total balance (available + pending + reserved)
+    /// Total balance in cents per OpenAPI spec
     #[serde(default)]
-    pub total: Option<f64>,
+    pub total: Option<i64>,
 
     /// Currency code (e.g., "USD")
     #[serde(default)]
@@ -514,10 +514,9 @@ mod tests {
         assert_eq!(fund.id.as_str(), "t1_fnd_12345678901234567890123");
         assert_eq!(fund.name, Some("Operating Fund".to_string()));
         assert_eq!(fund.fund_type, Some(FundType::Operating));
-        // NOTE: API returns floats for balance fields (e.g., 3524255.258)
-        assert_eq!(fund.available, Some(100000.0));
-        assert_eq!(fund.pending, Some(25000.0));
-        assert_eq!(fund.total, Some(130000.0));
+        assert_eq!(fund.available, Some(100000));
+        assert_eq!(fund.pending, Some(25000));
+        assert_eq!(fund.total, Some(130000));
         assert!(fund.is_default);
         assert!(!fund.inactive);
     }
