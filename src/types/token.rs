@@ -3,9 +3,92 @@
 //! Tokens represent stored payment methods (credit cards or bank accounts).
 //! They allow recurring charges without storing sensitive payment data.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt;
 
 use super::{bool_from_int_default_false, option_bool_from_int, DateMmyy, PaymentMethod, PayrixId};
+
+/// Deserialize payment method from either an integer or an object.
+///
+/// The Payrix API may return the payment field as:
+/// - An integer (e.g., `2` for Visa)
+/// - An object with a `method` field (e.g., `{"method": 2, ...}`)
+fn deserialize_payment_method<'de, D>(deserializer: D) -> Result<Option<PaymentMethod>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct PaymentMethodVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for PaymentMethodVisitor {
+        type Value = Option<PaymentMethod>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("an integer, object with method field, or null")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            // Direct integer value - match PaymentMethod enum values
+            match v {
+                1 => Ok(Some(PaymentMethod::AmericanExpress)),
+                2 => Ok(Some(PaymentMethod::Visa)),
+                3 => Ok(Some(PaymentMethod::Mastercard)),
+                4 => Ok(Some(PaymentMethod::DinersClub)),
+                5 => Ok(Some(PaymentMethod::Discover)),
+                8 => Ok(Some(PaymentMethod::IndividualChecking)),
+                9 => Ok(Some(PaymentMethod::IndividualSavings)),
+                10 => Ok(Some(PaymentMethod::BusinessChecking)),
+                11 => Ok(Some(PaymentMethod::BusinessSavings)),
+                _ => Err(serde::de::Error::custom(format!(
+                    "unknown payment method value: {}",
+                    v
+                ))),
+            }
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            self.visit_i64(v as i64)
+        }
+
+        fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+        where
+            M: serde::de::MapAccess<'de>,
+        {
+            // Object with "method" field
+            let mut method: Option<PaymentMethod> = None;
+            while let Some(key) = map.next_key::<String>()? {
+                if key == "method" {
+                    method = Some(map.next_value()?);
+                } else {
+                    // Skip other fields
+                    let _: serde::de::IgnoredAny = map.next_value()?;
+                }
+            }
+            Ok(method)
+        }
+    }
+
+    deserializer.deserialize_any(PaymentMethodVisitor)
+}
 
 /// Token status values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -49,7 +132,8 @@ pub struct Token {
     pub customer: Option<PayrixId>,
 
     /// Associated merchant ID
-    pub merchant: PayrixId,
+    #[serde(default)]
+    pub merchant: Option<PayrixId>,
 
     /// Auto-generated token string for use in transactions.
     /// Use this value (not `id`) when processing payments.
@@ -57,7 +141,9 @@ pub struct Token {
     pub token: Option<String>,
 
     /// Payment method type
-    #[serde(default)]
+    ///
+    /// The Payrix API may return this as either an integer or an object.
+    #[serde(default, deserialize_with = "deserialize_payment_method")]
     pub payment: Option<PaymentMethod>,
 
     /// First 6 digits of card (BIN)
@@ -266,7 +352,7 @@ mod tests {
         let token: Token = serde_json::from_str(json).unwrap();
         assert_eq!(token.id.as_str(), "t1_tok_12345678901234567890123");
         assert_eq!(token.customer.unwrap().as_str(), "t1_cus_12345678901234567890123");
-        assert_eq!(token.merchant.as_str(), "t1_mer_12345678901234567890123");
+        assert_eq!(token.merchant.unwrap().as_str(), "t1_mer_12345678901234567890123");
         assert_eq!(token.token.unwrap(), "tok_abc123xyz789");
         assert_eq!(token.payment, Some(PaymentMethod::Visa));
         assert_eq!(token.first6.unwrap(), "424242");
@@ -282,13 +368,12 @@ mod tests {
     #[test]
     fn token_deserialize_minimal() {
         let json = r#"{
-            "id": "t1_tok_12345678901234567890123",
-            "merchant": "t1_mer_12345678901234567890123"
+            "id": "t1_tok_12345678901234567890123"
         }"#;
 
         let token: Token = serde_json::from_str(json).unwrap();
         assert_eq!(token.id.as_str(), "t1_tok_12345678901234567890123");
-        assert_eq!(token.merchant.as_str(), "t1_mer_12345678901234567890123");
+        assert!(token.merchant.is_none());
         assert!(token.customer.is_none());
         assert!(token.token.is_none());
         assert!(token.status.is_none());
@@ -298,8 +383,32 @@ mod tests {
     }
 
     #[test]
+    fn token_deserialize_payment_as_object() {
+        // Payrix API may return payment as an object with method field
+        let json = r#"{
+            "id": "t1_tok_12345678901234567890123",
+            "payment": {"method": 2, "number": "4111xxxxxxxx1111"}
+        }"#;
+
+        let token: Token = serde_json::from_str(json).unwrap();
+        assert_eq!(token.payment, Some(PaymentMethod::Visa));
+    }
+
+    #[test]
+    fn token_deserialize_payment_as_integer() {
+        // Payrix API may also return payment as just the method integer
+        let json = r#"{
+            "id": "t1_tok_12345678901234567890123",
+            "payment": 3
+        }"#;
+
+        let token: Token = serde_json::from_str(json).unwrap();
+        assert_eq!(token.payment, Some(PaymentMethod::Mastercard));
+    }
+
+    #[test]
     fn token_bool_from_int_zero_is_false() {
-        let json = r#"{"id": "t1_tok_12345678901234567890123", "merchant": "t1_mer_12345678901234567890123", "inactive": 0, "frozen": 0}"#;
+        let json = r#"{"id": "t1_tok_12345678901234567890123", "inactive": 0, "frozen": 0}"#;
         let token: Token = serde_json::from_str(json).unwrap();
         assert!(!token.inactive);
         assert!(!token.frozen);
@@ -307,7 +416,7 @@ mod tests {
 
     #[test]
     fn token_bool_from_int_one_is_true() {
-        let json = r#"{"id": "t1_tok_12345678901234567890123", "merchant": "t1_mer_12345678901234567890123", "inactive": 1, "frozen": 1}"#;
+        let json = r#"{"id": "t1_tok_12345678901234567890123", "inactive": 1, "frozen": 1}"#;
         let token: Token = serde_json::from_str(json).unwrap();
         assert!(token.inactive);
         assert!(token.frozen);
@@ -315,7 +424,7 @@ mod tests {
 
     #[test]
     fn token_bool_from_int_missing_defaults_false() {
-        let json = r#"{"id": "t1_tok_12345678901234567890123", "merchant": "t1_mer_12345678901234567890123"}"#;
+        let json = r#"{"id": "t1_tok_12345678901234567890123"}"#;
         let token: Token = serde_json::from_str(json).unwrap();
         assert!(!token.inactive);
         assert!(!token.frozen);

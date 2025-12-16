@@ -5,19 +5,26 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::fmt;
 
-/// A validated Payrix ID (exactly 30 characters).
+/// A validated Payrix ID.
 ///
-/// All Payrix resource IDs follow the format `t1_xxx_...` and are exactly 30 characters.
-/// This type enforces that constraint at deserialization time.
+/// All Payrix resource IDs follow the format `t1_xxx_...` and are typically
+/// 29-32 characters long. Most are 30 characters, but some endpoints return
+/// IDs with slightly different lengths.
+///
+/// NOTE: The API is inconsistent with ID lengths. This type accepts IDs
+/// between 29 and 32 characters to avoid deserialization failures.
 ///
 /// # Example
 /// ```
 /// use payrix::types::PayrixId;
 ///
-/// // Valid ID (exactly 30 characters)
+/// // Valid ID (30 characters - most common)
 /// let id: PayrixId = "t1_txn_12345678901234567890123".parse().unwrap();
 ///
-/// // Invalid ID (wrong length) - will fail
+/// // Also valid (32 characters - some endpoints)
+/// let id2: PayrixId = "t1_txn_1234567890123456789012345".parse().unwrap();
+///
+/// // Invalid ID (too short) - will fail
 /// let result: Result<PayrixId, _> = "too_short".parse();
 /// assert!(result.is_err());
 /// ```
@@ -25,18 +32,23 @@ use std::fmt;
 pub struct PayrixId(String);
 
 impl PayrixId {
-    /// The required length for all Payrix IDs.
-    pub const LENGTH: usize = 30;
+    /// The typical length for Payrix IDs (most common).
+    pub const TYPICAL_LENGTH: usize = 30;
+    /// Minimum accepted length for Payrix IDs.
+    pub const MIN_LENGTH: usize = 29;
+    /// Maximum accepted length for Payrix IDs.
+    pub const MAX_LENGTH: usize = 32;
 
     /// Create a new PayrixId, validating the length.
     ///
-    /// Returns `Err` if the string is not exactly 30 characters.
+    /// Returns `Err` if the string is not between 29 and 32 characters.
     pub fn new(s: impl Into<String>) -> Result<Self, String> {
         let s = s.into();
-        if s.len() != Self::LENGTH {
+        if s.len() < Self::MIN_LENGTH || s.len() > Self::MAX_LENGTH {
             return Err(format!(
-                "PayrixId must be exactly {} characters, got {}",
-                Self::LENGTH,
+                "PayrixId must be between {} and {} characters, got {}",
+                Self::MIN_LENGTH,
+                Self::MAX_LENGTH,
                 s.len()
             ));
         }
@@ -108,63 +120,65 @@ impl sqlx::Type<sqlx::Postgres> for PayrixId {
     }
 }
 
-/// A validated date in YYYYMMDD format (exactly 8 characters).
+/// A date value from the Payrix API.
 ///
-/// This type enforces the format used by Payrix for date fields like
-/// `established`, `boarded`, `authDate`, etc.
+/// This type stores date values used by Payrix for date fields like
+/// `established`, `boarded`, `authDate`, etc. The API typically returns
+/// YYYYMMDD format (8 characters), but may also return shorter values
+/// like just a year (4 characters) in some cases.
+///
+/// NOTE: The API is inconsistent with date formats. This type accepts
+/// any numeric string to avoid deserialization failures.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DateYmd(String);
 
 impl DateYmd {
-    /// The required length for YYYYMMDD dates.
+    /// The expected length for YYYYMMDD dates.
     pub const LENGTH: usize = 8;
 
     /// Minimum valid year for Payrix dates.
     pub const MIN_YEAR: u16 = 2000;
 
-    /// Create a new DateYmd, validating the format and date validity.
+    /// Create a new DateYmd from any numeric string.
     ///
-    /// Returns `Err` if:
-    /// - String is not exactly 8 numeric characters
-    /// - Year is before 2000
-    /// - Month is not 1-12
-    /// - Day is not valid for the given month/year
+    /// Returns `Err` if the string contains non-digit characters or is empty.
+    ///
+    /// NOTE: This accepts any length to handle API inconsistencies where
+    /// some date fields return just a year (4 chars) instead of YYYYMMDD.
     pub fn new(s: impl Into<String>) -> Result<Self, String> {
         let s = s.into();
-        if s.len() != Self::LENGTH {
-            return Err(format!(
-                "DateYmd must be exactly {} characters (YYYYMMDD), got {}",
-                Self::LENGTH,
-                s.len()
-            ));
+        if s.is_empty() {
+            return Err("DateYmd cannot be empty".to_string());
         }
         if !s.chars().all(|c| c.is_ascii_digit()) {
             return Err(format!("DateYmd must contain only digits, got '{}'", s));
         }
 
-        // Parse and validate components (safe: we verified all chars are digits above)
-        let year: u16 = s[0..4].parse().expect("year digits verified");
-        let month: u8 = s[4..6].parse().expect("month digits verified");
-        let day: u8 = s[6..8].parse().expect("day digits verified");
+        // Only validate if we have a full 8-char date
+        if s.len() == Self::LENGTH {
+            let year: u16 = s[0..4].parse().expect("year digits verified");
+            let month: u8 = s[4..6].parse().expect("month digits verified");
+            let day: u8 = s[6..8].parse().expect("day digits verified");
 
-        if year < Self::MIN_YEAR {
-            return Err(format!(
-                "DateYmd year must be >= {}, got {}",
-                Self::MIN_YEAR,
-                year
-            ));
-        }
+            if year < Self::MIN_YEAR {
+                return Err(format!(
+                    "DateYmd year must be >= {}, got {}",
+                    Self::MIN_YEAR,
+                    year
+                ));
+            }
 
-        if !(1..=12).contains(&month) {
-            return Err(format!("DateYmd month must be 1-12, got {}", month));
-        }
+            if !(1..=12).contains(&month) {
+                return Err(format!("DateYmd month must be 1-12, got {}", month));
+            }
 
-        let max_day = Self::days_in_month(year, month);
-        if !(1..=max_day).contains(&day) {
-            return Err(format!(
-                "DateYmd day must be 1-{} for {}/{}, got {}",
-                max_day, year, month, day
-            ));
+            let max_day = Self::days_in_month(year, month);
+            if !(1..=max_day).contains(&day) {
+                return Err(format!(
+                    "DateYmd day must be 1-{} for {}/{}, got {}",
+                    max_day, year, month, day
+                ));
+            }
         }
 
         Ok(Self(s))
@@ -196,25 +210,31 @@ impl DateYmd {
         &self.0
     }
 
-    /// Get the year component.
-    pub fn year(&self) -> u16 {
-        self.0[0..4]
-            .parse()
-            .expect("DateYmd year validated at construction")
+    /// Get the year component if the date has at least 4 characters.
+    pub fn year(&self) -> Option<u16> {
+        if self.0.len() >= 4 {
+            self.0[0..4].parse().ok()
+        } else {
+            None
+        }
     }
 
-    /// Get the month component (1-12).
-    pub fn month(&self) -> u8 {
-        self.0[4..6]
-            .parse()
-            .expect("DateYmd month validated at construction")
+    /// Get the month component (1-12) if the date has at least 6 characters.
+    pub fn month(&self) -> Option<u8> {
+        if self.0.len() >= 6 {
+            self.0[4..6].parse().ok()
+        } else {
+            None
+        }
     }
 
-    /// Get the day component (1-31).
-    pub fn day(&self) -> u8 {
-        self.0[6..8]
-            .parse()
-            .expect("DateYmd day validated at construction")
+    /// Get the day component (1-31) if the date has at least 8 characters.
+    pub fn day(&self) -> Option<u8> {
+        if self.0.len() >= 8 {
+            self.0[6..8].parse().ok()
+        } else {
+            None
+        }
     }
 
     /// Consume self and return the inner String.
@@ -257,8 +277,39 @@ impl<'de> Deserialize<'de> for DateYmd {
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        Self::new(s).map_err(serde::de::Error::custom)
+        // Payrix API can return dates as either strings ("20231215") or integers (20231215)
+        struct DateYmdVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for DateYmdVisitor {
+            type Value = DateYmd;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a string or integer in YYYYMMDD format")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                DateYmd::new(v).map_err(serde::de::Error::custom)
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                DateYmd::new(v.to_string()).map_err(serde::de::Error::custom)
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                DateYmd::new(v.to_string()).map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_any(DateYmdVisitor)
     }
 }
 
@@ -473,6 +524,192 @@ pub mod bool_from_int_default_false {
         let value: Option<i32> = Option::deserialize(deserializer)?;
         Ok(value.map(|v| v != 0).unwrap_or(false))
     }
+}
+
+/// Deserialize an `Option<i64>` from either a string or integer.
+///
+/// The Payrix API may return amounts as either strings (`"1000"`) or integers (`1000`).
+pub fn deserialize_optional_amount<'de, D>(deserializer: D) -> Result<Option<i64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct OptionalAmountVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for OptionalAmountVisitor {
+        type Value = Option<i64>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("an integer, string containing an integer, or null")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Some(v))
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Some(v as i64))
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            v.parse::<i64>()
+                .map(Some)
+                .map_err(|_| serde::de::Error::custom(format!("invalid amount string: {}", v)))
+        }
+    }
+
+    deserializer.deserialize_any(OptionalAmountVisitor)
+}
+
+/// Deserialize an `Option<i32>` from either a string or integer.
+///
+/// The Payrix API may return small integers as either strings (`"1"`) or integers (`1`).
+pub fn deserialize_optional_i32<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct OptionalI32Visitor;
+
+    impl<'de> serde::de::Visitor<'de> for OptionalI32Visitor {
+        type Value = Option<i32>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("an integer, string containing an integer, or null")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Some(v as i32))
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Some(v as i32))
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            v.parse::<i32>()
+                .map(Some)
+                .map_err(|_| serde::de::Error::custom(format!("invalid i32 string: {}", v)))
+        }
+    }
+
+    deserializer.deserialize_any(OptionalI32Visitor)
+}
+
+/// Macro to implement flexible deserialization for i32 repr enums.
+///
+/// The Payrix API sometimes returns integer enum values as strings (e.g., `"1"` instead of `1`).
+/// This macro creates a custom Deserialize implementation that accepts both formats.
+///
+/// # Usage
+/// ```ignore
+/// impl_flexible_i32_enum_deserialize!(TransactionType, [
+///     (1, CreditCardSale),
+///     (2, CreditCardAuth),
+///     // ...
+/// ]);
+/// ```
+#[macro_export]
+macro_rules! impl_flexible_i32_enum_deserialize {
+    ($enum_name:ident, [$(($value:expr, $variant:ident)),* $(,)?]) => {
+        impl<'de> serde::Deserialize<'de> for $enum_name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct EnumVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for EnumVisitor {
+                    type Value = $enum_name;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        formatter.write_str(concat!("an integer or string integer for ", stringify!($enum_name)))
+                    }
+
+                    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match v as i32 {
+                            $($value => Ok($enum_name::$variant),)*
+                            other => Err(serde::de::Error::custom(format!(
+                                "unknown {} value: {}",
+                                stringify!($enum_name),
+                                other
+                            ))),
+                        }
+                    }
+
+                    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        self.visit_i64(v as i64)
+                    }
+
+                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match v.parse::<i32>() {
+                            Ok(i) => self.visit_i64(i as i64),
+                            Err(_) => Err(serde::de::Error::custom(format!(
+                                "invalid {} string: {}",
+                                stringify!($enum_name),
+                                v
+                            ))),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_any(EnumVisitor)
+            }
+        }
+    };
 }
 
 /// Top-level query response wrapper from Payrix.
@@ -876,14 +1113,29 @@ mod tests {
     fn payrix_id_too_short() {
         let result = PayrixId::new("t1_txn_short");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("exactly 30 characters"));
+        assert!(result.unwrap_err().contains("between 29 and 32 characters"));
     }
 
     #[test]
     fn payrix_id_too_long() {
         let result = PayrixId::new("t1_txn_1234567890123456789012345678901234567890");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("exactly 30 characters"));
+        assert!(result.unwrap_err().contains("between 29 and 32 characters"));
+    }
+
+    #[test]
+    fn payrix_id_32_chars_ok() {
+        // Some API responses return 32 character IDs
+        let result = PayrixId::new("t1_txn_1234567890123456789012345");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn payrix_id_29_chars_ok() {
+        // Some API responses return 29 character IDs
+        let result = PayrixId::new("t1_txn_1234567890123456789012");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str().len(), 29);
     }
 
     #[test]
@@ -931,26 +1183,26 @@ mod tests {
     #[test]
     fn date_ymd_valid() {
         let date = DateYmd::new("20231215").unwrap();
-        assert_eq!(date.year(), 2023);
-        assert_eq!(date.month(), 12);
-        assert_eq!(date.day(), 15);
+        assert_eq!(date.year().unwrap(), 2023);
+        assert_eq!(date.month().unwrap(), 12);
+        assert_eq!(date.day().unwrap(), 15);
         assert_eq!(date.as_str(), "20231215");
     }
 
     #[test]
     fn date_ymd_first_day_of_year() {
         let date = DateYmd::new("20240101").unwrap();
-        assert_eq!(date.year(), 2024);
-        assert_eq!(date.month(), 1);
-        assert_eq!(date.day(), 1);
+        assert_eq!(date.year().unwrap(), 2024);
+        assert_eq!(date.month().unwrap(), 1);
+        assert_eq!(date.day().unwrap(), 1);
     }
 
     #[test]
     fn date_ymd_last_day_of_year() {
         let date = DateYmd::new("20231231").unwrap();
-        assert_eq!(date.year(), 2023);
-        assert_eq!(date.month(), 12);
-        assert_eq!(date.day(), 31);
+        assert_eq!(date.year().unwrap(), 2023);
+        assert_eq!(date.month().unwrap(), 12);
+        assert_eq!(date.day().unwrap(), 31);
     }
 
     #[test]
@@ -1015,7 +1267,7 @@ mod tests {
         // Feb 29 in leap year (2024) should be valid
         let date = DateYmd::new("20240229");
         assert!(date.is_ok());
-        assert_eq!(date.unwrap().day(), 29);
+        assert_eq!(date.unwrap().day().unwrap(), 29);
     }
 
     #[test]
@@ -1069,17 +1321,19 @@ mod tests {
     }
 
     #[test]
-    fn date_ymd_too_short() {
-        let result = DateYmd::new("2023121");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("exactly 8 characters"));
+    fn date_ymd_short_is_valid() {
+        // Short dates (e.g., just a year) are now accepted to handle API inconsistencies
+        let result = DateYmd::new("2023");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str(), "2023");
     }
 
     #[test]
-    fn date_ymd_too_long() {
+    fn date_ymd_long_is_valid() {
+        // Longer numeric strings are accepted as-is
         let result = DateYmd::new("202312150");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("exactly 8 characters"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str(), "202312150");
     }
 
     #[test]
@@ -1097,12 +1351,22 @@ mod tests {
     }
 
     #[test]
-    fn date_ymd_deserialize_valid() {
+    fn date_ymd_deserialize_valid_string() {
         let json = "\"20231215\"";
         let date: DateYmd = serde_json::from_str(json).unwrap();
-        assert_eq!(date.year(), 2023);
-        assert_eq!(date.month(), 12);
-        assert_eq!(date.day(), 15);
+        assert_eq!(date.year().unwrap(), 2023);
+        assert_eq!(date.month().unwrap(), 12);
+        assert_eq!(date.day().unwrap(), 15);
+    }
+
+    #[test]
+    fn date_ymd_deserialize_valid_integer() {
+        // Payrix API can return dates as integers
+        let json = "20231215";
+        let date: DateYmd = serde_json::from_str(json).unwrap();
+        assert_eq!(date.year().unwrap(), 2023);
+        assert_eq!(date.month().unwrap(), 12);
+        assert_eq!(date.day().unwrap(), 15);
     }
 
     #[test]
@@ -1264,7 +1528,7 @@ mod tests {
 
         for (date_str, expected_day) in test_cases {
             let date = DateYmd::new(date_str).unwrap();
-            assert_eq!(date.day(), expected_day, "Failed for {}", date_str);
+            assert_eq!(date.day().unwrap(), expected_day, "Failed for {}", date_str);
         }
     }
 

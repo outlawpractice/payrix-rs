@@ -19,7 +19,9 @@ pub struct Customer {
     pub id: PayrixId,
 
     /// The ID of the Merchant (not the Merchant's entity)
-    pub merchant: PayrixId,
+    /// Note: API may return null for some customers
+    #[serde(default)]
+    pub merchant: Option<PayrixId>,
 
     /// Login ID that created this entity
     #[serde(default)]
@@ -272,7 +274,7 @@ mod tests {
 
         let customer: Customer = serde_json::from_str(json).unwrap();
         assert_eq!(customer.id.as_str(), "t1_cus_12345678901234567890123");
-        assert_eq!(customer.merchant.as_str(), "t1_mer_12345678901234567890123");
+        assert_eq!(customer.merchant.as_ref().unwrap().as_str(), "t1_mer_12345678901234567890123");
         assert_eq!(customer.login.unwrap().as_str(), "t1_lgn_12345678901234567890123");
         assert_eq!(customer.first.as_deref(), Some("John"));
         assert_eq!(customer.middle.as_deref(), Some("Q"));
@@ -316,7 +318,7 @@ mod tests {
 
         let customer: Customer = serde_json::from_str(json).unwrap();
         assert_eq!(customer.id.as_str(), "t1_cus_12345678901234567890123");
-        assert_eq!(customer.merchant.as_str(), "t1_mer_12345678901234567890123");
+        assert_eq!(customer.merchant.as_ref().unwrap().as_str(), "t1_mer_12345678901234567890123");
         assert!(customer.login.is_none());
         assert!(customer.first.is_none());
         assert!(customer.email.is_none());

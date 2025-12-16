@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
-    bool_from_int_default_false, option_bool_from_int, FeeCollection, FeeType, FeeUnit, PayrixId,
+    bool_from_int_default_false, option_bool_from_int, FeeCollection, FeeRuleType, FeeUnit, PayrixId,
 };
 
 /// A Payrix fee rule.
@@ -31,9 +31,9 @@ pub struct FeeRule {
     #[serde(default)]
     pub login: Option<PayrixId>,
 
-    /// Fee type
+    /// Fee rule type (different from Fee.type - uses string enum, not integer)
     #[serde(default, rename = "type")]
-    pub fee_type: Option<FeeType>,
+    pub fee_type: Option<FeeRuleType>,
 
     /// Fee unit (percentage or fixed)
     #[serde(default)]
@@ -112,9 +112,9 @@ pub struct NewFeeRule {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub merchant: Option<String>,
 
-    /// Fee type
+    /// Fee rule type (different from Fee.type - uses string enum, not integer)
     #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-    pub fee_type: Option<FeeType>,
+    pub fee_type: Option<FeeRuleType>,
 
     /// Fee unit (percentage or fixed)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -176,12 +176,13 @@ mod tests {
 
     #[test]
     fn fee_rule_deserialize_full() {
+        // Per OpenAPI: type is string enum, unit/collection are integers
         let json = r#"{
             "id": "t1_fer_12345678901234567890123",
             "entity": "t1_ent_12345678901234567890123",
             "merchant": "t1_mer_12345678901234567890123",
             "login": "t1_log_12345678901234567890123",
-            "type": 1,
+            "type": "method",
             "unit": 2,
             "collection": 1,
             "amount": 250,
@@ -205,7 +206,7 @@ mod tests {
         assert_eq!(fee_rule.entity.unwrap().as_str(), "t1_ent_12345678901234567890123");
         assert_eq!(fee_rule.merchant.unwrap().as_str(), "t1_mer_12345678901234567890123");
         assert_eq!(fee_rule.login.unwrap().as_str(), "t1_log_12345678901234567890123");
-        assert_eq!(fee_rule.fee_type, Some(FeeType::Fee));
+        assert_eq!(fee_rule.fee_type, Some(FeeRuleType::Method));
         assert_eq!(fee_rule.unit, Some(FeeUnit::Fixed));
         assert_eq!(fee_rule.collection, Some(FeeCollection::Transaction));
         assert_eq!(fee_rule.amount, Some(250));
@@ -280,14 +281,17 @@ mod tests {
 
     #[test]
     fn fee_rule_all_fee_type_variants() {
+        // Per OpenAPI: type is string enum (different from Fee.type)
         let test_cases = vec![
-            (1, FeeType::Fee),
-            (2, FeeType::Assessment),
+            ("method", FeeRuleType::Method),
+            ("bin", FeeRuleType::Bin),
+            ("avsresult", FeeRuleType::AvsResult),
+            ("business", FeeRuleType::Business),
         ];
 
         for (type_val, expected_type) in test_cases {
             let json = format!(
-                r#"{{"id": "t1_fer_12345678901234567890123", "type": {}}}"#,
+                r#"{{"id": "t1_fer_12345678901234567890123", "type": "{}"}}"#,
                 type_val
             );
             let fee_rule: FeeRule = serde_json::from_str(&json).unwrap();
@@ -297,6 +301,7 @@ mod tests {
 
     #[test]
     fn fee_rule_all_unit_variants() {
+        // Per OpenAPI: unit (feeUm) is integer enum [1, 2, 3]
         let test_cases = vec![
             (1, FeeUnit::Percent),
             (2, FeeUnit::Fixed),
@@ -315,6 +320,7 @@ mod tests {
 
     #[test]
     fn fee_rule_all_collection_variants() {
+        // Per OpenAPI: collection is integer enum [1, 2, 3]
         let test_cases = vec![
             (1, FeeCollection::Transaction),
             (2, FeeCollection::TransactionTaxId),
@@ -364,7 +370,7 @@ mod tests {
             entity: Some("t1_ent_12345678901234567890123".parse().unwrap()),
             merchant: Some("t1_mer_12345678901234567890123".parse().unwrap()),
             login: Some("t1_log_12345678901234567890123".parse().unwrap()),
-            fee_type: Some(FeeType::Fee),
+            fee_type: Some(FeeRuleType::Method),
             unit: Some(FeeUnit::Fixed),
             collection: Some(FeeCollection::Transaction),
             amount: Some(100),
@@ -395,7 +401,7 @@ mod tests {
         let new_fee_rule = NewFeeRule {
             entity: Some("t1_ent_12345678901234567890123".to_string()),
             merchant: Some("t1_mer_12345678901234567890123".to_string()),
-            fee_type: Some(FeeType::Fee),
+            fee_type: Some(FeeRuleType::Method),
             unit: Some(FeeUnit::Fixed),
             collection: Some(FeeCollection::Transaction),
             amount: 250,
@@ -414,7 +420,8 @@ mod tests {
         let json = serde_json::to_string(&new_fee_rule).unwrap();
         assert!(json.contains("\"entity\":\"t1_ent_12345678901234567890123\""));
         assert!(json.contains("\"merchant\":\"t1_mer_12345678901234567890123\""));
-        assert!(json.contains("\"type\":1"));
+        // Per OpenAPI: type is string, unit/collection are integers
+        assert!(json.contains("\"type\":\"method\""));
         assert!(json.contains("\"unit\":2"));
         assert!(json.contains("\"collection\":1"));
         assert!(json.contains("\"amount\":250"));
@@ -490,14 +497,15 @@ mod tests {
     fn new_fee_rule_with_all_enum_variants() {
         let new_fee_rule = NewFeeRule {
             amount: 500,
-            fee_type: Some(FeeType::Assessment),
+            fee_type: Some(FeeRuleType::Bin),
             unit: Some(FeeUnit::Percent),
             collection: Some(FeeCollection::TransactionMerchant),
             ..Default::default()
         };
 
         let json = serde_json::to_string(&new_fee_rule).unwrap();
-        assert!(json.contains("\"type\":2"));
+        // Per OpenAPI: type="bin" (string), unit=1 (Percent), collection=3 (TransactionMerchant)
+        assert!(json.contains("\"type\":\"bin\""));
         assert!(json.contains("\"unit\":1"));
         assert!(json.contains("\"collection\":3"));
     }

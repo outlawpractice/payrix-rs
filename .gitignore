@@ -19,3 +19,9 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Test logs
+logs/
+
+# Claude Code
+.claude/

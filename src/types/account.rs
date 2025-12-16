@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use super::{bool_from_int_default_false, PaymentMethod, PayrixId};
+use super::{bool_from_int_default_false, PayrixId};
 
 /// Account holder type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
@@ -84,9 +84,9 @@ pub struct Account {
     #[serde(default)]
     pub name: Option<String>,
 
-    /// Account type (uses PaymentMethod bank account values)
+    /// Account type (credit, debit, or all)
     #[serde(default, rename = "type")]
-    pub account_type: Option<PaymentMethod>,
+    pub account_type: Option<AccountType>,
 
     /// Bank routing number
     #[serde(default)]
@@ -168,9 +168,9 @@ pub struct NewAccount {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 
-    /// Account type (uses PaymentMethod bank account values)
+    /// Account type (credit, debit, or all)
     #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-    pub account_type: Option<PaymentMethod>,
+    pub account_type: Option<AccountType>,
 
     /// Bank routing number
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -327,12 +327,13 @@ mod tests {
 
     #[test]
     fn account_deserialize_full() {
+        // NOTE: API returns string values for type (e.g., "credit", "debit", "all")
         let json = r#"{
             "id": "t1_act_12345678901234567890123",
             "entity": "t1_ent_12345678901234567890123",
             "login": "t1_log_12345678901234567890123",
             "name": "Primary Checking",
-            "type": 10,
+            "type": "credit",
             "routing": "123456789",
             "account": "****1234",
             "last4": "1234",
@@ -357,7 +358,7 @@ mod tests {
         assert_eq!(account.entity.as_str(), "t1_ent_12345678901234567890123");
         assert_eq!(account.login.unwrap().as_str(), "t1_log_12345678901234567890123");
         assert_eq!(account.name.unwrap(), "Primary Checking");
-        assert_eq!(account.account_type, Some(PaymentMethod::BusinessChecking));
+        assert_eq!(account.account_type, Some(AccountType::Credit));
         assert_eq!(account.routing.unwrap(), "123456789");
         assert_eq!(account.last4.unwrap(), "1234");
         assert_eq!(account.first.unwrap(), "John");
@@ -422,7 +423,7 @@ mod tests {
         let new_account = NewAccount {
             entity: "t1_ent_12345678901234567890123".to_string(),
             name: Some("Primary Checking".to_string()),
-            account_type: Some(PaymentMethod::BusinessChecking),
+            account_type: Some(AccountType::Credit),
             routing: Some("123456789".to_string()),
             account: Some("987654321".to_string()),
             first: Some("John".to_string()),
@@ -437,7 +438,7 @@ mod tests {
         let json = serde_json::to_string(&new_account).unwrap();
         assert!(json.contains("\"entity\":\"t1_ent_12345678901234567890123\""));
         assert!(json.contains("\"name\":\"Primary Checking\""));
-        assert!(json.contains("\"type\":10"));
+        assert!(json.contains("\"type\":\"credit\""));
         assert!(json.contains("\"holderType\":1"));
         assert!(json.contains("\"primary\":1"));
     }

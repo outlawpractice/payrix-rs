@@ -4,9 +4,9 @@
 //! are stored as integers in **cents** (e.g., $10.00 = 1000).
 
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
+use serde_repr::Serialize_repr;
 
-use super::{bool_from_int_default_false, DateMmyy, DateYmd, PayrixId};
+use super::{bool_from_int_default_false, deserialize_optional_amount, deserialize_optional_i32, DateMmyy, DateYmd, PayrixId};
 
 /// A Payrix transaction.
 ///
@@ -21,22 +21,24 @@ pub struct Transaction {
     pub id: PayrixId,
 
     /// The ID of the Merchant (not the Merchant's entity)
-    pub merchant: PayrixId,
-
-    /// Token ID for the payment method (if using tokenized payment)
     #[serde(default)]
-    pub token: Option<PayrixId>,
+    pub merchant: Option<PayrixId>,
+
+    /// Token string for the payment method (if using tokenized payment).
+    /// This is the token string value, not the token ID.
+    #[serde(default)]
+    pub token: Option<String>,
 
     /// Transaction type
     #[serde(rename = "type")]
     pub txn_type: TransactionType,
 
     /// The total amount of this transaction, in **cents**
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_amount")]
     pub total: Option<i64>,
 
     /// The total amount approved by the processor, in **cents**
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_amount")]
     pub approved: Option<i64>,
 
     /// Authorization code returned by the network
@@ -82,7 +84,7 @@ pub struct Transaction {
     pub batch: Option<PayrixId>,
 
     /// Amount refunded from this transaction, in **cents**
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_amount")]
     pub refunded: Option<i64>,
 
     /// Date settled in YYYYMMDD format
@@ -90,7 +92,7 @@ pub struct Transaction {
     pub settled: Option<i64>,
 
     /// Settled amount in **cents**
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_amount")]
     pub settled_total: Option<i64>,
 
     /// Date funded in YYYYMMDD format
@@ -110,7 +112,7 @@ pub struct Transaction {
     pub cof_type: Option<CardOnFileType>,
 
     /// Whether partial payment is allowed (0 or 1)
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_i32")]
     pub allow_partial: Option<i32>,
 
     /// Subscription ID if from a recurring payment
@@ -182,19 +184,19 @@ pub struct Transaction {
     pub country: Option<String>,
 
     /// Tax amount in **cents**
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_amount")]
     pub tax: Option<i64>,
 
     /// Shipping fee in **cents**
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_amount")]
     pub shipping: Option<i64>,
 
     /// Discount amount in **cents**
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_amount")]
     pub discount: Option<i64>,
 
     /// Surcharge amount in **cents**
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_amount")]
     pub surcharge: Option<i64>,
 
     /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
@@ -215,7 +217,8 @@ pub struct Transaction {
 }
 
 /// Transaction types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
+/// NOTE: API may return values as strings (e.g., "1") instead of integers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
 #[repr(i32)]
 pub enum TransactionType {
     /// Credit card sale (auth + capture)
@@ -239,8 +242,21 @@ pub enum TransactionType {
     ECheckAccountVerification = 12,
 }
 
+crate::impl_flexible_i32_enum_deserialize!(TransactionType, [
+    (1, CreditCardSale),
+    (2, CreditCardAuth),
+    (3, CreditCardCapture),
+    (4, CreditCardReverseAuth),
+    (5, CreditCardRefund),
+    (7, ECheckSale),
+    (8, ECheckRefund),
+    (11, ECheckRedeposit),
+    (12, ECheckAccountVerification),
+]);
+
 /// Transaction status values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
+/// NOTE: API may return values as strings (e.g., "1") instead of integers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
 #[repr(i32)]
 pub enum TransactionStatus {
     /// Gateway awaiting processor confirmation
@@ -258,10 +274,22 @@ pub enum TransactionStatus {
     Returned = 5,
 }
 
+crate::impl_flexible_i32_enum_deserialize!(TransactionStatus, [
+    (0, Pending),
+    (1, Approved),
+    (2, Failed),
+    (3, Captured),
+    (4, Settled),
+    (5, Returned),
+]);
+
 /// Transaction origin values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
+/// NOTE: API may return values as strings (e.g., "2") instead of integers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
 #[repr(i32)]
 pub enum TransactionOrigin {
+    /// Unknown origin
+    Unknown = 0,
     /// Terminal/retail transaction
     #[default]
     Terminal = 1,
@@ -279,7 +307,22 @@ pub enum TransactionOrigin {
     Recurring = 7,
     /// Payframe transaction
     Payframe = 8,
+    /// Google Pay transaction
+    GooglePay = 9,
 }
+
+crate::impl_flexible_i32_enum_deserialize!(TransactionOrigin, [
+    (0, Unknown),
+    (1, Terminal),
+    (2, Ecommerce),
+    (3, MailOrTelephoneOrder),
+    (4, ApplePay),
+    (5, Success3DS),
+    (6, Attempted3DS),
+    (7, Recurring),
+    (8, Payframe),
+    (9, GooglePay),
+]);
 
 /// Transaction platform values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -329,7 +372,8 @@ pub enum CardOnFileType {
 }
 
 /// Terminal capability values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
+/// NOTE: API may return values as strings (e.g., "1") instead of integers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
 #[repr(i32)]
 pub enum TerminalCapability {
     /// Key entry only
@@ -341,8 +385,15 @@ pub enum TerminalCapability {
     IntegratedCircuitReader = 3,
 }
 
+crate::impl_flexible_i32_enum_deserialize!(TerminalCapability, [
+    (1, KeyEntryOnly),
+    (2, MagneticStripe),
+    (3, IntegratedCircuitReader),
+]);
+
 /// Entry mode values for how payment information was entered.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
+/// NOTE: API may return values as strings (e.g., "1") instead of integers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
 #[repr(i32)]
 pub enum EntryMode {
     /// Terminal used with key entry
@@ -357,6 +408,14 @@ pub enum EntryMode {
     /// EMV chip read
     EmvChipRead = 5,
 }
+
+crate::impl_flexible_i32_enum_deserialize!(EntryMode, [
+    (1, TerminalUsedWithKey),
+    (2, Track1Read),
+    (3, Track2Read),
+    (4, CompleteMagneticStripeRead),
+    (5, EmvChipRead),
+]);
 
 /// Unauthorized transaction reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -381,7 +440,8 @@ pub enum UnauthReason {
 }
 
 /// Transaction result type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
+/// NOTE: API may return values as strings (e.g., "1") instead of integers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
 #[repr(i32)]
 pub enum TxnResultType {
     /// General result
@@ -403,8 +463,20 @@ pub enum TxnResultType {
     ThreeDsAlert = 8,
 }
 
+crate::impl_flexible_i32_enum_deserialize!(TxnResultType, [
+    (1, General),
+    (2, FraudPrevention),
+    (3, Processor),
+    (4, CvvMismatch),
+    (5, AvsCheck),
+    (6, AavsCheck),
+    (7, NetworkError),
+    (8, ThreeDsAlert),
+]);
+
 /// Transaction result code.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
+/// NOTE: API may return values as strings (e.g., "0") instead of integers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr)]
 #[repr(i32)]
 pub enum TxnResultCode {
     /// Transaction approved
@@ -475,6 +547,42 @@ pub enum TxnResultCode {
     /// 3DS passed but liability not shifted
     ThreeDsAuthPassedLiabilityShifted = 32,
 }
+
+crate::impl_flexible_i32_enum_deserialize!(TxnResultCode, [
+    (0, Approved),
+    (1, PartiallyApproved),
+    (2, Declined),
+    (3, VerificationSuccessful),
+    (4, VerificationUnsuccessful),
+    (5, ZipCodeMismatch),
+    (6, AddressMismatch),
+    (7, NameMismatch),
+    (8, NameAndPhoneMismatch),
+    (9, NameAndEmailMismatch),
+    (10, PhoneMismatch),
+    (11, PhoneAndEmailMismatch),
+    (12, EmailMismatch),
+    (13, NameNotInTxnData),
+    (14, NameAndPhoneNotInTxnData),
+    (15, NameAndEmailNotInTxnData),
+    (16, PhoneNotInTxnData),
+    (17, PhoneAndEmailNotInTxnData),
+    (18, EmailNotInTxnData),
+    (19, CustomerNotInTxnData),
+    (20, NonSufficientFunds),
+    (21, AccountInvalid),
+    (22, AccountUnauthorized),
+    (23, GeneralError),
+    (24, ZipNotInTxnData),
+    (25, ZipAndAddressNotInTxnData),
+    (26, AddressNotInTxnData),
+    (27, NotCaptured),
+    (28, ThreeDsPassed),
+    (29, ThreeDsInvalid),
+    (30, ThreeDsFailed),
+    (31, ThreeDsNotValidated),
+    (32, ThreeDsAuthPassedLiabilityShifted),
+]);
 
 /// Custom data stored in transaction description field.
 ///
@@ -661,8 +769,16 @@ mod tests {
 
     #[test]
     fn transaction_origin_invalid_value() {
-        assert!(serde_json::from_str::<TransactionOrigin>("0").is_err());
+        // 0 is now valid (Unknown), so test with values outside the valid range
         assert!(serde_json::from_str::<TransactionOrigin>("99").is_err());
+        assert!(serde_json::from_str::<TransactionOrigin>("100").is_err());
+    }
+
+    #[test]
+    fn transaction_origin_unknown_is_valid() {
+        // OpenAPI spec includes 0 as a valid origin value
+        let origin: TransactionOrigin = serde_json::from_str("0").unwrap();
+        assert_eq!(origin, TransactionOrigin::Unknown);
     }
 
     // ==================== TransactionPlatform Tests ====================
@@ -1006,8 +1122,9 @@ mod tests {
 
         let txn: Transaction = serde_json::from_str(json).unwrap();
         assert_eq!(txn.id.as_str(), "t1_txn_12345678901234567890123");
-        assert_eq!(txn.merchant.as_str(), "t1_mer_12345678901234567890123");
-        assert_eq!(txn.token.unwrap().as_str(), "t1_tok_12345678901234567890123");
+        assert_eq!(txn.merchant.unwrap().as_str(), "t1_mer_12345678901234567890123");
+        // Token is now a string, not a PayrixId
+        assert_eq!(txn.token.unwrap(), "t1_tok_12345678901234567890123");
         assert_eq!(txn.txn_type, TransactionType::CreditCardSale);
         assert_eq!(txn.total, Some(10000));
         assert_eq!(txn.status, Some(TransactionStatus::Approved));
@@ -1022,13 +1139,12 @@ mod tests {
     fn transaction_deserialize_minimal() {
         let json = r#"{
             "id": "t1_txn_12345678901234567890123",
-            "merchant": "t1_mer_12345678901234567890123",
             "type": 1
         }"#;
 
         let txn: Transaction = serde_json::from_str(json).unwrap();
         assert_eq!(txn.id.as_str(), "t1_txn_12345678901234567890123");
-        assert_eq!(txn.merchant.as_str(), "t1_mer_12345678901234567890123");
+        assert!(txn.merchant.is_none());
         assert_eq!(txn.txn_type, TransactionType::CreditCardSale);
         assert!(txn.token.is_none());
         assert!(txn.status.is_none());

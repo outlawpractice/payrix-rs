@@ -9,6 +9,7 @@ use super::{bool_from_int_default_false, DateYmd, PayrixId};
 
 /// Chargeback cycle/stage values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum ChargebackCycle {
     /// Initial request from issuer for more information
     #[default]
@@ -43,6 +44,9 @@ pub enum ChargebackCycle {
     PreCompliance,
     /// Compliance stage
     Compliance,
+    /// Chargeback is closed
+    #[serde(rename = "closed")]
+    Closed,
 }
 
 /// Chargeback message status values.
@@ -132,22 +136,21 @@ pub enum ChargebackDocumentSource {
 }
 
 /// Chargeback status values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
+///
+/// The OpenAPI spec documents 4 values: open, closed, won, lost.
+/// These are the only values observed in integration testing (December 2025).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ChargebackStatusValue {
-    /// New/pending chargeback
+    /// Open chargeback - responses may be submitted
     #[default]
-    New = 0,
-    /// Under review
-    UnderReview = 1,
-    /// Response submitted
-    Responded = 2,
+    Open,
     /// Won by merchant
-    Won = 3,
+    Won,
     /// Lost by merchant
-    Lost = 4,
-    /// Expired (no response)
-    Expired = 5,
+    Lost,
+    /// Chargeback closed - responses may no longer be submitted
+    Closed,
 }
 
 /// Chargeback type values.
@@ -393,18 +396,25 @@ pub struct NewChargebackMessage {
 }
 
 /// Document type values for chargeback documents.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
+/// NOTE: API returns lowercase string values (e.g., "tiff", "pdf", "image")
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ChargebackDocumentType {
     /// Image file
     #[default]
-    Image = 1,
+    Image,
     /// PDF document
-    Pdf = 2,
+    Pdf,
     /// Text file
-    Text = 3,
+    Text,
+    /// TIFF image file
+    Tiff,
+    /// PNG image file
+    Png,
+    /// JPG/JPEG image file
+    Jpg,
     /// Other/generic
-    Other = 4,
+    Other,
 }
 
 /// A Payrix chargeback document.
@@ -609,23 +619,25 @@ mod tests {
 
     #[test]
     fn chargeback_cycle_all_variants_serialize() {
+        // NOTE: API returns camelCase values for cycle (e.g., "retrieval", "first", "preArbitration")
         let test_cases = [
-            (ChargebackCycle::Retrieval, "\"Retrieval\""),
-            (ChargebackCycle::First, "\"First\""),
-            (ChargebackCycle::Arbitration, "\"Arbitration\""),
-            (ChargebackCycle::Reversal, "\"Reversal\""),
-            (ChargebackCycle::Representment, "\"Representment\""),
-            (ChargebackCycle::PreArbitration, "\"PreArbitration\""),
-            (ChargebackCycle::ArbitrationLost, "\"ArbitrationLost\""),
-            (ChargebackCycle::ArbitrationSplit, "\"ArbitrationSplit\""),
-            (ChargebackCycle::ArbitrationWon, "\"ArbitrationWon\""),
-            (ChargebackCycle::IssuerAcceptPreArbitration, "\"IssuerAcceptPreArbitration\""),
-            (ChargebackCycle::IssuerDeclinedPreArbitration, "\"IssuerDeclinedPreArbitration\""),
-            (ChargebackCycle::ResponseToIssuerPreArbitration, "\"ResponseToIssuerPreArbitration\""),
-            (ChargebackCycle::MerchantAcceptedPreArbitration, "\"MerchantAcceptedPreArbitration\""),
-            (ChargebackCycle::MerchantDeclinedPreArbitration, "\"MerchantDeclinedPreArbitration\""),
-            (ChargebackCycle::PreCompliance, "\"PreCompliance\""),
-            (ChargebackCycle::Compliance, "\"Compliance\""),
+            (ChargebackCycle::Retrieval, "\"retrieval\""),
+            (ChargebackCycle::First, "\"first\""),
+            (ChargebackCycle::Arbitration, "\"arbitration\""),
+            (ChargebackCycle::Reversal, "\"reversal\""),
+            (ChargebackCycle::Representment, "\"representment\""),
+            (ChargebackCycle::PreArbitration, "\"preArbitration\""),
+            (ChargebackCycle::ArbitrationLost, "\"arbitrationLost\""),
+            (ChargebackCycle::ArbitrationSplit, "\"arbitrationSplit\""),
+            (ChargebackCycle::ArbitrationWon, "\"arbitrationWon\""),
+            (ChargebackCycle::IssuerAcceptPreArbitration, "\"issuerAcceptPreArbitration\""),
+            (ChargebackCycle::IssuerDeclinedPreArbitration, "\"issuerDeclinedPreArbitration\""),
+            (ChargebackCycle::ResponseToIssuerPreArbitration, "\"responseToIssuerPreArbitration\""),
+            (ChargebackCycle::MerchantAcceptedPreArbitration, "\"merchantAcceptedPreArbitration\""),
+            (ChargebackCycle::MerchantDeclinedPreArbitration, "\"merchantDeclinedPreArbitration\""),
+            (ChargebackCycle::PreCompliance, "\"preCompliance\""),
+            (ChargebackCycle::Compliance, "\"compliance\""),
+            (ChargebackCycle::Closed, "\"closed\""),
         ];
 
         for (variant, expected_json) in test_cases {
@@ -636,23 +648,25 @@ mod tests {
 
     #[test]
     fn chargeback_cycle_all_variants_deserialize() {
+        // NOTE: API returns camelCase values for cycle
         let test_cases = [
-            ("\"Retrieval\"", ChargebackCycle::Retrieval),
-            ("\"First\"", ChargebackCycle::First),
-            ("\"Arbitration\"", ChargebackCycle::Arbitration),
-            ("\"Reversal\"", ChargebackCycle::Reversal),
-            ("\"Representment\"", ChargebackCycle::Representment),
-            ("\"PreArbitration\"", ChargebackCycle::PreArbitration),
-            ("\"ArbitrationLost\"", ChargebackCycle::ArbitrationLost),
-            ("\"ArbitrationSplit\"", ChargebackCycle::ArbitrationSplit),
-            ("\"ArbitrationWon\"", ChargebackCycle::ArbitrationWon),
-            ("\"IssuerAcceptPreArbitration\"", ChargebackCycle::IssuerAcceptPreArbitration),
-            ("\"IssuerDeclinedPreArbitration\"", ChargebackCycle::IssuerDeclinedPreArbitration),
-            ("\"ResponseToIssuerPreArbitration\"", ChargebackCycle::ResponseToIssuerPreArbitration),
-            ("\"MerchantAcceptedPreArbitration\"", ChargebackCycle::MerchantAcceptedPreArbitration),
-            ("\"MerchantDeclinedPreArbitration\"", ChargebackCycle::MerchantDeclinedPreArbitration),
-            ("\"PreCompliance\"", ChargebackCycle::PreCompliance),
-            ("\"Compliance\"", ChargebackCycle::Compliance),
+            ("\"retrieval\"", ChargebackCycle::Retrieval),
+            ("\"first\"", ChargebackCycle::First),
+            ("\"arbitration\"", ChargebackCycle::Arbitration),
+            ("\"reversal\"", ChargebackCycle::Reversal),
+            ("\"representment\"", ChargebackCycle::Representment),
+            ("\"preArbitration\"", ChargebackCycle::PreArbitration),
+            ("\"arbitrationLost\"", ChargebackCycle::ArbitrationLost),
+            ("\"arbitrationSplit\"", ChargebackCycle::ArbitrationSplit),
+            ("\"arbitrationWon\"", ChargebackCycle::ArbitrationWon),
+            ("\"issuerAcceptPreArbitration\"", ChargebackCycle::IssuerAcceptPreArbitration),
+            ("\"issuerDeclinedPreArbitration\"", ChargebackCycle::IssuerDeclinedPreArbitration),
+            ("\"responseToIssuerPreArbitration\"", ChargebackCycle::ResponseToIssuerPreArbitration),
+            ("\"merchantAcceptedPreArbitration\"", ChargebackCycle::MerchantAcceptedPreArbitration),
+            ("\"merchantDeclinedPreArbitration\"", ChargebackCycle::MerchantDeclinedPreArbitration),
+            ("\"preCompliance\"", ChargebackCycle::PreCompliance),
+            ("\"compliance\"", ChargebackCycle::Compliance),
+            ("\"closed\"", ChargebackCycle::Closed),
         ];
 
         for (json, expected_variant) in test_cases {
@@ -850,18 +864,17 @@ mod tests {
 
     #[test]
     fn chargeback_status_value_default() {
-        assert_eq!(ChargebackStatusValue::default(), ChargebackStatusValue::New);
+        assert_eq!(ChargebackStatusValue::default(), ChargebackStatusValue::Open);
     }
 
     #[test]
     fn chargeback_status_value_all_variants_serialize() {
+        // Only the 4 values documented in OpenAPI and verified in integration tests
         let test_cases = [
-            (ChargebackStatusValue::New, "0"),
-            (ChargebackStatusValue::UnderReview, "1"),
-            (ChargebackStatusValue::Responded, "2"),
-            (ChargebackStatusValue::Won, "3"),
-            (ChargebackStatusValue::Lost, "4"),
-            (ChargebackStatusValue::Expired, "5"),
+            (ChargebackStatusValue::Open, "\"open\""),
+            (ChargebackStatusValue::Won, "\"won\""),
+            (ChargebackStatusValue::Lost, "\"lost\""),
+            (ChargebackStatusValue::Closed, "\"closed\""),
         ];
 
         for (variant, expected_json) in test_cases {
@@ -872,13 +885,12 @@ mod tests {
 
     #[test]
     fn chargeback_status_value_all_variants_deserialize() {
+        // Only the 4 values documented in OpenAPI and verified in integration tests
         let test_cases = [
-            ("0", ChargebackStatusValue::New),
-            ("1", ChargebackStatusValue::UnderReview),
-            ("2", ChargebackStatusValue::Responded),
-            ("3", ChargebackStatusValue::Won),
-            ("4", ChargebackStatusValue::Lost),
-            ("5", ChargebackStatusValue::Expired),
+            ("\"open\"", ChargebackStatusValue::Open),
+            ("\"won\"", ChargebackStatusValue::Won),
+            ("\"lost\"", ChargebackStatusValue::Lost),
+            ("\"closed\"", ChargebackStatusValue::Closed),
         ];
 
         for (json, expected_variant) in test_cases {
@@ -995,11 +1007,15 @@ mod tests {
 
     #[test]
     fn chargeback_document_type_all_variants_serialize() {
+        // NOTE: API returns string values for document type
         let test_cases = [
-            (ChargebackDocumentType::Image, "1"),
-            (ChargebackDocumentType::Pdf, "2"),
-            (ChargebackDocumentType::Text, "3"),
-            (ChargebackDocumentType::Other, "4"),
+            (ChargebackDocumentType::Image, "\"image\""),
+            (ChargebackDocumentType::Pdf, "\"pdf\""),
+            (ChargebackDocumentType::Text, "\"text\""),
+            (ChargebackDocumentType::Tiff, "\"tiff\""),
+            (ChargebackDocumentType::Png, "\"png\""),
+            (ChargebackDocumentType::Jpg, "\"jpg\""),
+            (ChargebackDocumentType::Other, "\"other\""),
         ];
 
         for (variant, expected_json) in test_cases {
@@ -1010,11 +1026,15 @@ mod tests {
 
     #[test]
     fn chargeback_document_type_all_variants_deserialize() {
+        // NOTE: API returns string values for document type
         let test_cases = [
-            ("1", ChargebackDocumentType::Image),
-            ("2", ChargebackDocumentType::Pdf),
-            ("3", ChargebackDocumentType::Text),
-            ("4", ChargebackDocumentType::Other),
+            ("\"image\"", ChargebackDocumentType::Image),
+            ("\"pdf\"", ChargebackDocumentType::Pdf),
+            ("\"text\"", ChargebackDocumentType::Text),
+            ("\"tiff\"", ChargebackDocumentType::Tiff),
+            ("\"png\"", ChargebackDocumentType::Png),
+            ("\"jpg\"", ChargebackDocumentType::Jpg),
+            ("\"other\"", ChargebackDocumentType::Other),
         ];
 
         for (json, expected_variant) in test_cases {
@@ -1038,7 +1058,7 @@ mod tests {
             "reason": "Cardholder Dispute",
             "amount": 10000,
             "currency": "USD",
-            "status": 1,
+            "status": "open",
             "type": 2,
             "dueDate": "20240115",
             "receivedDate": "20240101",
@@ -1069,7 +1089,7 @@ mod tests {
         assert_eq!(chargeback.reason.as_ref().unwrap(), "Cardholder Dispute");
         assert_eq!(chargeback.amount.unwrap(), 10000);
         assert_eq!(chargeback.currency.as_ref().unwrap(), "USD");
-        assert_eq!(chargeback.status.unwrap(), ChargebackStatusValue::UnderReview);
+        assert_eq!(chargeback.status.unwrap(), ChargebackStatusValue::Open);
         assert_eq!(chargeback.chargeback_type.unwrap(), ChargebackType::FirstChargeback);
         assert_eq!(chargeback.due_date.as_ref().unwrap().as_str(), "20240115");
         assert_eq!(chargeback.received_date.as_ref().unwrap().as_str(), "20240101");
@@ -1200,7 +1220,8 @@ mod tests {
         assert!(json.contains("\"chargeback\":\"t1_cbk_12345678901234567890123\""));
         assert!(json.contains("\"chargebackMessage\":\"t1_cbm_12345678901234567890123\""));
         assert!(json.contains("\"name\":\"evidence.pdf\""));
-        assert!(json.contains("\"type\":2"));
+        // NOTE: API returns string values for document type
+        assert!(json.contains("\"type\":\"pdf\""));
         assert!(json.contains("\"mimeType\":\"application/pdf\""));
         assert!(json.contains("\"description\":\"Supporting evidence\""));
     }

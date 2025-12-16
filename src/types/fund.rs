@@ -103,6 +103,7 @@ pub enum PayoutUnit {
 }
 
 /// Fee type values.
+/// Per OpenAPI spec: integer enum [1, 2]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum FeeType {
@@ -113,7 +114,24 @@ pub enum FeeType {
     Assessment = 2,
 }
 
-/// Fee unit of measure.
+/// Fee rule type values.
+/// Per OpenAPI spec: string enum (used for FeeRule.type, different from Fee.type)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FeeRuleType {
+    /// Method-based fee rule
+    #[default]
+    Method,
+    /// BIN-based fee rule
+    Bin,
+    /// AVS result-based fee rule
+    AvsResult,
+    /// Business type-based fee rule
+    Business,
+}
+
+/// Fee unit of measure (feeUm in OpenAPI).
+/// Per OpenAPI spec: integer enum [1, 2, 3]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum FeeUnit {
@@ -127,6 +145,7 @@ pub enum FeeUnit {
 }
 
 /// Fee collection scope.
+/// Per OpenAPI spec: integer enum [1, 2, 3]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum FeeCollection {
@@ -148,6 +167,8 @@ pub enum BatchStatus {
     Open,
     /// Batch has been processed
     Processed,
+    /// Batch is closed
+    Closed,
 }
 
 /// A Payrix fund balance.
@@ -180,21 +201,21 @@ pub struct Fund {
     #[serde(default, rename = "type")]
     pub fund_type: Option<FundType>,
 
-    /// Available balance in cents
+    /// Available balance (may be in dollars with fractional cents from API)
     #[serde(default)]
-    pub available: Option<i64>,
+    pub available: Option<f64>,
 
-    /// Pending balance in cents (not yet available)
+    /// Pending balance (not yet available)
     #[serde(default)]
-    pub pending: Option<i64>,
+    pub pending: Option<f64>,
 
-    /// Reserved/held balance in cents
+    /// Reserved/held balance
     #[serde(default)]
-    pub reserved: Option<i64>,
+    pub reserved: Option<f64>,
 
-    /// Total balance in cents (available + pending + reserved)
+    /// Total balance (available + pending + reserved)
     #[serde(default)]
-    pub total: Option<i64>,
+    pub total: Option<f64>,
 
     /// Currency code (e.g., "USD")
     #[serde(default)]
@@ -379,6 +400,7 @@ mod tests {
     }
 
     // ==================== FeeType Tests ====================
+    // Per OpenAPI spec: integer enum [1, 2]
 
     #[test]
     fn fee_type_serialize_all_variants() {
@@ -398,6 +420,7 @@ mod tests {
     }
 
     // ==================== FeeUnit Tests ====================
+    // Per OpenAPI spec: integer enum [1, 2, 3]
 
     #[test]
     fn fee_unit_serialize_all_variants() {
@@ -419,6 +442,7 @@ mod tests {
     }
 
     // ==================== FeeCollection Tests ====================
+    // Per OpenAPI spec: integer enum [1, 2, 3]
 
     #[test]
     fn fee_collection_serialize_all_variants() {
@@ -490,9 +514,10 @@ mod tests {
         assert_eq!(fund.id.as_str(), "t1_fnd_12345678901234567890123");
         assert_eq!(fund.name, Some("Operating Fund".to_string()));
         assert_eq!(fund.fund_type, Some(FundType::Operating));
-        assert_eq!(fund.available, Some(100000));
-        assert_eq!(fund.pending, Some(25000));
-        assert_eq!(fund.total, Some(130000));
+        // NOTE: API returns floats for balance fields (e.g., 3524255.258)
+        assert_eq!(fund.available, Some(100000.0));
+        assert_eq!(fund.pending, Some(25000.0));
+        assert_eq!(fund.total, Some(130000.0));
         assert!(fund.is_default);
         assert!(!fund.inactive);
     }

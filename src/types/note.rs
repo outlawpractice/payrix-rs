@@ -8,20 +8,23 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use super::{bool_from_int_default_false, option_bool_from_int, PayrixId};
 
 /// Note type values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
+/// NOTE: API returns camelCase string values (e.g., "note", "general", "customerService")
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum NoteType {
     /// General note
     #[default]
-    General = 1,
+    General,
+    /// Note (generic)
+    Note,
     /// Customer service note
-    CustomerService = 2,
+    CustomerService,
     /// Risk/compliance note
-    Risk = 3,
+    Risk,
     /// Internal note
-    Internal = 4,
+    Internal,
     /// System-generated note
-    System = 5,
+    System,
 }
 
 /// Note visibility values.
@@ -144,20 +147,27 @@ pub struct NewNote {
 }
 
 /// Document type values for note documents.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
+/// NOTE: API returns lowercase string values (e.g., "pdf", "image", "png")
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum NoteDocumentType {
     /// Image file
     #[default]
-    Image = 1,
+    Image,
     /// PDF document
-    Pdf = 2,
+    Pdf,
     /// Text file
-    Text = 3,
+    Text,
     /// Spreadsheet
-    Spreadsheet = 4,
+    Spreadsheet,
+    /// PNG image file
+    Png,
+    /// JPG/JPEG image file
+    Jpg,
+    /// TIFF image file
+    Tiff,
     /// Other/generic
-    Other = 5,
+    Other,
 }
 
 /// A Payrix note document.
@@ -256,12 +266,14 @@ mod tests {
 
     #[test]
     fn note_type_all_variants_serialize() {
+        // NOTE: API returns string values for note type
         let test_cases = [
-            (NoteType::General, "1"),
-            (NoteType::CustomerService, "2"),
-            (NoteType::Risk, "3"),
-            (NoteType::Internal, "4"),
-            (NoteType::System, "5"),
+            (NoteType::General, "\"general\""),
+            (NoteType::Note, "\"note\""),
+            (NoteType::CustomerService, "\"customerService\""),
+            (NoteType::Risk, "\"risk\""),
+            (NoteType::Internal, "\"internal\""),
+            (NoteType::System, "\"system\""),
         ];
 
         for (variant, expected_json) in test_cases {
@@ -272,12 +284,14 @@ mod tests {
 
     #[test]
     fn note_type_all_variants_deserialize() {
+        // NOTE: API returns string values for note type
         let test_cases = [
-            ("1", NoteType::General),
-            ("2", NoteType::CustomerService),
-            ("3", NoteType::Risk),
-            ("4", NoteType::Internal),
-            ("5", NoteType::System),
+            ("\"general\"", NoteType::General),
+            ("\"note\"", NoteType::Note),
+            ("\"customerService\"", NoteType::CustomerService),
+            ("\"risk\"", NoteType::Risk),
+            ("\"internal\"", NoteType::Internal),
+            ("\"system\"", NoteType::System),
         ];
 
         for (json, expected_variant) in test_cases {
@@ -326,12 +340,16 @@ mod tests {
 
     #[test]
     fn note_document_type_all_variants_serialize() {
+        // NOTE: API returns string values for document type
         let test_cases = [
-            (NoteDocumentType::Image, "1"),
-            (NoteDocumentType::Pdf, "2"),
-            (NoteDocumentType::Text, "3"),
-            (NoteDocumentType::Spreadsheet, "4"),
-            (NoteDocumentType::Other, "5"),
+            (NoteDocumentType::Image, "\"image\""),
+            (NoteDocumentType::Pdf, "\"pdf\""),
+            (NoteDocumentType::Text, "\"text\""),
+            (NoteDocumentType::Spreadsheet, "\"spreadsheet\""),
+            (NoteDocumentType::Png, "\"png\""),
+            (NoteDocumentType::Jpg, "\"jpg\""),
+            (NoteDocumentType::Tiff, "\"tiff\""),
+            (NoteDocumentType::Other, "\"other\""),
         ];
 
         for (variant, expected_json) in test_cases {
@@ -342,12 +360,16 @@ mod tests {
 
     #[test]
     fn note_document_type_all_variants_deserialize() {
+        // NOTE: API returns string values for document type
         let test_cases = [
-            ("1", NoteDocumentType::Image),
-            ("2", NoteDocumentType::Pdf),
-            ("3", NoteDocumentType::Text),
-            ("4", NoteDocumentType::Spreadsheet),
-            ("5", NoteDocumentType::Other),
+            ("\"image\"", NoteDocumentType::Image),
+            ("\"pdf\"", NoteDocumentType::Pdf),
+            ("\"text\"", NoteDocumentType::Text),
+            ("\"spreadsheet\"", NoteDocumentType::Spreadsheet),
+            ("\"png\"", NoteDocumentType::Png),
+            ("\"jpg\"", NoteDocumentType::Jpg),
+            ("\"tiff\"", NoteDocumentType::Tiff),
+            ("\"other\"", NoteDocumentType::Other),
         ];
 
         for (json, expected_variant) in test_cases {
@@ -360,13 +382,14 @@ mod tests {
 
     #[test]
     fn note_deserialize_full() {
+        // NOTE: API returns string values for note type
         let json = r#"{
             "id": "t1_nte_12345678901234567890123",
             "entity": "t1_ety_12345678901234567890123",
             "login": "t1_log_12345678901234567890123",
             "forType": "merchant",
             "forId": "t1_mer_12345678901234567890123",
-            "type": 2,
+            "type": "customerService",
             "visibility": 3,
             "subject": "Account Review",
             "body": "Reviewed account for compliance",
@@ -456,7 +479,8 @@ mod tests {
         assert!(json.contains("\"entity\":\"t1_ety_12345678901234567890123\""));
         assert!(json.contains("\"forType\":\"merchant\""));
         assert!(json.contains("\"forId\":\"t1_mer_12345678901234567890123\""));
-        assert!(json.contains("\"type\":3"));
+        // NOTE: API returns string values for note type
+        assert!(json.contains("\"type\":\"risk\""));
         assert!(json.contains("\"visibility\":2"));
         assert!(json.contains("\"subject\":\"Risk Assessment\""));
         assert!(json.contains("\"body\":\"Risk assessment completed\""));
@@ -526,12 +550,13 @@ mod tests {
 
     #[test]
     fn note_document_deserialize_full() {
+        // NOTE: API returns string values for document type
         let json = r#"{
             "id": "t1_ntd_12345678901234567890123",
             "note": "t1_nte_12345678901234567890123",
             "login": "t1_log_12345678901234567890123",
             "name": "attachment.pdf",
-            "type": 2,
+            "type": "pdf",
             "mimeType": "application/pdf",
             "size": 102400,
             "url": "https://example.com/files/attachment.pdf",
@@ -596,7 +621,8 @@ mod tests {
         let json = serde_json::to_string(&doc).unwrap();
         assert!(json.contains("\"note\":\"t1_nte_12345678901234567890123\""));
         assert!(json.contains("\"name\":\"document.xlsx\""));
-        assert!(json.contains("\"type\":4"));
+        // NOTE: API returns string values for document type
+        assert!(json.contains("\"type\":\"spreadsheet\""));
         assert!(json.contains("\"mimeType\":\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\""));
         assert!(json.contains("\"description\":\"Financial data\""));
     }

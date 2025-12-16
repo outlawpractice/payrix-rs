@@ -98,6 +98,7 @@ mod tests {
 
     #[test]
     fn fee_deserialize_full() {
+        // Per OpenAPI: type and unit are integers
         let json = r#"{
             "id": "t1_fee_12345678901234567890123",
             "entity": "t1_ent_12345678901234567890123",
@@ -196,6 +197,7 @@ mod tests {
 
     #[test]
     fn fee_type_variants() {
+        // Per OpenAPI: type is integer enum [1, 2]
         let test_cases = vec![
             (1, FeeType::Fee),
             (2, FeeType::Assessment),
@@ -213,6 +215,7 @@ mod tests {
 
     #[test]
     fn fee_unit_variants() {
+        // Per OpenAPI: unit (feeUm) is integer enum [1, 2, 3]
         let test_cases = vec![
             (1, FeeUnit::Percent),
             (2, FeeUnit::Fixed),

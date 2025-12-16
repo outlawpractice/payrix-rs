@@ -6,6 +6,22 @@ use serde::{Deserialize, Serialize};
 
 use super::{bool_from_int_default_false, option_bool_from_int, PayrixId};
 
+/// Alert action type values.
+/// NOTE: API returns string values for action type (e.g., "web", "email")
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AlertActionType {
+    /// Web action (webhook)
+    #[default]
+    Web,
+    /// Email notification
+    Email,
+    /// SMS notification
+    Sms,
+    /// Push notification
+    Push,
+}
+
 /// A Payrix alert configuration.
 ///
 /// Alerts define notification rules for various events.
@@ -16,8 +32,9 @@ pub struct Alert {
     /// Unique identifier (30 characters, e.g., "t1_alt_...")
     pub id: PayrixId,
 
-    /// Entity ID that owns this alert (required)
-    pub entity: PayrixId,
+    /// Entity ID that owns this alert
+    #[serde(default)]
+    pub entity: Option<PayrixId>,
 
     /// Login ID that created this alert
     #[serde(default)]
@@ -122,8 +139,9 @@ pub struct AlertAction {
     pub login: Option<PayrixId>,
 
     /// Action type (e.g., email, webhook, SMS)
+    /// NOTE: API returns string values like "web", "email"
     #[serde(default, rename = "type")]
-    pub action_type: Option<i32>,
+    pub action_type: Option<AlertActionType>,
 
     /// Action name/label
     #[serde(default)]

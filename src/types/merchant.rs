@@ -50,6 +50,9 @@ pub enum MerchantStatus {
 }
 
 /// Merchant environment.
+///
+/// The Payrix API accepts lowercase values for input (e.g., `ecommerce`)
+/// but may return different casing in responses (e.g., `eCommerce`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MerchantEnvironment {
@@ -68,7 +71,7 @@ pub enum MerchantEnvironment {
     Restaurant,
     /// Ecommerce
     #[default]
-    #[serde(rename = "eCommerce")]
+    #[serde(rename = "ecommerce", alias = "eCommerce")]
     Ecommerce,
 }
 
@@ -354,7 +357,8 @@ mod tests {
         assert_eq!(serde_json::to_string(&MerchantEnvironment::Fuel).unwrap(), "\"fuel\"");
         assert_eq!(serde_json::to_string(&MerchantEnvironment::ServiceStation).unwrap(), "\"serviceStation\"");
         assert_eq!(serde_json::to_string(&MerchantEnvironment::Restaurant).unwrap(), "\"restaurant\"");
-        assert_eq!(serde_json::to_string(&MerchantEnvironment::Ecommerce).unwrap(), "\"eCommerce\"");
+        // API accepts lowercase "ecommerce" for input
+        assert_eq!(serde_json::to_string(&MerchantEnvironment::Ecommerce).unwrap(), "\"ecommerce\"");
     }
 
     #[test]
@@ -365,7 +369,9 @@ mod tests {
         assert_eq!(serde_json::from_str::<MerchantEnvironment>("\"fuel\"").unwrap(), MerchantEnvironment::Fuel);
         assert_eq!(serde_json::from_str::<MerchantEnvironment>("\"serviceStation\"").unwrap(), MerchantEnvironment::ServiceStation);
         assert_eq!(serde_json::from_str::<MerchantEnvironment>("\"restaurant\"").unwrap(), MerchantEnvironment::Restaurant);
+        // API returns "eCommerce" in responses but accepts "ecommerce" for input
         assert_eq!(serde_json::from_str::<MerchantEnvironment>("\"eCommerce\"").unwrap(), MerchantEnvironment::Ecommerce);
+        assert_eq!(serde_json::from_str::<MerchantEnvironment>("\"ecommerce\"").unwrap(), MerchantEnvironment::Ecommerce);
     }
 
     #[test]
@@ -440,6 +446,7 @@ mod tests {
 
     #[test]
     fn merchant_deserialize_full() {
+        // Note: API responses may use "eCommerce" (legacy) or "ecommerce"
         let json = r#"{
             "id": "t1_mer_12345678901234567890123",
             "entity": "t1_ent_12345678901234567890123",

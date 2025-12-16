@@ -1,45 +1,16 @@
 //! Team login types for the Payrix API.
 //!
-//! Team logins represent user accounts with specific roles and permissions.
+//! Team logins represent permission assignments for logins within teams.
+//! Per OpenAPI spec, these define CRUD permissions for a login on a specific team.
 
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use super::{bool_from_int_default_false, option_bool_from_int, PayrixId};
 
-/// Team login role values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-pub enum TeamLoginRole {
-    /// Admin role - full access
-    Admin = 1,
-    /// Manager role - limited admin access
-    Manager = 2,
-    /// User role - basic access
-    #[default]
-    User = 3,
-    /// Read-only role
-    ReadOnly = 4,
-}
-
-/// Team login status values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-pub enum TeamLoginStatus {
-    /// Login is inactive
-    Inactive = 0,
-    /// Login is active
-    #[default]
-    Active = 1,
-    /// Login is locked
-    Locked = 2,
-    /// Login is suspended
-    Suspended = 3,
-}
-
-/// A Payrix team login.
+/// A Payrix team login (permission assignment).
 ///
-/// Team logins are user accounts associated with an entity.
+/// Per OpenAPI spec: Team logins define the permissions a login has within a team.
+/// This represents CRUD and admin rights, not user account data.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
@@ -47,49 +18,37 @@ pub struct TeamLogin {
     /// Unique identifier (30 characters, e.g., "t1_tlg_...")
     pub id: PayrixId,
 
-    /// Entity ID this login belongs to
+    /// Login ID this permission applies to
     #[serde(default)]
-    pub entity: Option<PayrixId>,
+    pub login: Option<PayrixId>,
 
-    /// Parent login ID (if sub-user)
+    /// Team ID this permission is for
     #[serde(default)]
-    pub parent: Option<PayrixId>,
+    pub team: Option<PayrixId>,
 
-    /// Login status
-    #[serde(default)]
-    pub status: Option<TeamLoginStatus>,
-
-    /// Login role
-    #[serde(default)]
-    pub role: Option<TeamLoginRole>,
-
-    /// Username/email
-    #[serde(default)]
-    pub username: Option<String>,
-
-    /// First name
-    #[serde(default)]
-    pub first: Option<String>,
-
-    /// Last name
-    #[serde(default)]
-    pub last: Option<String>,
-
-    /// Email address
-    #[serde(default)]
-    pub email: Option<String>,
-
-    /// Phone number
-    #[serde(default)]
-    pub phone: Option<String>,
-
-    /// Last login timestamp
-    #[serde(default)]
-    pub last_login: Option<String>,
-
-    /// Two-factor authentication enabled
+    /// Create permission (0/1)
     #[serde(default, with = "bool_from_int_default_false")]
-    pub two_factor: bool,
+    pub create: bool,
+
+    /// Read permission (0/1)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub read: bool,
+
+    /// Update permission (0/1)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub update: bool,
+
+    /// Delete permission (0/1)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub delete: bool,
+
+    /// Reference permission (0/1) - ability to reference this resource
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub reference: bool,
+
+    /// Team admin permission (0/1)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub team_admin: bool,
 
     /// Custom data field
     #[serde(default)]
@@ -112,38 +71,39 @@ pub struct TeamLogin {
     pub frozen: bool,
 }
 
-/// Request to create a new team login.
+/// Request to create a new team login (permission assignment).
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NewTeamLogin {
-    /// Entity ID (required)
-    pub entity: String,
+    /// Login ID (required)
+    pub login: String,
 
-    /// Login role
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role: Option<TeamLoginRole>,
+    /// Team ID (required)
+    pub team: String,
 
-    /// Username/email (required)
-    pub username: String,
+    /// Create permission
+    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
+    pub create: Option<bool>,
 
-    /// Password (required for new logins)
-    pub password: String,
+    /// Read permission
+    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
+    pub read: Option<bool>,
 
-    /// First name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub first: Option<String>,
+    /// Update permission
+    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
+    pub update: Option<bool>,
 
-    /// Last name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last: Option<String>,
+    /// Delete permission
+    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
+    pub delete: Option<bool>,
 
-    /// Email address
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub email: Option<String>,
+    /// Reference permission
+    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
+    pub reference: Option<bool>,
 
-    /// Phone number
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub phone: Option<String>,
+    /// Team admin permission
+    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
+    pub team_admin: Option<bool>,
 
     /// Custom data field
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -159,91 +119,41 @@ mod tests {
     use super::*;
     use serde_json;
 
-    // TeamLoginRole enum tests
-    #[test]
-    fn test_team_login_role_default() {
-        assert_eq!(TeamLoginRole::default(), TeamLoginRole::User);
-    }
-
-    #[test]
-    fn test_team_login_role_serialize() {
-        assert_eq!(serde_json::to_string(&TeamLoginRole::Admin).unwrap(), "1");
-        assert_eq!(serde_json::to_string(&TeamLoginRole::Manager).unwrap(), "2");
-        assert_eq!(serde_json::to_string(&TeamLoginRole::User).unwrap(), "3");
-        assert_eq!(serde_json::to_string(&TeamLoginRole::ReadOnly).unwrap(), "4");
-    }
-
-    #[test]
-    fn test_team_login_role_deserialize() {
-        assert_eq!(serde_json::from_str::<TeamLoginRole>("1").unwrap(), TeamLoginRole::Admin);
-        assert_eq!(serde_json::from_str::<TeamLoginRole>("2").unwrap(), TeamLoginRole::Manager);
-        assert_eq!(serde_json::from_str::<TeamLoginRole>("3").unwrap(), TeamLoginRole::User);
-        assert_eq!(serde_json::from_str::<TeamLoginRole>("4").unwrap(), TeamLoginRole::ReadOnly);
-    }
-
-    // TeamLoginStatus enum tests
-    #[test]
-    fn test_team_login_status_default() {
-        assert_eq!(TeamLoginStatus::default(), TeamLoginStatus::Active);
-    }
-
-    #[test]
-    fn test_team_login_status_serialize() {
-        assert_eq!(serde_json::to_string(&TeamLoginStatus::Inactive).unwrap(), "0");
-        assert_eq!(serde_json::to_string(&TeamLoginStatus::Active).unwrap(), "1");
-        assert_eq!(serde_json::to_string(&TeamLoginStatus::Locked).unwrap(), "2");
-        assert_eq!(serde_json::to_string(&TeamLoginStatus::Suspended).unwrap(), "3");
-    }
-
-    #[test]
-    fn test_team_login_status_deserialize() {
-        assert_eq!(serde_json::from_str::<TeamLoginStatus>("0").unwrap(), TeamLoginStatus::Inactive);
-        assert_eq!(serde_json::from_str::<TeamLoginStatus>("1").unwrap(), TeamLoginStatus::Active);
-        assert_eq!(serde_json::from_str::<TeamLoginStatus>("2").unwrap(), TeamLoginStatus::Locked);
-        assert_eq!(serde_json::from_str::<TeamLoginStatus>("3").unwrap(), TeamLoginStatus::Suspended);
-    }
-
-    // TeamLogin struct tests
+    // TeamLogin struct tests - per OpenAPI, this is a permissions assignment
     #[test]
     fn test_team_login_deserialize_full() {
         let json = r#"{
             "id": "t1_tlg_12345678901234567890123",
-            "entity": "t1_ent_23456789012345678901234",
-            "parent": "t1_tlg_34567890123456789012345",
-            "status": 1,
-            "role": 2,
-            "username": "john.doe",
-            "first": "John",
-            "last": "Doe",
-            "email": "john@example.com",
-            "phone": "555-1234",
-            "lastLogin": "2024-01-02 08:30:00.000",
-            "twoFactor": 1,
+            "login": "t1_log_23456789012345678901234",
+            "team": "t1_tea_34567890123456789012345",
+            "create": 1,
+            "read": 1,
+            "update": 1,
+            "delete": 0,
+            "reference": 1,
+            "teamAdmin": 1,
             "custom": "{\"key\":\"value\"}",
             "created": "2024-01-01 12:00:00.000",
             "modified": "2024-01-02 12:00:00.000",
             "inactive": 0,
-            "frozen": 1
+            "frozen": 0
         }"#;
 
         let team_login: TeamLogin = serde_json::from_str(json).unwrap();
         assert_eq!(team_login.id.as_str(), "t1_tlg_12345678901234567890123");
-        assert_eq!(team_login.entity, Some(PayrixId::new("t1_ent_23456789012345678901234").unwrap()));
-        assert_eq!(team_login.parent, Some(PayrixId::new("t1_tlg_34567890123456789012345").unwrap()));
-        assert_eq!(team_login.status, Some(TeamLoginStatus::Active));
-        assert_eq!(team_login.role, Some(TeamLoginRole::Manager));
-        assert_eq!(team_login.username, Some("john.doe".to_string()));
-        assert_eq!(team_login.first, Some("John".to_string()));
-        assert_eq!(team_login.last, Some("Doe".to_string()));
-        assert_eq!(team_login.email, Some("john@example.com".to_string()));
-        assert_eq!(team_login.phone, Some("555-1234".to_string()));
-        assert_eq!(team_login.last_login, Some("2024-01-02 08:30:00.000".to_string()));
-        assert_eq!(team_login.two_factor, true);
+        assert_eq!(team_login.login, Some(PayrixId::new("t1_log_23456789012345678901234").unwrap()));
+        assert_eq!(team_login.team, Some(PayrixId::new("t1_tea_34567890123456789012345").unwrap()));
+        assert!(team_login.create);
+        assert!(team_login.read);
+        assert!(team_login.update);
+        assert!(!team_login.delete);
+        assert!(team_login.reference);
+        assert!(team_login.team_admin);
         assert_eq!(team_login.custom, Some("{\"key\":\"value\"}".to_string()));
         assert_eq!(team_login.created, Some("2024-01-01 12:00:00.000".to_string()));
         assert_eq!(team_login.modified, Some("2024-01-02 12:00:00.000".to_string()));
-        assert_eq!(team_login.inactive, false);
-        assert_eq!(team_login.frozen, true);
+        assert!(!team_login.inactive);
+        assert!(!team_login.frozen);
     }
 
     #[test]
@@ -254,154 +164,118 @@ mod tests {
 
         let team_login: TeamLogin = serde_json::from_str(json).unwrap();
         assert_eq!(team_login.id.as_str(), "t1_tlg_12345678901234567890123");
-        assert_eq!(team_login.entity, None);
-        assert_eq!(team_login.parent, None);
-        assert_eq!(team_login.status, None);
-        assert_eq!(team_login.role, None);
-        assert_eq!(team_login.username, None);
-        assert_eq!(team_login.first, None);
-        assert_eq!(team_login.last, None);
-        assert_eq!(team_login.email, None);
-        assert_eq!(team_login.phone, None);
-        assert_eq!(team_login.last_login, None);
-        assert_eq!(team_login.two_factor, false);
-        assert_eq!(team_login.custom, None);
-        assert_eq!(team_login.created, None);
-        assert_eq!(team_login.modified, None);
-        assert_eq!(team_login.inactive, false);
-        assert_eq!(team_login.frozen, false);
+        assert!(team_login.login.is_none());
+        assert!(team_login.team.is_none());
+        assert!(!team_login.create);
+        assert!(!team_login.read);
+        assert!(!team_login.update);
+        assert!(!team_login.delete);
+        assert!(!team_login.reference);
+        assert!(!team_login.team_admin);
+        assert!(team_login.custom.is_none());
+        assert!(team_login.created.is_none());
+        assert!(team_login.modified.is_none());
+        assert!(!team_login.inactive);
+        assert!(!team_login.frozen);
     }
 
     #[test]
     fn test_team_login_bool_from_int() {
-        // Test inactive field with int values
-        let json = r#"{"id": "t1_tlg_12345678901234567890123", "inactive": 1}"#;
+        // Test all permission fields with int values
+        let json = r#"{
+            "id": "t1_tlg_12345678901234567890123",
+            "create": 1,
+            "read": 0,
+            "update": 1,
+            "delete": 0,
+            "reference": 1,
+            "teamAdmin": 0,
+            "inactive": 1,
+            "frozen": 0
+        }"#;
         let team_login: TeamLogin = serde_json::from_str(json).unwrap();
-        assert_eq!(team_login.inactive, true);
-
-        let json = r#"{"id": "t1_tlg_12345678901234567890123", "inactive": 0}"#;
-        let team_login: TeamLogin = serde_json::from_str(json).unwrap();
-        assert_eq!(team_login.inactive, false);
-
-        // Test frozen field with int values
-        let json = r#"{"id": "t1_tlg_12345678901234567890123", "frozen": 1}"#;
-        let team_login: TeamLogin = serde_json::from_str(json).unwrap();
-        assert_eq!(team_login.frozen, true);
-
-        let json = r#"{"id": "t1_tlg_12345678901234567890123", "frozen": 0}"#;
-        let team_login: TeamLogin = serde_json::from_str(json).unwrap();
-        assert_eq!(team_login.frozen, false);
-
-        // Test two_factor field with int values
-        let json = r#"{"id": "t1_tlg_12345678901234567890123", "twoFactor": 1}"#;
-        let team_login: TeamLogin = serde_json::from_str(json).unwrap();
-        assert_eq!(team_login.two_factor, true);
-
-        let json = r#"{"id": "t1_tlg_12345678901234567890123", "twoFactor": 0}"#;
-        let team_login: TeamLogin = serde_json::from_str(json).unwrap();
-        assert_eq!(team_login.two_factor, false);
+        assert!(team_login.create);
+        assert!(!team_login.read);
+        assert!(team_login.update);
+        assert!(!team_login.delete);
+        assert!(team_login.reference);
+        assert!(!team_login.team_admin);
+        assert!(team_login.inactive);
+        assert!(!team_login.frozen);
     }
 
     // NewTeamLogin struct tests
     #[test]
     fn test_new_team_login_serialize_full() {
         let new_team_login = NewTeamLogin {
-            entity: "t1_ent_23456789012345678901234".to_string(),
-            role: Some(TeamLoginRole::Manager),
-            username: "john.doe".to_string(),
-            password: "SecurePassword123!".to_string(),
-            first: Some("John".to_string()),
-            last: Some("Doe".to_string()),
-            email: Some("john@example.com".to_string()),
-            phone: Some("555-1234".to_string()),
+            login: "t1_log_23456789012345678901234".to_string(),
+            team: "t1_tea_34567890123456789012345".to_string(),
+            create: Some(true),
+            read: Some(true),
+            update: Some(true),
+            delete: Some(false),
+            reference: Some(true),
+            team_admin: Some(true),
             custom: Some("{\"key\":\"value\"}".to_string()),
-            inactive: Some(true),
+            inactive: Some(false),
         };
 
         let json = serde_json::to_string(&new_team_login).unwrap();
-        assert!(json.contains("\"entity\":\"t1_ent_23456789012345678901234\""));
-        assert!(json.contains("\"role\":2"));
-        assert!(json.contains("\"username\":\"john.doe\""));
-        assert!(json.contains("\"password\":\"SecurePassword123!\""));
-        assert!(json.contains("\"first\":\"John\""));
-        assert!(json.contains("\"last\":\"Doe\""));
-        assert!(json.contains("\"inactive\":1"));
+        assert!(json.contains("\"login\":\"t1_log_23456789012345678901234\""));
+        assert!(json.contains("\"team\":\"t1_tea_34567890123456789012345\""));
+        assert!(json.contains("\"create\":1"));
+        assert!(json.contains("\"read\":1"));
+        assert!(json.contains("\"update\":1"));
+        assert!(json.contains("\"delete\":0"));
+        assert!(json.contains("\"reference\":1"));
+        assert!(json.contains("\"teamAdmin\":1"));
+        assert!(json.contains("\"custom\":\"{\\\"key\\\":\\\"value\\\"}\""));
+        assert!(json.contains("\"inactive\":0"));
     }
 
     #[test]
     fn test_new_team_login_serialize_minimal() {
         let new_team_login = NewTeamLogin {
-            entity: "t1_ent_23456789012345678901234".to_string(),
-            username: "john.doe".to_string(),
-            password: "SecurePassword123!".to_string(),
+            login: "t1_log_23456789012345678901234".to_string(),
+            team: "t1_tea_34567890123456789012345".to_string(),
             ..Default::default()
         };
 
         let json = serde_json::to_string(&new_team_login).unwrap();
-        assert!(json.contains("\"entity\":\"t1_ent_23456789012345678901234\""));
-        assert!(json.contains("\"username\":\"john.doe\""));
-        assert!(json.contains("\"password\":\"SecurePassword123!\""));
-        assert!(!json.contains("role"));
-        assert!(!json.contains("first"));
+        assert!(json.contains("\"login\":\"t1_log_23456789012345678901234\""));
+        assert!(json.contains("\"team\":\"t1_tea_34567890123456789012345\""));
+        // Optional fields should be omitted
+        assert!(!json.contains("create"));
+        assert!(!json.contains("read"));
+        assert!(!json.contains("update"));
+        assert!(!json.contains("delete"));
+        assert!(!json.contains("reference"));
+        assert!(!json.contains("teamAdmin"));
+        assert!(!json.contains("custom"));
         assert!(!json.contains("inactive"));
     }
 
     #[test]
-    fn test_new_team_login_serialize_with_inactive() {
-        // Test with inactive = true (should serialize as 1)
+    fn test_new_team_login_permissions() {
+        // Test with all permissions enabled
         let new_team_login = NewTeamLogin {
-            entity: "t1_ent_23456789012345678901234".to_string(),
-            username: "john.doe".to_string(),
-            password: "password".to_string(),
-            inactive: Some(true),
+            login: "t1_log_23456789012345678901234".to_string(),
+            team: "t1_tea_34567890123456789012345".to_string(),
+            create: Some(true),
+            read: Some(true),
+            update: Some(true),
+            delete: Some(true),
+            reference: Some(true),
+            team_admin: Some(true),
             ..Default::default()
         };
+
         let json = serde_json::to_string(&new_team_login).unwrap();
-        assert!(json.contains("\"inactive\":1"));
-
-        // Test with inactive = false (should serialize as 0)
-        let new_team_login = NewTeamLogin {
-            entity: "t1_ent_23456789012345678901234".to_string(),
-            username: "john.doe".to_string(),
-            password: "password".to_string(),
-            inactive: Some(false),
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&new_team_login).unwrap();
-        assert!(json.contains("\"inactive\":0"));
-
-        // Test with inactive = None (should not serialize)
-        let new_team_login = NewTeamLogin {
-            entity: "t1_ent_23456789012345678901234".to_string(),
-            username: "john.doe".to_string(),
-            password: "password".to_string(),
-            inactive: None,
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&new_team_login).unwrap();
-        assert!(!json.contains("inactive"));
-    }
-
-    #[test]
-    fn test_new_team_login_serialize_roles() {
-        // Test all role variants
-        let variants = vec![
-            (TeamLoginRole::Admin, "1"),
-            (TeamLoginRole::Manager, "2"),
-            (TeamLoginRole::User, "3"),
-            (TeamLoginRole::ReadOnly, "4"),
-        ];
-
-        for (variant, expected) in variants {
-            let new_team_login = NewTeamLogin {
-                entity: "t1_ent_23456789012345678901234".to_string(),
-                username: "john.doe".to_string(),
-                password: "password".to_string(),
-                role: Some(variant),
-                ..Default::default()
-            };
-            let json = serde_json::to_string(&new_team_login).unwrap();
-            assert!(json.contains(&format!("\"role\":{}", expected)));
-        }
+        assert!(json.contains("\"create\":1"));
+        assert!(json.contains("\"read\":1"));
+        assert!(json.contains("\"update\":1"));
+        assert!(json.contains("\"delete\":1"));
+        assert!(json.contains("\"reference\":1"));
+        assert!(json.contains("\"teamAdmin\":1"));
     }
 }

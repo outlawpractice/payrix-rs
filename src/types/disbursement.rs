@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
-    bool_from_int_default_false, option_bool_from_int, DateYmd, DisbursementCode,
+    bool_from_int_default_false, option_bool_from_int, DisbursementCode,
     DisbursementStatus, PayrixId,
 };
 
@@ -69,13 +69,15 @@ pub struct Disbursement {
     #[serde(default)]
     pub currency: Option<String>,
 
-    /// Scheduled date for disbursement (YYYYMMDD format)
+    /// Scheduled date for disbursement
+    /// NOTE: API may return datetime format instead of YYYYMMDD
     #[serde(default)]
-    pub scheduled: Option<DateYmd>,
+    pub scheduled: Option<String>,
 
-    /// Date disbursement was processed (YYYYMMDD format)
+    /// Date disbursement was processed
+    /// NOTE: API may return datetime format instead of YYYYMMDD
     #[serde(default)]
-    pub processed: Option<DateYmd>,
+    pub processed: Option<String>,
 
     /// ACH trace number
     #[serde(default)]
