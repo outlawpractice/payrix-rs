@@ -9,7 +9,7 @@
 //! This implementation is based on the following Payrix/Worldpay documentation:
 //!
 //! - [Worldpay Developer Hub - Payrix Pro](https://docs.worldpay.com/apis/payrix) -
-//!   Primary API documentation (as of July 2025)
+//!   Primary API documentation
 //! - [Merchant Boarding via API](https://resource.payrix.com/resources/merchant-boarding-via-api) -
 //!   API boarding process and JSON structure
 //! - [New Merchant Boarding Flow](https://resource.payrix.com/docs/new-merchant-boarding-flow) -
@@ -341,7 +341,7 @@ pub struct MerchantConfig {
 /// For instant account verification via Plaid, provide the `plaid_public_token`
 /// instead of routing/account numbers. The Payrix API will retrieve the bank
 /// details from Plaid.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct BankAccountInfo {
     /// Account name/label (optional).
     ///
@@ -408,7 +408,7 @@ pub struct BankAccountInfo {
 /// - `Owner` - Individual with 25% or more ownership
 /// - `ControlPerson` - Individual with significant control (e.g., CEO, CFO)
 /// - `Principal` - Other key individual
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MemberInfo {
     /// Type of member relationship.
     pub member_type: MemberType,
@@ -729,7 +729,7 @@ struct PayrixAccountPayload {
 }
 
 /// Internal account details for Payrix API.
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PayrixAccountDetails {
     /// Account method/type (8 = checking)
@@ -778,7 +778,7 @@ struct PayrixMerchantPayload {
 }
 
 /// Internal member payload for Payrix API.
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PayrixMemberPayload {
     /// Member type (1=Owner, 2=ControlPerson, 3=Principal)
@@ -828,6 +828,84 @@ struct PayrixMemberPayload {
 
     /// Country
     country: String,
+}
+
+// ============================================================================
+// Custom Debug Implementations (mask sensitive data)
+// ============================================================================
+
+/// Helper to mask sensitive strings, showing only last 4 characters.
+fn mask_sensitive(value: &str) -> String {
+    if value.len() <= 4 {
+        "*".repeat(value.len())
+    } else {
+        format!("{}{}", "*".repeat(value.len() - 4), &value[value.len() - 4..])
+    }
+}
+
+impl std::fmt::Debug for BankAccountInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BankAccountInfo")
+            .field("name", &self.name)
+            .field("routing_number", &self.routing_number.as_ref().map(|s| mask_sensitive(s)))
+            .field("account_number", &self.account_number.as_ref().map(|s| mask_sensitive(s)))
+            .field("holder_type", &self.holder_type)
+            .field("transaction_type", &self.transaction_type)
+            .field("currency", &self.currency)
+            .field("is_primary", &self.is_primary)
+            .field("plaid_public_token", &self.plaid_public_token.as_ref().map(|_| "[REDACTED]"))
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for MemberInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MemberInfo")
+            .field("member_type", &self.member_type)
+            .field("first_name", &self.first_name)
+            .field("last_name", &self.last_name)
+            .field("title", &self.title)
+            .field("ownership_percentage", &self.ownership_percentage)
+            .field("date_of_birth", &self.date_of_birth)
+            .field("ssn", &mask_sensitive(&self.ssn))
+            .field("email", &self.email)
+            .field("phone", &self.phone)
+            .field("address", &self.address)
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for PayrixAccountDetails {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PayrixAccountDetails")
+            .field("method", &self.method)
+            .field("number", &mask_sensitive(&self.number))
+            .field("routing", &mask_sensitive(&self.routing))
+            .field("holder_type", &self.holder_type)
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for PayrixMemberPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PayrixMemberPayload")
+            .field("member_type", &self.member_type)
+            .field("first", &self.first)
+            .field("last", &self.last)
+            .field("title", &self.title)
+            .field("ownership", &self.ownership)
+            .field("dob", &self.dob)
+            .field("ssn", &mask_sensitive(&self.ssn))
+            .field("email", &self.email)
+            .field("phone", &self.phone)
+            .field("address1", &self.address1)
+            .field("address2", &self.address2)
+            .field("city", &self.city)
+            .field("state", &self.state)
+            .field("zip", &self.zip)
+            .field("country", &self.country)
+            .finish()
+    }
 }
 
 // ============================================================================
@@ -967,6 +1045,98 @@ struct MerchantInResponse {
 }
 
 // ============================================================================
+// Validation
+// ============================================================================
+
+/// Validates an onboarding request before sending to the API.
+///
+/// This catches common errors early with clear error messages, rather than
+/// waiting for cryptic API responses.
+fn validate_request(request: &OnboardMerchantRequest) -> Result<()> {
+    // Validate accounts
+    if request.accounts.is_empty() {
+        return Err(crate::error::Error::Config(
+            "At least one bank account is required".into(),
+        ));
+    }
+
+    if !request.accounts.iter().any(|a| a.is_primary) {
+        return Err(crate::error::Error::Config(
+            "One account must be marked as primary".into(),
+        ));
+    }
+
+    // Validate each account has either routing/account numbers OR Plaid token
+    for (i, account) in request.accounts.iter().enumerate() {
+        let has_manual = account.routing_number.is_some() && account.account_number.is_some();
+        let has_plaid = account.plaid_public_token.is_some();
+
+        if !has_manual && !has_plaid {
+            return Err(crate::error::Error::Config(format!(
+                "Account {} requires either routing/account numbers or a Plaid token",
+                i + 1
+            )));
+        }
+
+        // Validate routing number format (9 digits)
+        if let Some(ref routing) = account.routing_number {
+            if routing.len() != 9 || !routing.chars().all(|c| c.is_ascii_digit()) {
+                return Err(crate::error::Error::Config(format!(
+                    "Account {} routing number must be exactly 9 digits",
+                    i + 1
+                )));
+            }
+        }
+    }
+
+    // Validate members
+    if request.members.is_empty() {
+        return Err(crate::error::Error::Config(
+            "At least one member (owner or control person) is required".into(),
+        ));
+    }
+
+    // Validate SSN format for each member (9 digits)
+    for (i, member) in request.members.iter().enumerate() {
+        if member.ssn.len() != 9 || !member.ssn.chars().all(|c| c.is_ascii_digit()) {
+            return Err(crate::error::Error::Config(format!(
+                "Member {} SSN must be exactly 9 digits (no dashes)",
+                i + 1
+            )));
+        }
+
+        // Validate date of birth format (YYYYMMDD, 8 digits)
+        if member.date_of_birth.len() != 8
+            || !member.date_of_birth.chars().all(|c| c.is_ascii_digit())
+        {
+            return Err(crate::error::Error::Config(format!(
+                "Member {} date of birth must be in YYYYMMDD format (8 digits)",
+                i + 1
+            )));
+        }
+
+        // Validate ownership percentage is reasonable
+        if member.ownership_percentage < 0 || member.ownership_percentage > 100 {
+            return Err(crate::error::Error::Config(format!(
+                "Member {} ownership percentage must be between 0 and 100",
+                i + 1
+            )));
+        }
+    }
+
+    // Validate EIN format (9 digits)
+    if request.business.ein.len() != 9
+        || !request.business.ein.chars().all(|c| c.is_ascii_digit())
+    {
+        return Err(crate::error::Error::Config(
+            "EIN must be exactly 9 digits (no dashes)".into(),
+        ));
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // Workflow Functions
 // ============================================================================
 
@@ -1010,6 +1180,9 @@ pub async fn onboard_merchant(
     client: &PayrixClient,
     request: OnboardMerchantRequest,
 ) -> Result<OnboardMerchantResult> {
+    // Validate the request before sending to API
+    validate_request(&request)?;
+
     // Convert the user-friendly request to Payrix's nested format
     let payload: PayrixOnboardingPayload = request.into();
 
@@ -1142,6 +1315,361 @@ pub async fn check_boarding_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ============================================================================
+    // Sensitive Data Masking Tests
+    // ============================================================================
+
+    #[test]
+    fn test_mask_sensitive_full_ssn() {
+        let result = mask_sensitive("123456789");
+        assert_eq!(result, "*****6789");
+    }
+
+    #[test]
+    fn test_mask_sensitive_short_value() {
+        let result = mask_sensitive("1234");
+        assert_eq!(result, "****");
+    }
+
+    #[test]
+    fn test_mask_sensitive_empty() {
+        let result = mask_sensitive("");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_bank_account_debug_masks_sensitive() {
+        let account = BankAccountInfo {
+            name: Some("Test Account".to_string()),
+            routing_number: Some("123456789".to_string()),
+            account_number: Some("9876543210".to_string()),
+            holder_type: AccountHolderType::Business,
+            transaction_type: AccountType::All,
+            currency: Some("USD".to_string()),
+            is_primary: true,
+            plaid_public_token: None,
+        };
+        let debug_str = format!("{:?}", account);
+        // Should NOT contain full account/routing numbers
+        assert!(!debug_str.contains("123456789"));
+        assert!(!debug_str.contains("9876543210"));
+        // Should contain masked versions
+        assert!(debug_str.contains("*****6789"));
+        assert!(debug_str.contains("******3210"));
+    }
+
+    #[test]
+    fn test_member_info_debug_masks_ssn() {
+        let member = MemberInfo {
+            member_type: MemberType::Owner,
+            first_name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            title: Some("CEO".to_string()),
+            ownership_percentage: 100,
+            date_of_birth: "19800115".to_string(),
+            ssn: "123456789".to_string(),
+            email: "john@example.com".to_string(),
+            phone: "5551234567".to_string(),
+            address: Address {
+                line1: "123 Main St".to_string(),
+                line2: None,
+                city: "Chicago".to_string(),
+                state: "IL".to_string(),
+                zip: "60601".to_string(),
+                country: "USA".to_string(),
+            },
+        };
+        let debug_str = format!("{:?}", member);
+        // Should NOT contain full SSN
+        assert!(!debug_str.contains("123456789"));
+        // Should contain masked version
+        assert!(debug_str.contains("*****6789"));
+        // Name should still be visible
+        assert!(debug_str.contains("John"));
+    }
+
+    // ============================================================================
+    // Validation Tests
+    // ============================================================================
+
+    /// Helper to create a valid request for validation tests
+    fn valid_request() -> OnboardMerchantRequest {
+        OnboardMerchantRequest {
+            business: BusinessInfo {
+                business_type: MerchantType::LimitedLiabilityCorporation,
+                legal_name: "Test LLC".to_string(),
+                address: Address {
+                    line1: "123 Main St".to_string(),
+                    line2: None,
+                    city: "Chicago".to_string(),
+                    state: "IL".to_string(),
+                    zip: "60601".to_string(),
+                    country: "USA".to_string(),
+                },
+                phone: "5551234567".to_string(),
+                email: "test@example.com".to_string(),
+                website: None,
+                ein: "123456789".to_string(),
+            },
+            merchant: MerchantConfig {
+                dba: "Test DBA".to_string(),
+                mcc: "5999".to_string(),
+                environment: MerchantEnvironment::Ecommerce,
+                annual_cc_sales: 100000,
+                avg_ticket: 5000,
+                established: DateYmd::new("20200101").unwrap(),
+                is_new_business: false,
+            },
+            accounts: vec![BankAccountInfo {
+                name: Some("Operating".to_string()),
+                routing_number: Some("123456789".to_string()),
+                account_number: Some("987654321".to_string()),
+                holder_type: AccountHolderType::Business,
+                transaction_type: AccountType::All,
+                currency: Some("USD".to_string()),
+                is_primary: true,
+                plaid_public_token: None,
+            }],
+            members: vec![MemberInfo {
+                member_type: MemberType::Owner,
+                first_name: "John".to_string(),
+                last_name: "Doe".to_string(),
+                title: Some("CEO".to_string()),
+                ownership_percentage: 100,
+                date_of_birth: "19800115".to_string(),
+                ssn: "123456789".to_string(),
+                email: "john@example.com".to_string(),
+                phone: "5551234567".to_string(),
+                address: Address {
+                    line1: "456 Oak Ave".to_string(),
+                    line2: None,
+                    city: "Chicago".to_string(),
+                    state: "IL".to_string(),
+                    zip: "60602".to_string(),
+                    country: "USA".to_string(),
+                },
+            }],
+            terms_acceptance: TermsAcceptance {
+                version: "4.21".to_string(),
+                accepted_at: "2024-01-15 10:30:00".to_string(),
+            },
+        }
+    }
+
+    #[test]
+    fn test_validate_valid_request() {
+        let request = valid_request();
+        assert!(validate_request(&request).is_ok());
+    }
+
+    #[test]
+    fn test_validate_empty_accounts() {
+        let mut request = valid_request();
+        request.accounts = vec![];
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("bank account"));
+    }
+
+    #[test]
+    fn test_validate_no_primary_account() {
+        let mut request = valid_request();
+        request.accounts[0].is_primary = false;
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("primary"));
+    }
+
+    #[test]
+    fn test_validate_account_missing_routing_and_plaid() {
+        let mut request = valid_request();
+        request.accounts[0].routing_number = None;
+        request.accounts[0].account_number = None;
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("routing/account numbers or a Plaid token"));
+    }
+
+    #[test]
+    fn test_validate_invalid_routing_number() {
+        let mut request = valid_request();
+        request.accounts[0].routing_number = Some("12345".to_string()); // Too short
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("routing number"));
+    }
+
+    #[test]
+    fn test_validate_routing_number_with_dashes() {
+        let mut request = valid_request();
+        request.accounts[0].routing_number = Some("123-456-789".to_string());
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("routing number"));
+    }
+
+    #[test]
+    fn test_validate_empty_members() {
+        let mut request = valid_request();
+        request.members = vec![];
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("member"));
+    }
+
+    #[test]
+    fn test_validate_invalid_ssn() {
+        let mut request = valid_request();
+        request.members[0].ssn = "123-45-6789".to_string(); // With dashes
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("SSN"));
+    }
+
+    #[test]
+    fn test_validate_ssn_too_short() {
+        let mut request = valid_request();
+        request.members[0].ssn = "12345".to_string();
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("SSN"));
+    }
+
+    #[test]
+    fn test_validate_invalid_dob() {
+        let mut request = valid_request();
+        request.members[0].date_of_birth = "1980-01-15".to_string(); // With dashes
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("date of birth"));
+    }
+
+    #[test]
+    fn test_validate_ownership_over_100() {
+        let mut request = valid_request();
+        request.members[0].ownership_percentage = 150;
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("ownership"));
+    }
+
+    #[test]
+    fn test_validate_negative_ownership() {
+        let mut request = valid_request();
+        request.members[0].ownership_percentage = -10;
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("ownership"));
+    }
+
+    #[test]
+    fn test_validate_invalid_ein() {
+        let mut request = valid_request();
+        request.business.ein = "12-3456789".to_string(); // With dash
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("EIN"));
+    }
+
+    #[test]
+    fn test_validate_ein_too_short() {
+        let mut request = valid_request();
+        request.business.ein = "12345".to_string();
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("EIN"));
+    }
+
+    #[test]
+    fn test_validate_plaid_token_valid() {
+        let mut request = valid_request();
+        // Remove manual entry, add Plaid token
+        request.accounts[0].routing_number = None;
+        request.accounts[0].account_number = None;
+        request.accounts[0].plaid_public_token = Some("public-token-xxx".to_string());
+        assert!(validate_request(&request).is_ok());
+    }
+
+    #[test]
+    fn test_validate_routing_number_with_letters() {
+        let mut request = valid_request();
+        request.accounts[0].routing_number = Some("12345678A".to_string());
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("routing number"));
+    }
+
+    #[test]
+    fn test_validate_ssn_with_letters() {
+        let mut request = valid_request();
+        request.members[0].ssn = "12345678A".to_string();
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("SSN"));
+    }
+
+    #[test]
+    fn test_validate_dob_too_short() {
+        let mut request = valid_request();
+        request.members[0].date_of_birth = "1980".to_string();
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("date of birth"));
+    }
+
+    #[test]
+    fn test_validate_ein_with_letters() {
+        let mut request = valid_request();
+        request.business.ein = "12345678A".to_string();
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("EIN"));
+    }
+
+    #[test]
+    fn test_validate_ownership_zero_valid() {
+        let mut request = valid_request();
+        request.members[0].ownership_percentage = 0;
+        assert!(validate_request(&request).is_ok());
+    }
+
+    #[test]
+    fn test_validate_ownership_100_valid() {
+        let mut request = valid_request();
+        request.members[0].ownership_percentage = 100;
+        assert!(validate_request(&request).is_ok());
+    }
+
+    #[test]
+    fn test_validate_second_account_fails() {
+        let mut request = valid_request();
+        request.accounts.push(BankAccountInfo {
+            name: Some("Second".to_string()),
+            routing_number: Some("invalid".to_string()), // Invalid
+            account_number: Some("123456".to_string()),
+            holder_type: AccountHolderType::Business,
+            transaction_type: AccountType::Credit,
+            currency: None,
+            is_primary: false,
+            plaid_public_token: None,
+        });
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("Account 2"));
+    }
+
+    #[test]
+    fn test_validate_second_member_fails() {
+        let mut request = valid_request();
+        request.members.push(MemberInfo {
+            member_type: MemberType::Owner,
+            first_name: "Jane".to_string(),
+            last_name: "Doe".to_string(),
+            title: None,
+            ownership_percentage: 50,
+            date_of_birth: "19850520".to_string(),
+            ssn: "invalid".to_string(), // Invalid
+            email: "jane@example.com".to_string(),
+            phone: "5559876543".to_string(),
+            address: Address {
+                line1: "789 Pine St".to_string(),
+                line2: None,
+                city: "Chicago".to_string(),
+                state: "IL".to_string(),
+                zip: "60603".to_string(),
+                country: "USA".to_string(),
+            },
+        });
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("Member 2"));
+    }
+
+    // ============================================================================
+    // Boarding Status Tests
+    // ============================================================================
 
     #[test]
     fn test_boarding_status_from_merchant_status() {
@@ -2242,7 +2770,7 @@ mod tests {
     #[test]
     fn test_boarding_status_clone() {
         let status = BoardingStatus::ManualReview;
-        let cloned = status.clone();
+        let cloned = status; // BoardingStatus implements Copy
         assert_eq!(status, cloned);
     }
 
