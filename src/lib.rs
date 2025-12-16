@@ -130,7 +130,7 @@ pub use types::{
 
 // Re-export workflow types for convenience
 pub use workflows::merchant_onboarding::{
-    check_boarding_status, onboard_merchant, Address, BankAccountInfo, BoardingStatus,
-    BoardingStatusResult, BusinessInfo, MemberInfo, MerchantConfig, OnboardMerchantRequest,
-    OnboardMerchantResult, TermsAcceptance,
+    check_boarding_status, onboard_merchant, Address, BankAccountInfo, BankAccountMethod,
+    BoardingStatus, BoardingStatusResult, BusinessInfo, MemberInfo, MerchantConfig,
+    OnboardMerchantRequest, OnboardMerchantResult, TermsAcceptance,
 };

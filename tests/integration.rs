@@ -35,7 +35,7 @@ use payrix::{
     TeamLogin, Token, Transaction, TransactionOrigin, Vendor,
     // Workflow types
     onboard_merchant, check_boarding_status, OnboardMerchantRequest, BusinessInfo, MerchantConfig,
-    BankAccountInfo, MemberInfo, Address, TermsAcceptance, BoardingStatus,
+    BankAccountInfo, BankAccountMethod, MemberInfo, Address, TermsAcceptance, BoardingStatus,
 };
 use payrix::types::{
     AccountHolderType, AccountType, DateYmd, MemberType, MerchantEnvironment, MerchantType,
@@ -1468,6 +1468,7 @@ fn create_test_onboarding_request() -> OnboardMerchantRequest {
             routing_number: Some("121000358".to_string()), // Test routing number
             account_number: Some("123456789".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::All,
             currency: Some("USD".to_string()),
             is_primary: true,
@@ -1674,6 +1675,7 @@ async fn test_merchant_onboarding_with_trust_account() {
         routing_number: Some("121000358".to_string()),
         account_number: Some("987654321".to_string()),
         holder_type: AccountHolderType::Business,
+        account_method: BankAccountMethod::Checking,
         transaction_type: AccountType::Credit, // Deposits ONLY - no fee withdrawals
         currency: Some("USD".to_string()),
         is_primary: false, // Not primary - fees come from operating

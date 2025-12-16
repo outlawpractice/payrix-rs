@@ -92,6 +92,7 @@
 //!             routing_number: Some("123456789".to_string()),
 //!             account_number: Some("987654321".to_string()),
 //!             holder_type: AccountHolderType::Business,
+//!             account_method: BankAccountMethod::Checking,
 //!             transaction_type: AccountType::All, // Merchant account
 //!             currency: Some("USD".to_string()),
 //!             is_primary: true,
@@ -103,6 +104,7 @@
 //!             routing_number: Some("123456789".to_string()),
 //!             account_number: Some("987654322".to_string()),
 //!             holder_type: AccountHolderType::Business,
+//!             account_method: BankAccountMethod::Checking,
 //!             transaction_type: AccountType::Credit,  // Trust account - deposits only
 //!             currency: Some("USD".to_string()),
 //!             is_primary: false,
@@ -321,6 +323,22 @@ pub struct MerchantConfig {
     pub is_new_business: bool,
 }
 
+/// Bank account method (checking or savings).
+///
+/// Combined with `AccountHolderType` to determine the Payrix API method value:
+/// - Individual + Checking = 8
+/// - Individual + Savings = 9
+/// - Business + Checking = 10
+/// - Business + Savings = 11
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BankAccountMethod {
+    /// Checking account (default)
+    #[default]
+    Checking,
+    /// Savings account
+    Savings,
+}
+
 /// Bank account information for funding.
 ///
 /// At least one bank account is required for merchant onboarding.
@@ -367,6 +385,12 @@ pub struct BankAccountInfo {
     ///
     /// Whether this is a personal or business account.
     pub holder_type: AccountHolderType,
+
+    /// Bank account method.
+    ///
+    /// Whether this is a checking or savings account.
+    /// Defaults to `Checking` if not specified.
+    pub account_method: BankAccountMethod,
 
     /// Transaction type this account supports.
     ///
@@ -850,6 +874,7 @@ impl std::fmt::Debug for BankAccountInfo {
             .field("routing_number", &self.routing_number.as_ref().map(|s| mask_sensitive(s)))
             .field("account_number", &self.account_number.as_ref().map(|s| mask_sensitive(s)))
             .field("holder_type", &self.holder_type)
+            .field("account_method", &self.account_method)
             .field("transaction_type", &self.transaction_type)
             .field("currency", &self.currency)
             .field("is_primary", &self.is_primary)
@@ -950,12 +975,23 @@ impl From<BankAccountInfo> for PayrixAccountPayload {
     fn from(account: BankAccountInfo) -> Self {
         // Build account details if routing/account numbers are provided (manual entry)
         let account_details = match (&account.routing_number, &account.account_number) {
-            (Some(routing), Some(number)) => Some(PayrixAccountDetails {
-                method: 8, // Checking account
-                number: number.clone(),
-                routing: routing.clone(),
-                holder_type: account.holder_type,
-            }),
+            (Some(routing), Some(number)) => {
+                // Calculate method based on holder type and account method:
+                // Individual + Checking = 8, Individual + Savings = 9
+                // Business + Checking = 10, Business + Savings = 11
+                let method = match (account.holder_type, account.account_method) {
+                    (AccountHolderType::Individual, BankAccountMethod::Checking) => 8,
+                    (AccountHolderType::Individual, BankAccountMethod::Savings) => 9,
+                    (AccountHolderType::Business, BankAccountMethod::Checking) => 10,
+                    (AccountHolderType::Business, BankAccountMethod::Savings) => 11,
+                };
+                Some(PayrixAccountDetails {
+                    method,
+                    number: number.clone(),
+                    routing: routing.clone(),
+                    holder_type: account.holder_type,
+                })
+            }
             _ => None,
         };
 
@@ -1172,6 +1208,23 @@ fn validate_request(request: &OnboardMerchantRequest) -> Result<()> {
 /// - The API request fails
 /// - Required fields are missing or invalid
 /// - Rate limits are exceeded
+/// - API response is missing required data (merchant ID)
+///
+/// # Cancellation Safety
+///
+/// **Warning:** This function is NOT cancellation-safe. If the async task is
+/// cancelled mid-execution (e.g., due to a timeout), partial resources may
+/// exist in Payrix:
+///
+/// - The entity may be created but not fully fetched
+/// - The merchant may be created but the function returns before completion
+/// - Accounts and members may be created but not returned to the caller
+///
+/// If you need to handle timeouts, consider:
+/// 1. Using a generous timeout (the Payrix API can take several seconds)
+/// 2. Implementing a recovery mechanism that searches for recently created
+///    entities if the operation fails unexpectedly
+/// 3. Using unique identifiers (like EIN) to detect duplicate submissions
 ///
 /// # Example
 ///
@@ -1191,13 +1244,16 @@ pub async fn onboard_merchant(
     let response: PayrixOnboardingResponse = client.create(EntityType::Entities, &payload).await?;
 
     // Extract the merchant and member data from the nested response
-    let merchant_response = response.merchant.unwrap_or_else(|| MerchantInResponse {
-        id: String::new(),
-        status: None,
-        entity: None,
-        boarded: None,
-        members: None,
-    });
+    let merchant_response = response.merchant.ok_or_else(|| {
+        crate::error::Error::Internal("API response missing merchant data".into())
+    })?;
+
+    // Validate the merchant ID is not empty
+    if merchant_response.id.is_empty() {
+        return Err(crate::error::Error::Internal(
+            "API response contains empty merchant ID".into(),
+        ));
+    }
 
     let boarding_status = merchant_response
         .status
@@ -1345,6 +1401,7 @@ mod tests {
             routing_number: Some("123456789".to_string()),
             account_number: Some("9876543210".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::All,
             currency: Some("USD".to_string()),
             is_primary: true,
@@ -1426,6 +1483,7 @@ mod tests {
                 routing_number: Some("123456789".to_string()),
                 account_number: Some("987654321".to_string()),
                 holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
                 transaction_type: AccountType::All,
                 currency: Some("USD".to_string()),
                 is_primary: true,
@@ -1632,6 +1690,7 @@ mod tests {
             routing_number: Some("invalid".to_string()), // Invalid
             account_number: Some("123456".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::Credit,
             currency: None,
             is_primary: false,
@@ -1747,6 +1806,7 @@ mod tests {
                 routing_number: Some("123456789".to_string()),
                 account_number: Some("987654321".to_string()),
                 holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
                 transaction_type: AccountType::All,
                 currency: Some("USD".to_string()),
                 is_primary: true,
@@ -1804,6 +1864,7 @@ mod tests {
             routing_number: Some("123456789".to_string()),
             account_number: Some("987654321".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::All,
             currency: Some("USD".to_string()),
             is_primary: true,
@@ -1819,7 +1880,7 @@ mod tests {
         let account_details = payload.account.unwrap();
         assert_eq!(account_details.routing, "123456789");
         assert_eq!(account_details.number, "987654321");
-        assert_eq!(account_details.method, 8);
+        assert_eq!(account_details.method, 10); // Business + Checking = 10
         assert_eq!(account_details.holder_type, AccountHolderType::Business);
     }
 
@@ -1831,6 +1892,7 @@ mod tests {
             routing_number: None,
             account_number: None,
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::Credit,  // Deposits only
             currency: Some("USD".to_string()),
             is_primary: false,
@@ -1890,6 +1952,7 @@ mod tests {
             routing_number: Some("123456789".to_string()),
             account_number: Some("111111111".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::All,  // Deposits AND fee withdrawals
             currency: Some("USD".to_string()),
             is_primary: true,  // Primary account for fees
@@ -1901,6 +1964,7 @@ mod tests {
             routing_number: Some("123456789".to_string()),
             account_number: Some("222222222".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::Credit,  // Deposits ONLY - no fee withdrawals
             currency: Some("USD".to_string()),
             is_primary: false,  // Not primary - fees come from operating
@@ -1932,6 +1996,7 @@ mod tests {
                 routing_number: Some("123456789".to_string()),
                 account_number: Some("111111111".to_string()),
                 holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
                 transaction_type: AccountType::All,
                 currency: Some("USD".to_string()),
                 is_primary: true,
@@ -1942,6 +2007,7 @@ mod tests {
                 routing_number: Some("123456789".to_string()),
                 account_number: Some("222222222".to_string()),
                 holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
                 transaction_type: AccountType::Credit,
                 currency: Some("USD".to_string()),
                 is_primary: false,
@@ -1997,6 +2063,7 @@ mod tests {
                 routing_number: Some("123456789".to_string()),
                 account_number: Some("987654321".to_string()),
                 holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
                 transaction_type: AccountType::All,
                 currency: None,
                 is_primary: true,
@@ -2155,6 +2222,7 @@ mod tests {
             routing_number: Some("123456789".to_string()),
             account_number: Some("987654321".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::All,
             currency: Some("USD".to_string()),
             is_primary: true,
@@ -2330,6 +2398,7 @@ mod tests {
             routing_number: Some("123456789".to_string()),
             account_number: Some("111111111".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::All,
             currency: None,
             is_primary: true,
@@ -2344,6 +2413,7 @@ mod tests {
             routing_number: Some("123456789".to_string()),
             account_number: Some("222222222".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::Credit,
             currency: None,
             is_primary: false,
@@ -2375,12 +2445,13 @@ mod tests {
     }
 
     #[test]
-    fn test_account_method_is_checking() {
+    fn test_account_method_business_checking() {
         let account = BankAccountInfo {
             name: None,
             routing_number: Some("123456789".to_string()),
             account_number: Some("987654321".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::All,
             currency: None,
             is_primary: true,
@@ -2390,8 +2461,192 @@ mod tests {
         let payload: PayrixAccountPayload = account.into();
         let account_details = payload.account.expect("account details missing");
 
-        // Method should be 8 (checking account)
-        assert_eq!(account_details.method, 8, "Account method should be 8 (checking)");
+        // Business + Checking = 10
+        assert_eq!(account_details.method, 10, "Business checking should be method 10");
+    }
+
+    #[test]
+    fn test_account_method_business_savings() {
+        let account = BankAccountInfo {
+            name: None,
+            routing_number: Some("123456789".to_string()),
+            account_number: Some("987654321".to_string()),
+            holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Savings,
+            transaction_type: AccountType::All,
+            currency: None,
+            is_primary: true,
+            plaid_public_token: None,
+        };
+
+        let payload: PayrixAccountPayload = account.into();
+        let account_details = payload.account.expect("account details missing");
+
+        // Business + Savings = 11
+        assert_eq!(account_details.method, 11, "Business savings should be method 11");
+    }
+
+    #[test]
+    fn test_account_method_individual_checking() {
+        let account = BankAccountInfo {
+            name: None,
+            routing_number: Some("123456789".to_string()),
+            account_number: Some("987654321".to_string()),
+            holder_type: AccountHolderType::Individual,
+            account_method: BankAccountMethod::Checking,
+            transaction_type: AccountType::All,
+            currency: None,
+            is_primary: true,
+            plaid_public_token: None,
+        };
+
+        let payload: PayrixAccountPayload = account.into();
+        let account_details = payload.account.expect("account details missing");
+
+        // Individual + Checking = 8
+        assert_eq!(account_details.method, 8, "Individual checking should be method 8");
+    }
+
+    #[test]
+    fn test_account_method_individual_savings() {
+        let account = BankAccountInfo {
+            name: None,
+            routing_number: Some("123456789".to_string()),
+            account_number: Some("987654321".to_string()),
+            holder_type: AccountHolderType::Individual,
+            account_method: BankAccountMethod::Savings,
+            transaction_type: AccountType::All,
+            currency: None,
+            is_primary: true,
+            plaid_public_token: None,
+        };
+
+        let payload: PayrixAccountPayload = account.into();
+        let account_details = payload.account.expect("account details missing");
+
+        // Individual + Savings = 9
+        assert_eq!(account_details.method, 9, "Individual savings should be method 9");
+    }
+
+    /// Exhaustive test of ALL holder type + account method combinations.
+    /// This ensures we never miss a combination when making changes.
+    #[test]
+    fn test_account_method_exhaustive_combinations() {
+        let test_cases: &[(AccountHolderType, BankAccountMethod, i32, &str)] = &[
+            (AccountHolderType::Individual, BankAccountMethod::Checking, 8, "Individual+Checking"),
+            (AccountHolderType::Individual, BankAccountMethod::Savings, 9, "Individual+Savings"),
+            (AccountHolderType::Business, BankAccountMethod::Checking, 10, "Business+Checking"),
+            (AccountHolderType::Business, BankAccountMethod::Savings, 11, "Business+Savings"),
+        ];
+
+        for (holder_type, account_method, expected_method, description) in test_cases {
+            let account = BankAccountInfo {
+                name: None,
+                routing_number: Some("123456789".to_string()),
+                account_number: Some("987654321".to_string()),
+                holder_type: *holder_type,
+                account_method: *account_method,
+                transaction_type: AccountType::All,
+                currency: None,
+                is_primary: true,
+                plaid_public_token: None,
+            };
+
+            let payload: PayrixAccountPayload = account.into();
+            let account_details = payload.account.expect("account details missing");
+
+            assert_eq!(
+                account_details.method, *expected_method,
+                "Failed for {}: expected method {}, got {}",
+                description, expected_method, account_details.method
+            );
+        }
+    }
+
+    // ============================================================================
+    // Error Path and Edge Case Tests
+    // ============================================================================
+
+    #[test]
+    fn test_response_missing_merchant_field() {
+        // Simulate API response with missing merchant data
+        let json = r#"{
+            "id": "t1_ent_12345678901234567890123"
+        }"#;
+
+        let response: PayrixOnboardingResponse = serde_json::from_str(json).unwrap();
+        assert!(response.merchant.is_none(), "merchant should be None when missing from response");
+    }
+
+    #[test]
+    fn test_response_with_empty_merchant_id() {
+        // Simulate API response with empty merchant ID
+        let json = r#"{
+            "id": "t1_ent_12345678901234567890123",
+            "merchant": {
+                "id": "",
+                "status": 1
+            }
+        }"#;
+
+        let response: PayrixOnboardingResponse = serde_json::from_str(json).unwrap();
+        let merchant = response.merchant.unwrap();
+        assert!(merchant.id.is_empty(), "merchant ID should be empty");
+    }
+
+    #[test]
+    fn test_response_with_null_status() {
+        // Simulate API response with null/missing status
+        let json = r#"{
+            "id": "t1_ent_12345678901234567890123",
+            "merchant": {
+                "id": "t1_mer_12345678901234567890123"
+            }
+        }"#;
+
+        let response: PayrixOnboardingResponse = serde_json::from_str(json).unwrap();
+        let merchant = response.merchant.unwrap();
+        assert!(merchant.status.is_none(), "status should be None when missing");
+    }
+
+    #[test]
+    fn test_boarding_status_defaults_to_not_ready_when_missing() {
+        // When status is None, BoardingStatus should default to NotReady
+        let status: Option<MerchantStatus> = None;
+        let boarding_status = status
+            .map(BoardingStatus::from)
+            .unwrap_or(BoardingStatus::NotReady);
+        assert_eq!(boarding_status, BoardingStatus::NotReady);
+    }
+
+    #[test]
+    fn test_bank_account_method_default() {
+        // Verify the default is Checking
+        assert_eq!(BankAccountMethod::default(), BankAccountMethod::Checking);
+    }
+
+    #[test]
+    fn test_validation_catches_empty_routing_with_account_number() {
+        // Edge case: account number provided but no routing number
+        let mut request = valid_request();
+        request.accounts[0].routing_number = None;
+        request.accounts[0].account_number = Some("123456789".to_string());
+        request.accounts[0].plaid_public_token = None;
+
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("routing/account numbers or a Plaid token"));
+    }
+
+    #[test]
+    fn test_validation_catches_routing_without_account_number() {
+        // Edge case: routing number provided but no account number
+        let mut request = valid_request();
+        request.accounts[0].routing_number = Some("123456789".to_string());
+        request.accounts[0].account_number = None;
+        request.accounts[0].plaid_public_token = None;
+
+        let err = validate_request(&request).unwrap_err();
+        assert!(err.to_string().contains("routing/account numbers or a Plaid token"));
     }
 
     // ============================================================================
@@ -2457,6 +2712,7 @@ mod tests {
             routing_number: Some("123456789".to_string()),
             account_number: Some("987654321".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::All,
             currency: None,
             is_primary: true,
@@ -2487,6 +2743,7 @@ mod tests {
             routing_number: Some("123456789".to_string()),
             account_number: Some("987654321".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::All,
             currency: None,
             is_primary: true,
@@ -2553,6 +2810,7 @@ mod tests {
             routing_number: None,  // No manual entry
             account_number: None,  // No manual entry
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::All,
             currency: Some("USD".to_string()),
             is_primary: true,
@@ -2622,6 +2880,7 @@ mod tests {
             routing_number: Some("123456789".to_string()),
             account_number: Some("222222222".to_string()),
             holder_type: AccountHolderType::Business,
+            account_method: BankAccountMethod::Checking,
             transaction_type: AccountType::Credit,  // Deposits only
             currency: Some("USD".to_string()),
             is_primary: false,
