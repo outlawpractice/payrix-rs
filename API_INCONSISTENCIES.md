@@ -1,19 +1,38 @@
 # Payrix API Inconsistencies
 
-This document catalogs discrepancies between the Payrix API documentation (OpenAPI 3.1 specification) and the actual API behavior observed during integration testing. These findings inform the design choices in this library.
+This document catalogs discrepancies between the Payrix API documentation (OpenAPI 3.1 specification) and actual API behavior observed during integration testing.
 
 **Official Documentation:** https://docs.worldpay.com/apis/payrix
 
-**Principle:** Reality wins. When integration tests pass but the OpenAPI spec differs, we follow the actual API behavior.
+## Methodology
+
+**Important:** Our integration tests run against a test instance with limited, sometimes stale data (some records are 2+ years old). This affects how we interpret test results:
+
+1. **OpenAPI spec values are authoritative** - The OpenAPI specification defines the valid enum values. We include all spec values even if we didn't observe them in tests. Absence of evidence in limited test data is NOT evidence of absence.
+
+2. **Test observations that differ from spec are suspect** - When we observe values NOT in the OpenAPI spec, this likely indicates:
+   - Bad/legacy test data
+   - Data migration artifacts
+   - Test environment issues
+
+3. **Trust the spec, not test data** - We do NOT add enum values to our code just because we saw them in tests. If deserialization fails on an undocumented value, we handle it gracefully (e.g., with `#[serde(other)]` catch-all variants) but don't treat test observations as authoritative.
+
+**Principle:** Trust the OpenAPI specification for enum values. Document discrepancies but don't modify enums based solely on test observations.
+
+**Note:** Some enum implementations in this codebase were written before this methodology was established and may include undocumented values. These are documented below for historical reference.
 
 ## Summary
 
-The Payrix API documentation (OpenAPI spec) sometimes differs from actual API behavior:
-1. **Enum variants:** API often returns undocumented enum values not in OpenAPI
-2. **Field types:** Integer vs float, date formats vary
-3. **Missing fields:** Many fields in actual API responses aren't documented in OpenAPI
-4. **Semantic mismatches:** Same field names with different meanings/values
-5. **String vs integer formats:** Some fields use string-encoded integers (e.g., `"1"` vs `1`)
+The Payrix API sometimes returns data in different formats than the OpenAPI spec documents. The **critical issues** are type mismatches that break deserialization:
+
+1. **String vs integer formats** (CRITICAL) - Fields documented as integers but returned as strings (e.g., `"1"` vs `1`). This breaks strict deserializers.
+2. **Integer vs float types** (CRITICAL) - Fields documented as integers but returned as floats (e.g., `3524255.258` vs `3524255`).
+3. **Date format variations** (CRITICAL) - Date fields returning full timestamps vs YYYYMMDD format.
+4. **Null handling** (CRITICAL) - Required fields sometimes returning null.
+
+Less critical but notable:
+5. **Missing fields:** Some fields in actual API responses aren't documented in OpenAPI.
+6. **Semantic mismatches:** Same field names with different meanings/values in different contexts.
 
 ---
 
