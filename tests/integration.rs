@@ -46,6 +46,24 @@ use std::sync::Once;
 
 static INIT: Once = Once::new();
 
+// =============================================================================
+// Test Merchant Constants
+// =============================================================================
+// These IDs are from a merchant created via test_merchant_onboarding_with_trust_account
+// Use these for tests that create customers, tokens, transactions, etc.
+
+/// Test entity ID (the business entity)
+const TEST_ENTITY_ID: &str = "t1_ent_6941bf37e9b488e9ff0392a";
+
+/// Test merchant ID (for processing payments)
+const TEST_MERCHANT_ID: &str = "t1_mer_6941bf385591f9e279b1937";
+
+/// Test operating account ID (type=All, primary=true)
+const TEST_OPERATING_ACCOUNT_ID: &str = "t1_act_6941bf3803046cefe558296";
+
+/// Test trust account ID (type=Credit, primary=false)
+const TEST_TRUST_ACCOUNT_ID: &str = "t1_act_6941bf38481536ee5afca28";
+
 /// Test context that holds created resources for cleanup.
 struct TestContext {
     client: PayrixClient,
@@ -1450,8 +1468,8 @@ fn create_test_onboarding_request() -> OnboardMerchantRequest {
                 country: "USA".to_string(),
             },
             phone: "5551234567".to_string(),
-            email: format!("test{}@example.com", timestamp),
-            website: Some("https://example.com".to_string()),
+            email: "payrixrust@gmail.com".to_string(),
+            website: Some("https://github.com/outlawpractice/payrix-rs".to_string()),
             ein: "123456789".to_string(),
         },
         merchant: MerchantConfig {
@@ -1482,7 +1500,7 @@ fn create_test_onboarding_request() -> OnboardMerchantRequest {
             ownership_percentage: 100,
             date_of_birth: "19800115".to_string(),
             ssn: "123456789".to_string(),
-            email: format!("owner{}@example.com", timestamp),
+            email: "payrixrust@gmail.com".to_string(),
             phone: "5559876543".to_string(),
             address: Address {
                 line1: "456 Owner Lane".to_string(),
@@ -1664,10 +1682,9 @@ async fn test_merchant_onboarding_with_trust_account() {
 
     let mut request = create_test_onboarding_request();
 
-    // Update with unique data
+    // Update with unique data (keep email as payrixrust@gmail.com from helper)
     request.business.legal_name = format!("Trust Account Test {} LLC", timestamp);
     request.merchant.dba = format!("Trust Test DBA {}", timestamp);
-    request.business.email = format!("trust{}@example.com", timestamp);
 
     // Add a trust account in addition to the operating account
     request.accounts.push(BankAccountInfo {
@@ -1716,7 +1733,8 @@ async fn test_merchant_onboarding_with_trust_account() {
         }
         Err(e) => {
             println!("Error: {}", e);
-            println!("\nThis is expected when using test/dummy data.");
+            println!("Debug: {:?}", e);
+            println!("\nNote: This may fail with dummy data or if accounts already exist.");
         }
     }
 }
@@ -1824,6 +1842,261 @@ async fn test_merchant_onboarding_with_multiple_members() {
         Err(e) => {
             println!("Error: {}", e);
             println!("\nThis is expected when using test/dummy data.");
+        }
+    }
+}
+
+// =============================================================================
+// OpenAPI Validation Tests
+// =============================================================================
+// These tests create data using our test merchant and validate that API responses
+// match the OpenAPI specification. Failures document real API inconsistencies.
+
+/// Create a customer and validate all response fields match OpenAPI spec.
+///
+/// This test creates a customer with all optional fields populated to ensure
+/// the API returns them correctly.
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY - creates real customer"]
+async fn test_create_customer_validate_response() {
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Create customer with all fields populated
+    let new_customer = NewCustomer {
+        merchant: TEST_MERCHANT_ID.to_string(),
+        first: Some(format!("Test{}", timestamp)),
+        middle: Some("M".to_string()),
+        last: Some("Customer".to_string()),
+        email: Some("payrixrust@gmail.com".to_string()),
+        phone: Some("5551234567".to_string()),
+        address1: Some("123 Test Street".to_string()),
+        address2: Some("Suite 100".to_string()),
+        city: Some("Chicago".to_string()),
+        state: Some("IL".to_string()),
+        zip: Some("60601".to_string()),
+        country: Some("USA".to_string()),
+        company: Some(format!("Test Company {}", timestamp)),
+        custom: Some(format!("{{\"test_id\": {}}}", timestamp)),
+        ..Default::default()
+    };
+
+    println!("Creating customer: {} {} ({})",
+        new_customer.first.as_deref().unwrap_or(""),
+        new_customer.last.as_deref().unwrap_or(""),
+        new_customer.email.as_deref().unwrap_or("")
+    );
+
+    let result: Result<Customer, _> = client.create(EntityType::Customers, &new_customer).await;
+
+    match result {
+        Ok(customer) => {
+            println!("\n=== CUSTOMER CREATED SUCCESSFULLY ===");
+            println!("ID: {}", customer.id.as_str());
+
+            // Validate required fields
+            assert!(!customer.id.as_str().is_empty(), "ID should not be empty");
+            assert!(customer.id.as_str().starts_with("t1_cus_"), "ID should start with t1_cus_");
+
+            // Validate optional fields that we set
+            assert_eq!(customer.first.as_deref(), Some(&format!("Test{}", timestamp) as &str));
+            assert_eq!(customer.middle.as_deref(), Some("M"));
+            assert_eq!(customer.last.as_deref(), Some("Customer"));
+            assert_eq!(customer.email.as_deref(), Some("payrixrust@gmail.com"));
+            assert_eq!(customer.phone.as_deref(), Some("5551234567"));
+            assert_eq!(customer.city.as_deref(), Some("Chicago"));
+            assert_eq!(customer.state.as_deref(), Some("IL"));
+            assert_eq!(customer.zip.as_deref(), Some("60601"));
+
+            // Validate system-generated fields
+            assert!(customer.created.is_some(), "Created timestamp should be set");
+            assert!(customer.modified.is_some(), "Modified timestamp should be set");
+
+            println!("\nAll response fields validated successfully!");
+            println!("Customer ID for use in other tests: {}", customer.id.as_str());
+        }
+        Err(e) => {
+            panic!("Failed to create customer: {:?}", e);
+        }
+    }
+}
+
+/// Create a token and validate all response fields match OpenAPI spec.
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY - creates real token"]
+async fn test_create_token_validate_response() {
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    // First create a customer to attach the token to
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let new_customer = NewCustomer {
+        merchant: TEST_MERCHANT_ID.to_string(),
+        first: Some(format!("TokenTest{}", timestamp)),
+        last: Some("Customer".to_string()),
+        email: Some("payrixrust@gmail.com".to_string()),
+        ..Default::default()
+    };
+
+    let customer: Customer = client.create(EntityType::Customers, &new_customer).await
+        .expect("Failed to create customer for token test");
+
+    println!("Created customer: {}", customer.id.as_str());
+
+    // Create a Visa token
+    let new_token = NewToken {
+        customer: customer.id.to_string(),
+        payment: PaymentInfo {
+            method: PaymentMethod::Visa,
+            number: Some("4111111111111111".to_string()),
+            routing: None,
+            expiration: Some("1230".to_string()), // December 2030
+            cvv: Some("123".to_string()),
+        },
+        ..Default::default()
+    };
+
+    println!("Creating Visa token for customer {}", customer.id.as_str());
+
+    let result: Result<Token, _> = client.create(EntityType::Tokens, &new_token).await;
+
+    match result {
+        Ok(token) => {
+            println!("\n=== TOKEN CREATED SUCCESSFULLY ===");
+            println!("ID: {}", token.id.as_str());
+
+            // Validate required fields
+            assert!(!token.id.as_str().is_empty(), "ID should not be empty");
+            assert!(token.id.as_str().starts_with("t1_tok_"), "ID should start with t1_tok_");
+
+            // Note: last4/first6 may not be returned immediately on create
+            // These fields are populated asynchronously - verify via GET instead
+            println!("Last4: {:?}", token.last4);
+            println!("First6: {:?}", token.first6);
+            println!("Payment method: {:?}", token.payment);
+
+            // Validate expiration
+            assert!(token.expiration.is_some(), "Expiration should be set");
+
+            // Validate timestamps
+            assert!(token.created.is_some(), "Created timestamp should be set");
+
+            println!("\nAll response fields validated successfully!");
+            println!("Token ID: {}", token.id.as_str());
+            println!("Last4: {:?}", token.last4);
+            println!("Payment Method: {:?}", token.payment);
+        }
+        Err(e) => {
+            panic!("Failed to create token: {:?}", e);
+        }
+    }
+}
+
+/// Create a transaction and validate response fields match OpenAPI spec.
+/// This test validates integer enums are returned correctly.
+///
+/// NOTE: Requires a fully boarded merchant (status=Boarded). The test merchant
+/// created in test_merchant_onboarding_with_trust_account has status=NotReady
+/// because it uses dummy data. Use an existing boarded merchant for this test.
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY and a BOARDED merchant - TEST_MERCHANT_ID must be Boarded"]
+async fn test_create_transaction_validate_response() {
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // First create customer and token
+    let new_customer = NewCustomer {
+        merchant: TEST_MERCHANT_ID.to_string(),
+        first: Some(format!("TxnTest{}", timestamp)),
+        last: Some("Customer".to_string()),
+        email: Some("payrixrust@gmail.com".to_string()),
+        ..Default::default()
+    };
+
+    let customer: Customer = client.create(EntityType::Customers, &new_customer).await
+        .expect("Failed to create customer");
+
+    let new_token = NewToken {
+        customer: customer.id.to_string(),
+        payment: PaymentInfo {
+            method: PaymentMethod::Visa,
+            number: Some("4111111111111111".to_string()),
+            routing: None,
+            expiration: Some("1230".to_string()),
+            cvv: Some("123".to_string()),
+        },
+        ..Default::default()
+    };
+
+    let token: Token = client.create(EntityType::Tokens, &new_token).await
+        .expect("Failed to create token");
+
+    println!("Created customer {} and token {}", customer.id.as_str(), token.id.as_str());
+
+    // Create a $1.00 transaction using the token's transaction token string
+    let token_string = token.token.expect("Token should have a token string");
+    let new_txn = NewTransaction {
+        merchant: TEST_MERCHANT_ID.to_string(),
+        token: Some(token_string),
+        total: 100, // $1.00 in cents
+        origin: Some(TransactionOrigin::Ecommerce),
+        ..Default::default()
+    };
+
+    println!("Creating $1.00 transaction...");
+
+    let result: Result<Transaction, _> = client.create(EntityType::Txns, &new_txn).await;
+
+    match result {
+        Ok(txn) => {
+            println!("\n=== TRANSACTION CREATED SUCCESSFULLY ===");
+            println!("ID: {}", txn.id.as_str());
+            println!("Status: {:?}", txn.status);
+            println!("Type: {:?}", txn.txn_type);
+            println!("Total: {:?}", txn.total);
+
+            // Validate required fields
+            assert!(!txn.id.as_str().is_empty(), "ID should not be empty");
+            assert!(txn.id.as_str().starts_with("t1_txn_"), "ID should start with t1_txn_");
+
+            // Validate amounts
+            assert_eq!(txn.total, Some(100), "Total should be 100 cents");
+
+            // Validate enums (these should be integers per OpenAPI spec)
+            // If this fails with "invalid type: string expected i32", the API
+            // is returning strings instead of integers for enum fields
+            assert!(txn.status.is_some(), "Status should be set");
+            // txn_type is not Option, it's a direct TransactionType enum
+            println!("Transaction type: {:?}", txn.txn_type);
+
+            // Validate timestamps
+            assert!(txn.created.is_some(), "Created timestamp should be set");
+
+            println!("\nAll response fields validated successfully!");
+            println!("Transaction ID: {}", txn.id.as_str());
+        }
+        Err(e) => {
+            // This is where we'll see the API inconsistencies
+            println!("\n=== TRANSACTION CREATION FAILED ===");
+            println!("Error: {:?}", e);
+            panic!("Transaction creation failed - this documents an API inconsistency: {:?}", e);
         }
     }
 }

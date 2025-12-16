@@ -1046,10 +1046,9 @@ struct PayrixOnboardingResponse {
     /// Nested merchant in response
     #[serde(default)]
     merchant: Option<MerchantInResponse>,
-
-    /// Nested accounts in response
-    #[serde(default)]
-    accounts: Option<Vec<Account>>,
+    // Note: Accounts are not included here because the API returns them with
+    // nested objects (expanded entity) rather than just IDs. We fetch accounts
+    // separately after creation.
 }
 
 /// Internal merchant response structure.
@@ -2912,6 +2911,8 @@ mod tests {
     #[test]
     fn test_payrix_onboarding_response_deserialize() {
         // Test parsing of the nested response structure from Payrix
+        // Note: accounts are not included in this response struct because the API
+        // returns them with expanded nested objects. We fetch them separately.
         let json = r#"{
             "id": "t1_ent_12345678901234567890123",
             "merchant": {
@@ -2919,18 +2920,7 @@ mod tests {
                 "status": 2,
                 "entity": "t1_ent_12345678901234567890123",
                 "boarded": "20240115"
-            },
-            "accounts": [
-                {
-                    "id": "t1_acc_34567890123456789012345",
-                    "entity": "t1_ent_12345678901234567890123",
-                    "primary": 1,
-                    "type": "all",
-                    "status": 1,
-                    "inactive": 0,
-                    "frozen": 0
-                }
-            ]
+            }
         }"#;
 
         let response: PayrixOnboardingResponse = serde_json::from_str(json).unwrap();
@@ -2940,10 +2930,6 @@ mod tests {
         assert_eq!(merchant.id, "t1_mer_23456789012345678901234");
         assert_eq!(merchant.status, Some(MerchantStatus::Boarded));
         assert_eq!(merchant.boarded, Some("20240115".to_string()));
-
-        let accounts = response.accounts.unwrap();
-        assert_eq!(accounts.len(), 1);
-        assert_eq!(accounts[0].id.as_str(), "t1_acc_34567890123456789012345");
     }
 
     #[test]
@@ -2956,7 +2942,6 @@ mod tests {
         let response: PayrixOnboardingResponse = serde_json::from_str(json).unwrap();
         assert_eq!(response.id, "t1_ent_12345678901234567890123");
         assert!(response.merchant.is_none());
-        assert!(response.accounts.is_none());
     }
 
     #[test]
