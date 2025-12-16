@@ -50,6 +50,11 @@ pub struct Config {
     pub max_retries: u32,
     /// Delay between retries (default: 10 seconds per Payrix docs)
     pub retry_delay: Duration,
+    /// Custom base URL (overrides environment URL if set).
+    ///
+    /// This is primarily useful for testing with mock servers.
+    /// If `None`, the URL is determined by the `environment` field.
+    pub base_url: Option<String>,
 }
 
 impl Config {
@@ -60,7 +65,23 @@ impl Config {
             environment,
             max_retries: 3,
             retry_delay: Duration::from_secs(10),
+            base_url: None,
         }
+    }
+
+    /// Set a custom base URL (for testing with mock servers).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use payrix::{Config, Environment};
+    ///
+    /// let config = Config::new("api-key", Environment::Test)
+    ///     .with_base_url("http://localhost:8080/");
+    /// ```
+    pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
+        self.base_url = Some(url.into());
+        self
     }
 }
 
@@ -127,8 +148,14 @@ impl PayrixClient {
     }
 
     /// Get the base URL for the configured environment.
+    ///
+    /// If a custom base URL is configured, it takes precedence over
+    /// the environment's default URL.
     pub fn base_url(&self) -> &str {
-        self.config.environment.base_url()
+        self.config
+            .base_url
+            .as_deref()
+            .unwrap_or_else(|| self.config.environment.base_url())
     }
 
     /// Execute an HTTP request with rate limiting and retry logic.

@@ -115,6 +115,7 @@ mod error;
 mod rate_limiter;
 pub mod search;
 pub mod types;
+pub mod workflows;
 
 pub use client::{Config, Environment, PayrixClient};
 pub use entity::EntityType;
@@ -125,4 +126,11 @@ pub use types::*;
 // Re-export for convenience
 pub use types::{
     Customer, Entity, Merchant, NewCustomer, NewToken, NewTransaction, Token, Transaction,
+};
+
+// Re-export workflow types for convenience
+pub use workflows::merchant_onboarding::{
+    check_boarding_status, onboard_merchant, Address, BankAccountInfo, BoardingStatus,
+    BoardingStatusResult, BusinessInfo, MemberInfo, MerchantConfig, OnboardMerchantRequest,
+    OnboardMerchantResult, TermsAcceptance,
 };

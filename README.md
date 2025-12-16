@@ -2,6 +2,22 @@
 
 A Rust client library for the [Payrix](https://www.payrix.com/) payment processing API.
 
+This library was created based on our experience implementing Payrix Pro at our company,
+18 months of experience with the quirks and peculiarities of the interface. This was
+also *not* our first payment provider integration.
+
+We used Claude Code's Opus 4.5 thinking mode to help with grunt work, like taking
+the OpenAPI spec and ensuring that we had all of the Enums correct, and documenting
+return codes (first quirk: errors are returned with an HTTP status code 200, plus
+an array of errors, in one of two places in the result, depending on the kind of 
+error).
+
+We provide a layered set of API calls, starting with low-level calls directly
+to each Payrix endpoint (e.g. /merchant), then layering workflow-specific functions
+to keep the code idiomatic and encapsulate best practices.
+
+Author: john@outlawpractice.com
+
 [![Crates.io](https://img.shields.io/crates/v/payrix.svg)](https://crates.io/crates/payrix)
 [![Documentation](https://docs.rs/payrix/badge.svg)](https://docs.rs/payrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -11,9 +27,11 @@ A Rust client library for the [Payrix](https://www.payrix.com/) payment processi
 - **Full async/await support** with Tokio
 - **Built-in rate limiting** to avoid API throttling
 - **Automatic retry** with exponential backoff for transient failures
-- **Strongly typed** API responses with 68 enums and 26 resource types
+- **Strongly typed** API responses with 68 enums and 80 struct types
 - **Comprehensive error handling** with domain-specific error types
 - **Optional SQLx support** for database integration
+- **OpenAPI 3.1 spec** included for reference (`openApi/payrix-openapi31.yaml`)
+- **API discrepancy documentation** cataloging differences between docs and reality
 
 ## Installation
 
@@ -35,7 +53,7 @@ payrix = { version = "0.1", features = ["sqlx"] }
 ## Quick Start
 
 ```rust,no_run
-use payrix::{PayrixClient, Environment, EntityType, Customer, NewCustomer};
+use payrix::{PayrixClient, Environment, EntityType, Customer};
 
 #[tokio::main]
 async fn main() -> Result<(), payrix::Error> {
@@ -48,18 +66,6 @@ async fn main() -> Result<(), payrix::Error> {
         "t1_cus_12345678901234567890123"
     ).await?;
 
-    // Create a new customer
-    let new_customer: Customer = client.create(
-        EntityType::Customers,
-        &NewCustomer {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            first: Some("John".to_string()),
-            last: Some("Doe".to_string()),
-            email: Some("john@example.com".to_string()),
-            ..Default::default()
-        }
-    ).await?;
-
     Ok(())
 }
 ```
@@ -69,17 +75,16 @@ async fn main() -> Result<(), payrix::Error> {
 ### Creating a Transaction
 
 ```rust,no_run
-use payrix::{PayrixClient, Environment, EntityType, Transaction, NewTransaction};
+use payrix::{PayrixClient, Environment, EntityType, Transaction};
 
 async fn charge_card(client: &PayrixClient) -> Result<Transaction, payrix::Error> {
     client.create(
         EntityType::Txns,
-        &NewTransaction {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            token: Some("t1_tok_12345678901234567890123".to_string()),
-            total: 1000, // $10.00 in cents
-            ..Default::default()
-        }
+        &serde_json::json!({
+            "merchant": "t1_mer_12345678901234567890123",
+            "token": "t1_tok_12345678901234567890123",
+            "total": 1000  // $10.00 in cents
+        })
     ).await
 }
 ```
@@ -128,6 +133,81 @@ async fn get_transaction_with_token(
         txn_id,
         &["token", "customer"]
     ).await
+}
+```
+
+## High-Level Workflows
+
+The library includes workflow modules that encapsulate complex multi-step operations:
+
+### Merchant Onboarding
+
+```rust,no_run
+use payrix::{PayrixClient, Environment, onboard_merchant, OnboardMerchantRequest};
+use payrix::{BusinessInfo, MerchantConfig, BankAccountInfo, MemberInfo, Address, TermsAcceptance};
+use payrix::types::{MerchantType, MemberType, AccountHolderType, MerchantEnvironment, DateYmd};
+
+async fn onboard_new_merchant(client: &PayrixClient) -> Result<(), payrix::Error> {
+    let result = onboard_merchant(client, OnboardMerchantRequest {
+        business: BusinessInfo {
+            business_type: MerchantType::Llc,
+            legal_name: "Acme Corp LLC".to_string(),
+            address: Address {
+                line1: "123 Main St".to_string(),
+                line2: None,
+                city: "Chicago".to_string(),
+                state: "IL".to_string(),
+                zip: "60601".to_string(),
+                country: "USA".to_string(),
+            },
+            phone: "3125551234".to_string(),
+            email: "contact@acme.com".to_string(),
+            website: Some("https://acme.com".to_string()),
+            ein: "123456789".to_string(),
+        },
+        merchant: MerchantConfig {
+            dba: "Acme Services".to_string(),
+            mcc: "5812".to_string(),
+            environment: MerchantEnvironment::Ecommerce,
+            annual_cc_sales: 500_000_00,  // $500,000 in cents
+            avg_ticket: 50_00,             // $50 in cents
+            established: DateYmd::new("20200101").unwrap(),
+            is_new_business: false,
+        },
+        accounts: vec![BankAccountInfo {
+            routing_number: "071000013".to_string(),
+            account_number: "123456789".to_string(),
+            account_type: AccountHolderType::Business,
+            is_primary: true,
+        }],
+        members: vec![MemberInfo {
+            member_type: MemberType::Owner,
+            first_name: "Jane".to_string(),
+            last_name: "Smith".to_string(),
+            title: Some("CEO".to_string()),
+            ownership_percentage: 100,
+            date_of_birth: DateYmd::new("19800115").unwrap(),
+            ssn: "123456789".to_string(),
+            email: "jane@acme.com".to_string(),
+            phone: "3125559876".to_string(),
+            address: Address {
+                line1: "456 Oak Ave".to_string(),
+                line2: None,
+                city: "Chicago".to_string(),
+                state: "IL".to_string(),
+                zip: "60602".to_string(),
+                country: "USA".to_string(),
+            },
+        }],
+        terms_acceptance: TermsAcceptance {
+            version: "4.21".to_string(),
+            accepted_at: "2024-01-15 10:30:00".to_string(),
+        },
+    }).await?;
+
+    println!("Merchant {} created with status {:?}",
+             result.merchant_id, result.boarding_status);
+    Ok(())
 }
 ```
 
@@ -204,6 +284,39 @@ This library uses method-specific helpers instead of Tower middleware:
 ### Async-First
 
 All API methods are async and require a Tokio runtime. This matches the reality of HTTP API clients and enables efficient concurrent requests.
+
+### Reality Wins
+
+When the OpenAPI spec differs from actual API behavior, we follow reality:
+
+- **Flexible deserializers** - Transaction enums accept both integer and string formats (the API returns both depending on context)
+- **Undocumented variants** - Added enum values observed in production that aren't in OpenAPI
+- **Optional fields** - Made fields like `Customer.merchant` optional when the API returns null
+- **Integer vs string enums** - `FeeType`, `FeeUnit`, `FeeCollection` use integers despite OpenAPI suggesting strings
+
+See [API_INCONSISTENCIES.md](API_INCONSISTENCIES.md) for the full catalog of discrepancies.
+
+## Test Results
+
+| Category | Count | Status |
+|----------|-------|--------|
+| Unit tests | 586 | All passing |
+| Doc tests | 27 | All passing |
+| Integration tests | 52 | Ignored (require API key) |
+
+Unit tests verify serialization, type conversions, and workflow payload structure without requiring API access.
+
+Run unit and doc tests:
+
+```bash
+cargo test
+```
+
+Run integration tests (requires API credentials):
+
+```bash
+PAYRIX_API_KEY=your_key cargo test -- --ignored
+```
 
 ## API Reference
 

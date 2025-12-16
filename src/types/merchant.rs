@@ -108,167 +108,346 @@ pub enum TaxIdStatus {
 }
 
 /// A Payrix merchant.
+///
+/// A merchant represents a payment processing account under an entity.
+/// Merchants handle the actual transaction processing configuration.
+///
+/// # Creating a Merchant
+///
+/// When creating a new merchant, the following fields are required:
+/// - `entity` - Parent entity ID
+/// - `dba` - "Doing Business As" name shown on customer statements
+/// - `mcc` - Merchant Category Code for the business type
+/// - `environment` - Transaction environment (ecommerce, card present, etc.)
+/// - `annual_cc_sales` - Estimated annual credit card volume in cents
+/// - `avg_ticket` - Average transaction amount in cents
+/// - `established` - Date business was established (YYYYMMDD)
+///
+/// Read-only fields (returned by API, not sent on create):
+/// - `id` - Assigned by Payrix
+/// - `login` - Set by API
+/// - `risk_level` - Set by underwriting
+/// - `boarded` - Set when boarding completes
+/// - `created`, `modified` - Timestamps set by API
+///
+/// # Boarding Status
+///
+/// Set `status` to control the boarding workflow:
+/// - `Ready` (1) - Submit for immediate automated underwriting
+/// - `NotReady` (0) - Save as draft, don't start underwriting yet
+///
+/// After submission, status will change to:
+/// - `Boarded` (2) - Approved and ready to process
+/// - `Manual` (3) - Needs manual underwriting review
+/// - `Pending` (6) - Automated review in progress
+///
+/// # Common MCC Codes
+///
+/// | Code | Description |
+/// |------|-------------|
+/// | 5812 | Restaurants |
+/// | 5814 | Fast Food |
+/// | 5999 | Miscellaneous Retail |
+/// | 7299 | Miscellaneous Services |
+/// | 8111 | Legal Services |
+/// | 8999 | Professional Services |
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Merchant {
-    /// Unique identifier (30 characters, e.g., "t1_mer_...")
+    /// Unique identifier (30 characters, e.g., "t1_mer_...").
+    ///
+    /// **Read-only**: Assigned by Payrix when merchant is created.
     pub id: PayrixId,
 
-    /// Parent entity ID
+    /// Parent entity ID.
+    ///
+    /// **Required for creation**. The entity that owns this merchant account.
+    /// Format: "t1_ent_..." (30 characters).
     #[serde(default)]
     pub entity: Option<PayrixId>,
 
-    /// Merchant's login/username
+    /// Login ID associated with this merchant.
+    ///
+    /// **Optional on create**. Links the merchant to a login for portal access.
     #[serde(default)]
     pub login: Option<PayrixId>,
 
-    /// Merchant's DBA (doing business as) name
+    /// "Doing Business As" name.
+    ///
+    /// **Required for creation**. The name customers see on their card statements.
+    /// Keep it recognizable to reduce chargebacks.
     #[serde(default)]
     pub dba: Option<String>,
 
-    /// Merchant status
+    /// Merchant status / boarding instruction.
+    ///
+    /// **Required for boarding**. Controls the boarding workflow:
+    /// - `NotReady` (0) - Draft, don't start underwriting
+    /// - `Ready` (1) - Submit for automated underwriting immediately
+    ///
+    /// Status will change to `Boarded`, `Manual`, or `Pending` after submission.
     #[serde(default)]
     pub status: Option<MerchantStatus>,
 
-    /// Merchant environment
+    /// Transaction environment.
+    ///
+    /// **Required for creation**. Where transactions primarily occur:
+    /// - `Ecommerce` - Online/internet transactions
+    /// - `CardPresent` - In-person with physical cards
+    /// - `MailOrTelephoneOrder` - Phone/mail orders
+    /// - `Restaurant` - Restaurant with tip adjustment
     #[serde(default)]
     pub environment: Option<MerchantEnvironment>,
 
-    /// Risk level
+    /// Risk level assigned by underwriting.
+    ///
+    /// **Read-only**: Set by Payrix's underwriting process.
     #[serde(default)]
     pub risk_level: Option<RiskLevel>,
 
-    /// Whether merchant is new
+    /// Whether this is a new business (less than 2 years old).
+    ///
+    /// **Required for creation**. Set to `true` if business has been
+    /// operating less than 2 years. Affects underwriting requirements.
     #[serde(default, with = "bool_from_int_default_false")]
     pub new: bool,
 
-    /// Date established (YYYYMMDD format)
+    /// Date business was established (YYYYMMDD format).
+    ///
+    /// **Required for creation**. When the business started operations.
+    /// Example: "20200115" for January 15, 2020.
     #[serde(default)]
     pub established: Option<DateYmd>,
 
-    /// Annual credit card sales in cents
+    /// Estimated annual credit card sales in cents.
+    ///
+    /// **Required for creation**. Total expected card volume per year.
+    /// Example: $500,000/year = 50_000_000 (cents).
     #[serde(default)]
     pub annual_cc_sales: Option<i64>,
 
-    /// Average ticket amount in cents
+    /// Average transaction amount in cents.
+    ///
+    /// **Required for creation**. Typical single transaction value.
+    /// Example: $125.00 = 12500 (cents).
     #[serde(default)]
     pub avg_ticket: Option<i64>,
 
-    /// Merchant Category Code (e.g., "8111" for legal services)
+    /// Merchant Category Code (MCC).
+    ///
+    /// **Required for creation**. 4-digit code classifying the business type.
+    /// Affects interchange rates, fraud monitoring, and underwriting.
+    /// Common codes: "5812" (Restaurants), "8111" (Legal), "5999" (Retail).
     #[serde(default)]
     pub mcc: Option<String>,
 
-    /// Date boarded (YYYYMMDD format)
+    /// Date merchant was boarded (YYYYMMDD format).
+    ///
+    /// **Read-only**: Set by Payrix when boarding completes successfully.
     #[serde(default)]
     pub boarded: Option<DateYmd>,
 
-    /// Chargeback notification email
+    /// Chargeback notification email.
+    ///
+    /// **Optional**. Email address to receive chargeback alerts.
+    /// If not set, uses the entity's primary email.
     #[serde(default)]
     pub chargeback_notification_email: Option<String>,
 
-    /// Created timestamp
+    /// Created timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
+    ///
+    /// **Read-only**: Set by Payrix when merchant is created.
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Last modified timestamp
+    /// Last modified timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
+    ///
+    /// **Read-only**: Updated by Payrix on changes.
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive
+    /// Whether resource is inactive.
+    ///
+    /// **Optional on create**. Set to `true` to create in inactive state.
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
-    /// Whether resource is frozen
+    /// Whether resource is frozen.
+    ///
+    /// **Read-only**: Set by Payrix for compliance/risk reasons.
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }
 
 /// A Payrix entity (business entity above merchants).
+///
+/// An entity represents a business or organization in Payrix. Each entity can have
+/// multiple merchants, accounts, and members (beneficial owners).
+///
+/// # Creating an Entity
+///
+/// When creating a new entity, the following fields are required:
+/// - `name` - Legal business name
+/// - `entity_type` - Business structure (LLC, Corporation, etc.)
+/// - `address1`, `city`, `state`, `zip`, `country` - Business address
+/// - `phone` - Business phone number
+/// - `email` - Primary contact email
+/// - `ein` - Employer Identification Number (9 digits, no dashes)
+///
+/// Read-only fields (returned by API, not sent on create):
+/// - `id` - Assigned by Payrix
+/// - `login` - Set by API based on authentication
+/// - `tin_status` - Set by verification process
+/// - `created`, `modified` - Timestamps set by API
+///
+/// # Merchant Onboarding
+///
+/// When creating an entity as part of merchant onboarding, you must also include
+/// Terms & Conditions acceptance fields (via the onboarding workflow):
+/// - `tcVersion` - Version of terms accepted
+/// - `tcDate` - Timestamp of acceptance
+/// - `tcAttestation` - Confirmation of acceptance
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Entity {
-    /// Unique identifier (30 characters, e.g., "t1_ent_...")
+    /// Unique identifier (30 characters, e.g., "t1_ent_...").
+    ///
+    /// **Read-only**: Assigned by Payrix when entity is created.
     pub id: PayrixId,
 
-    /// Login ID that owns this entity
+    /// Login ID that owns this entity.
+    ///
+    /// **Read-only**: Set by Payrix based on the authenticated user.
     #[serde(default)]
     pub login: Option<PayrixId>,
 
-    /// Entity name (1-100 characters)
+    /// Legal business name as registered with the state.
+    ///
+    /// **Required for creation**. This should be the exact legal name,
+    /// not the DBA (doing business as) name. Max 100 characters.
     #[serde(default)]
     pub name: Option<String>,
 
-    /// Entity type (business structure)
+    /// Business structure/type.
+    ///
+    /// **Required for creation**. Common values:
+    /// - `SoleProprietor` - Individual owner
+    /// - `LimitedLiabilityCorporation` - LLC
+    /// - `Corporation` - C-Corp
+    /// - `SCorporation` - S-Corp
+    /// - `Partnership` - General or limited partnership
     #[serde(default, rename = "type")]
     pub entity_type: Option<MerchantType>,
 
-    /// Address line 1
+    /// Primary business address line 1.
+    ///
+    /// **Required for creation**. Street address where the business is located.
     #[serde(default)]
     pub address1: Option<String>,
 
-    /// Address line 2
+    /// Address line 2.
+    ///
+    /// **Optional**. Suite number, floor, building name, etc.
     #[serde(default)]
     pub address2: Option<String>,
 
-    /// City
+    /// City name.
+    ///
+    /// **Required for creation**.
     #[serde(default)]
     pub city: Option<String>,
 
-    /// State/province code
+    /// State or province code.
+    ///
+    /// **Required for creation**. Use 2-letter codes for US (e.g., "IL", "CA").
     #[serde(default)]
     pub state: Option<String>,
 
-    /// ZIP/postal code
+    /// ZIP or postal code.
+    ///
+    /// **Required for creation**. For US: 5-digit or ZIP+4 format.
     #[serde(default)]
     pub zip: Option<String>,
 
-    /// Country code
+    /// Country code.
+    ///
+    /// **Required for creation**. Use "USA" for United States.
     #[serde(default)]
     pub country: Option<String>,
 
-    /// Phone number
+    /// Business phone number.
+    ///
+    /// **Required for creation**. Digits only, no formatting
+    /// (e.g., "3125551234" not "(312) 555-1234").
     #[serde(default)]
     pub phone: Option<String>,
 
-    /// Fax number
+    /// Fax number.
+    ///
+    /// **Optional**. Digits only, no formatting.
     #[serde(default)]
     pub fax: Option<String>,
 
-    /// Email address
+    /// Primary contact email address.
+    ///
+    /// **Required for creation**. Used for account notifications.
     #[serde(default)]
     pub email: Option<String>,
 
-    /// Website URL
+    /// Business website URL.
+    ///
+    /// **Optional but recommended**. Include full URL with protocol.
+    /// Helps with underwriting verification.
     #[serde(default)]
     pub website: Option<String>,
 
-    /// EIN (Tax ID)
+    /// Employer Identification Number (EIN/Tax ID).
+    ///
+    /// **Required for creation**. 9 digits without dashes
+    /// (e.g., "123456789" not "12-3456789").
+    /// For sole proprietors without an EIN, use the owner's SSN.
     #[serde(default)]
     pub ein: Option<String>,
 
-    /// Tax ID status
+    /// Tax ID verification status.
+    ///
+    /// **Read-only**: Set by Payrix's verification process.
+    /// - `Pending` - Awaiting verification
+    /// - `Valid` - Verified successfully
+    /// - `Invalid` - Verification failed
     #[serde(default)]
     pub tin_status: Option<TaxIdStatus>,
 
-    /// Custom field (0-1000 characters)
+    /// Custom data field for your application's use.
+    ///
+    /// **Optional**. Can store up to 1000 characters of arbitrary data.
+    /// Useful for storing your internal reference IDs.
     #[serde(default)]
     pub custom: Option<String>,
 
-    /// Created timestamp
+    /// Created timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
+    ///
+    /// **Read-only**: Set by Payrix when entity is created.
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Last modified timestamp
+    /// Last modified timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
+    ///
+    /// **Read-only**: Updated by Payrix on changes.
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive
+    /// Whether resource is inactive.
+    ///
+    /// **Optional on create**. Set to `true` to create in inactive state.
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
-    /// Whether resource is frozen
+    /// Whether resource is frozen.
+    ///
+    /// **Read-only**: Set by Payrix for compliance/risk reasons.
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }

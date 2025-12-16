@@ -65,148 +65,208 @@ pub enum AccountType {
 
 /// A Payrix bank account.
 ///
-/// Accounts are used for merchant funding and disbursements.
+/// Bank accounts are used for merchant funding (receiving deposits) and
+/// debiting (fee withdrawals, refunds). An entity can have multiple accounts
+/// for different purposes.
+///
+/// # Creating an Account
+///
+/// When creating a new account, the following fields are required:
+/// - `entity` - Parent entity ID
+/// - `routing` - Bank routing number (9 digits) OR `public_token` for Plaid
+/// - `account` - Bank account number OR `public_token` for Plaid
+/// - `holder_type` - Individual or Business
+///
+/// Read-only fields (returned by API, not sent on create):
+/// - `id` - Assigned by Payrix
+/// - `login` - Set by API based on authentication
+/// - `last4` - Derived from account number
+/// - `status`, `verified` - Set by verification process
+/// - `created`, `modified` - Timestamps set by API
+///
+/// # Account Types
+///
+/// The `account_type` field controls what transactions can use this account:
+/// - `All` - Both credits (deposits) and debits (withdrawals). Use for primary
+///   operating accounts that receive deposits and have fees deducted.
+/// - `Credit` - Deposits only, no fee withdrawals. Use for trust accounts,
+///   client funds accounts, or accounts that should only receive money.
+/// - `Debit` - Withdrawals only. Rarely used, for special fee accounts.
+///
+/// # Primary Account
+///
+/// One account should be marked as `primary: true`. The primary account is used
+/// for fee deductions and as the default funding destination.
+///
+/// # Bank Account Entry Methods
+///
+/// You can add bank accounts two ways:
+/// 1. **Manual Entry** - Provide `routing` and `account` numbers directly
+/// 2. **Plaid Integration** - Provide a `public_token` from Plaid Link
+///
+/// # Trust Account + Operating Account Pattern
+///
+/// Businesses handling client funds (law firms, escrow, property managers)
+/// often need two accounts:
+/// - **Operating account** (`account_type: All`, `primary: true`) - receives
+///   merchant's share of funds, pays processing fees
+/// - **Trust account** (`account_type: Credit`, `primary: false`) - receives
+///   client funds only, no fee withdrawals allowed
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
-    /// Unique identifier (30 characters, e.g., "t1_act_...")
+    /// Unique identifier (30 characters, e.g., "t1_act_...").
+    ///
+    /// **Read-only**: Assigned by Payrix when account is created.
     pub id: PayrixId,
 
-    /// Entity ID that owns this account (required)
+    /// Parent entity ID.
+    ///
+    /// **Required for creation**. The entity that owns this bank account.
+    /// Format: "t1_ent_..." (30 characters).
     pub entity: PayrixId,
 
-    /// Login ID that created this account
+    /// Login ID that created this account.
+    ///
+    /// **Read-only**: Set by Payrix based on the authenticated user.
     #[serde(default)]
     pub login: Option<PayrixId>,
 
-    /// Account name/label
+    /// Account name/label for identification.
+    ///
+    /// **Optional**. Use descriptive names like "Operating Account",
+    /// "Client Trust Account" to distinguish between multiple accounts.
     #[serde(default)]
     pub name: Option<String>,
 
-    /// Account type (credit, debit, or all)
+    /// Transaction type this account can be used for.
+    ///
+    /// **Optional** (defaults to `All`).
+    /// - `All` - Credits (deposits) and debits (fee withdrawals)
+    /// - `Credit` - Deposits only (use for trust accounts)
+    /// - `Debit` - Withdrawals only (rare)
     #[serde(default, rename = "type")]
     pub account_type: Option<AccountType>,
 
-    /// Bank routing number
+    /// Bank routing number (ABA number).
+    ///
+    /// **Required for creation** (manual entry). 9-digit US bank routing number.
+    /// Not needed when using Plaid integration.
     #[serde(default)]
     pub routing: Option<String>,
 
-    /// Bank account number (masked)
+    /// Bank account number.
+    ///
+    /// **Required for creation** (manual entry). Full account number.
+    /// Not needed when using Plaid integration.
+    /// Note: API returns masked value in responses.
     #[serde(default)]
     pub account: Option<String>,
 
-    /// Last 4 digits of account number
+    /// Last 4 digits of account number.
+    ///
+    /// **Read-only**: Derived from the account number by Payrix.
     #[serde(default)]
     pub last4: Option<String>,
 
-    /// Account holder's first name
+    /// Account holder's first name.
+    ///
+    /// **Optional**. For individual accounts, the account holder's first name.
+    /// Not typically needed for business accounts.
     #[serde(default)]
     pub first: Option<String>,
 
-    /// Account holder's middle name
+    /// Account holder's middle name.
+    ///
+    /// **Optional**.
     #[serde(default)]
     pub middle: Option<String>,
 
-    /// Account holder's last name
+    /// Account holder's last name.
+    ///
+    /// **Optional**. For individual accounts, the account holder's last name.
+    /// Not typically needed for business accounts.
     #[serde(default)]
     pub last: Option<String>,
 
-    /// Bank name
+    /// Bank name.
+    ///
+    /// **Optional**. Name of the financial institution.
+    /// Often auto-populated from routing number.
     #[serde(default)]
     pub bank: Option<String>,
 
-    /// Account holder type
+    /// Account holder type.
+    ///
+    /// **Required for creation**.
+    /// - `Individual` - Personal bank account
+    /// - `Business` - Business/corporate bank account
     #[serde(default)]
     pub holder_type: Option<AccountHolderType>,
 
-    /// Whether this is the primary account
+    /// Whether this is the primary account.
+    ///
+    /// **Optional** (defaults to false). The primary account is used for:
+    /// - Default funding destination for deposits
+    /// - Fee deductions and other debits
+    ///
+    /// One account per entity should be marked primary.
     #[serde(default, with = "bool_from_int_default_false")]
     pub primary: bool,
 
-    /// Account status
+    /// Account verification status.
+    ///
+    /// **Read-only**: Set by Payrix's verification process.
+    /// - `NotReady` - Not yet ready to verify
+    /// - `Ready` - Ready to be verified
+    /// - `Challenged` - Micro-deposit challenge sent
+    /// - `Verified` - Successfully verified
+    /// - `Manual` - Needs manual review
     #[serde(default)]
     pub status: Option<AccountStatus>,
 
-    /// Verification status
+    /// Verification status code.
+    ///
+    /// **Read-only**: Numeric verification state set by Payrix.
     #[serde(default)]
     pub verified: Option<i32>,
 
-    /// Currency code (e.g., "USD")
+    /// Currency code (e.g., "USD").
+    ///
+    /// **Optional**. ISO 4217 currency code. Defaults to "USD" if not specified.
     #[serde(default)]
     pub currency: Option<String>,
 
-    /// Description/notes
+    /// Description/notes for internal reference.
+    ///
+    /// **Optional**.
     #[serde(default)]
     pub description: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// Created timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
+    ///
+    /// **Read-only**: Set by Payrix when account is created.
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// Last modified timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
+    ///
+    /// **Read-only**: Updated by Payrix on changes.
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive (false=active, true=inactive)
+    /// Whether resource is inactive.
+    ///
+    /// **Optional on create**. Set to `true` to create in inactive state.
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
-    /// Whether resource is frozen
+    /// Whether resource is frozen.
+    ///
+    /// **Read-only**: Set by Payrix for compliance/risk reasons.
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
-}
-
-/// Request to create a new account.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewAccount {
-    /// Entity ID (required)
-    pub entity: String,
-
-    /// Account name/label
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-
-    /// Account type (credit, debit, or all)
-    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-    pub account_type: Option<AccountType>,
-
-    /// Bank routing number
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub routing: Option<String>,
-
-    /// Bank account number
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub account: Option<String>,
-
-    /// Account holder's first name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub first: Option<String>,
-
-    /// Account holder's middle name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub middle: Option<String>,
-
-    /// Account holder's last name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last: Option<String>,
-
-    /// Bank name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub bank: Option<String>,
-
-    /// Account holder type
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub holder_type: Option<AccountHolderType>,
-
-    /// Whether this is the primary account
-    #[serde(skip_serializing_if = "Option::is_none", with = "super::option_bool_from_int")]
-    pub primary: Option<bool>,
-
-    /// Description/notes
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
 }
 
 #[cfg(test)]
@@ -414,71 +474,5 @@ mod tests {
         assert!(!account.primary);
         assert!(!account.inactive);
         assert!(!account.frozen);
-    }
-
-    // ==================== NewAccount Tests ====================
-
-    #[test]
-    fn new_account_serialize_full() {
-        let new_account = NewAccount {
-            entity: "t1_ent_12345678901234567890123".to_string(),
-            name: Some("Primary Checking".to_string()),
-            account_type: Some(AccountType::Credit),
-            routing: Some("123456789".to_string()),
-            account: Some("987654321".to_string()),
-            first: Some("John".to_string()),
-            middle: Some("Q".to_string()),
-            last: Some("Doe".to_string()),
-            bank: Some("Chase Bank".to_string()),
-            holder_type: Some(AccountHolderType::Individual),
-            primary: Some(true),
-            description: Some("Primary business account".to_string()),
-        };
-
-        let json = serde_json::to_string(&new_account).unwrap();
-        assert!(json.contains("\"entity\":\"t1_ent_12345678901234567890123\""));
-        assert!(json.contains("\"name\":\"Primary Checking\""));
-        assert!(json.contains("\"type\":\"credit\""));
-        assert!(json.contains("\"holderType\":1"));
-        assert!(json.contains("\"primary\":1"));
-    }
-
-    #[test]
-    fn new_account_serialize_minimal() {
-        let new_account = NewAccount {
-            entity: "t1_ent_12345678901234567890123".to_string(),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_account).unwrap();
-        assert!(json.contains("\"entity\":\"t1_ent_12345678901234567890123\""));
-        // Optional fields should be omitted
-        assert!(!json.contains("\"name\""));
-        assert!(!json.contains("\"type\""));
-        assert!(!json.contains("\"primary\""));
-    }
-
-    #[test]
-    fn new_account_option_bool_to_int_true() {
-        let new_account = NewAccount {
-            entity: "t1_ent_12345678901234567890123".to_string(),
-            primary: Some(true),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_account).unwrap();
-        assert!(json.contains("\"primary\":1"));
-    }
-
-    #[test]
-    fn new_account_option_bool_to_int_false() {
-        let new_account = NewAccount {
-            entity: "t1_ent_12345678901234567890123".to_string(),
-            primary: Some(false),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_account).unwrap();
-        assert!(json.contains("\"primary\":0"));
     }
 }
