@@ -106,6 +106,7 @@
 //! - `sqlx` - Enable `sqlx::FromRow` derives for database storage
 //! - `webhooks` - Enable webhook server for receiving Payrix callbacks
 //! - `webhook-cli` - Enable CLI binary for webhook server management
+//! - `cache` - Enable local entity cache for faster queries and offline resilience
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![warn(missing_docs)]
@@ -121,6 +122,9 @@ pub mod workflows;
 
 #[cfg(feature = "webhooks")]
 pub mod webhooks;
+
+#[cfg(feature = "cache")]
+pub mod cache;
 
 pub use client::{Config, Environment, PayrixClient};
 pub use entity::EntityType;

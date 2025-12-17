@@ -90,6 +90,11 @@ pub enum Error {
     /// IO error - file operations failed
     #[error("IO error: {0}")]
     Io(String),
+
+    /// Database error (when cache feature is enabled)
+    #[cfg(feature = "cache")]
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
 }
 
 fn format_api_errors(errors: &[PayrixApiError]) -> String {
