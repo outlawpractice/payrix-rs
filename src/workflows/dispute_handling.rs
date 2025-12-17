@@ -1503,4 +1503,228 @@ mod tests {
 
         assert_eq!(dispute.id().as_str(), id.as_str());
     }
+
+    // =========================================================================
+    // Mock Data Tests (tests/mock_data/chargebacks.json)
+    // =========================================================================
+
+    /// Test that we can deserialize and process real Payrix chargeback responses.
+    #[test]
+    fn test_from_mock_data_chargebacks() {
+        // This is the raw JSON from tests/mock_data/chargebacks.json
+        let mock_json = r#"{
+            "response": {
+                "data": [
+                    {
+                        "id": "t1_chb_6616a9f7c19a47bea938957",
+                        "created": "2024-04-10 11:02:15.8016",
+                        "modified": "2024-06-20 13:34:48.1638",
+                        "creator": "t1_log_618afcdc2543bcabeaf184e",
+                        "modifier": "t1_log_657202cb80bcfc9df78676f",
+                        "merchant": "t1_mer_65f097a2848a4ceae39b6ee",
+                        "txn": "t1_txn_6616a938dab5e92858d4e0a",
+                        "description": "",
+                        "total": 30000,
+                        "representedTotal": null,
+                        "cycle": "first",
+                        "currency": "USD",
+                        "ref": "j3JeC74OWBL000065",
+                        "reason": "Missing Signature",
+                        "reasonCode": "F14",
+                        "issued": 20240409,
+                        "received": null,
+                        "reply": 20241231,
+                        "bankRef": null,
+                        "chargebackRef": null,
+                        "status": "closed",
+                        "inactive": 0,
+                        "frozen": 0,
+                        "lastStatusChange": "t1_chs_66746838179377f5d203381",
+                        "actionable": 1,
+                        "paymentMethod": 4,
+                        "shadow": 0
+                    },
+                    {
+                        "id": "t1_chb_6616a9de06fd751e5ae91e5",
+                        "created": "2024-04-10 11:01:50.0337",
+                        "modified": "2024-04-10 11:01:50.1415",
+                        "creator": "t1_log_618afcdc2543bcabeaf184e",
+                        "modifier": "t1_log_618afcdc2543bcabeaf184e",
+                        "merchant": "t1_mer_65f097a2848a4ceae39b6ee",
+                        "txn": "t1_txn_6616a925e796be0ebf69dd9",
+                        "description": "",
+                        "total": 20000,
+                        "representedTotal": null,
+                        "cycle": "first",
+                        "currency": "USD",
+                        "ref": "j3JeC74OWBL000064",
+                        "reason": "Missing Signature",
+                        "reasonCode": "F14",
+                        "issued": 20240409,
+                        "received": null,
+                        "reply": 20241231,
+                        "bankRef": null,
+                        "chargebackRef": null,
+                        "status": "open",
+                        "inactive": 0,
+                        "frozen": 0,
+                        "lastStatusChange": "t1_chs_6616a9de0caecb0efb2c2e6",
+                        "actionable": 1,
+                        "paymentMethod": 4,
+                        "shadow": 0
+                    },
+                    {
+                        "id": "t1_chb_6616a9b87fce852bab31384",
+                        "created": "2024-04-10 11:01:12.5285",
+                        "modified": "2024-04-10 21:00:01.8517",
+                        "creator": "t1_log_618afcdc2543bcabeaf184e",
+                        "modifier": "t1_log_64ee6855b97877780a5bfef",
+                        "merchant": "t1_mer_65f097a2848a4ceae39b6ee",
+                        "txn": "t1_txn_6616a9113625edd8552a81d",
+                        "description": "",
+                        "total": 10000,
+                        "representedTotal": null,
+                        "cycle": "first",
+                        "currency": "USD",
+                        "ref": "j3JeC74OWBL000063",
+                        "reason": "Missing Signature",
+                        "reasonCode": "F14",
+                        "issued": 20240409,
+                        "received": null,
+                        "reply": 20241231,
+                        "bankRef": null,
+                        "chargebackRef": null,
+                        "status": "lost",
+                        "inactive": 0,
+                        "frozen": 0,
+                        "lastStatusChange": "t1_chs_66173611ab3e030eb8b9b4e",
+                        "actionable": 1,
+                        "paymentMethod": 4,
+                        "shadow": 0
+                    }
+                ],
+                "details": {
+                    "requestId": 1,
+                    "totals": [],
+                    "page": {
+                        "current": 1,
+                        "last": 1,
+                        "hasMore": false
+                    }
+                },
+                "errors": []
+            }
+        }"#;
+
+        // Parse the response wrapper
+        #[derive(serde::Deserialize)]
+        struct Response {
+            response: ResponseBody,
+        }
+        #[derive(serde::Deserialize)]
+        struct ResponseBody {
+            data: Vec<Chargeback>,
+        }
+
+        let response: Response = serde_json::from_str(mock_json).expect("Failed to parse mock JSON");
+        let chargebacks = response.response.data;
+
+        assert_eq!(chargebacks.len(), 3);
+
+        // Test first chargeback - closed status should be Terminal
+        let dispute1 = ChargebackDispute::from_chargeback(chargebacks[0].clone());
+        assert_eq!(dispute1.id().as_str(), "t1_chb_6616a9f7c19a47bea938957");
+        assert!(dispute1.is_terminal(), "Closed chargeback should be Terminal");
+        assert_eq!(dispute1.inner().total, Some(30000));
+        assert_eq!(dispute1.inner().reason_code.as_deref(), Some("F14"));
+
+        // Test second chargeback - open first cycle should be Active(First)
+        let dispute2 = ChargebackDispute::from_chargeback(chargebacks[1].clone());
+        assert_eq!(dispute2.id().as_str(), "t1_chb_6616a9de06fd751e5ae91e5");
+        assert!(dispute2.is_active(), "Open chargeback should be Active");
+        assert_eq!(dispute2.state_name(), "first");
+        if let ChargebackDispute::Active(ActiveDispute::First(first)) = &dispute2 {
+            assert_eq!(first.inner().total, Some(20000));
+            assert!(first.inner().actionable, "Should be actionable");
+        } else {
+            panic!("Expected Active(First) state for open chargeback");
+        }
+
+        // Test third chargeback - lost status should be Terminal
+        let dispute3 = ChargebackDispute::from_chargeback(chargebacks[2].clone());
+        assert_eq!(dispute3.id().as_str(), "t1_chb_6616a9b87fce852bab31384");
+        assert!(dispute3.is_terminal(), "Lost chargeback should be Terminal");
+        assert_eq!(dispute3.inner().total, Some(10000));
+    }
+
+    #[test]
+    fn test_mock_data_chargeback_fields() {
+        // Test a single chargeback with all fields populated
+        let cb_json = r#"{
+            "id": "t1_chb_6616a9de06fd751e5ae91e5",
+            "created": "2024-04-10 11:01:50.0337",
+            "modified": "2024-04-10 11:01:50.1415",
+            "creator": "t1_log_618afcdc2543bcabeaf184e",
+            "modifier": "t1_log_618afcdc2543bcabeaf184e",
+            "merchant": "t1_mer_65f097a2848a4ceae39b6ee",
+            "txn": "t1_txn_6616a925e796be0ebf69dd9",
+            "description": "",
+            "total": 20000,
+            "representedTotal": null,
+            "cycle": "first",
+            "currency": "USD",
+            "ref": "j3JeC74OWBL000064",
+            "reason": "Missing Signature",
+            "reasonCode": "F14",
+            "issued": 20240409,
+            "received": null,
+            "reply": 20241231,
+            "bankRef": null,
+            "chargebackRef": null,
+            "status": "open",
+            "inactive": 0,
+            "frozen": 0,
+            "lastStatusChange": "t1_chs_6616a9de0caecb0efb2c2e6",
+            "actionable": 1,
+            "paymentMethod": 4,
+            "shadow": 0
+        }"#;
+
+        let cb: Chargeback = serde_json::from_str(cb_json).expect("Failed to parse chargeback");
+
+        // Verify all important fields
+        assert_eq!(cb.id.as_str(), "t1_chb_6616a9de06fd751e5ae91e5");
+        assert_eq!(cb.merchant.as_ref().map(|m| m.as_str()), Some("t1_mer_65f097a2848a4ceae39b6ee"));
+        assert_eq!(cb.txn.as_ref().map(|t| t.as_str()), Some("t1_txn_6616a925e796be0ebf69dd9"));
+        assert_eq!(cb.total, Some(20000));
+        assert_eq!(cb.cycle, Some(ChargebackCycle::First));
+        assert_eq!(cb.status, Some(ChargebackStatusValue::Open));
+        assert_eq!(cb.reason.as_deref(), Some("Missing Signature"));
+        assert_eq!(cb.reason_code.as_deref(), Some("F14"));
+        assert_eq!(cb.reply, Some(20241231));
+        assert!(cb.actionable);
+        assert!(!cb.inactive);
+        assert!(!cb.frozen);
+        assert!(!cb.shadow);
+
+        // Convert to dispute and verify state
+        let dispute = ChargebackDispute::from_chargeback(cb);
+        assert!(dispute.is_active());
+        assert_eq!(dispute.state_name(), "first");
+    }
+
+    #[test]
+    fn test_mime_type_to_document_type() {
+        assert!(matches!(mime_type_to_document_type("application/pdf"), ChargebackDocumentType::Pdf));
+        assert!(matches!(mime_type_to_document_type("APPLICATION/PDF"), ChargebackDocumentType::Pdf));
+        assert!(matches!(mime_type_to_document_type("image/tiff"), ChargebackDocumentType::Tiff));
+        assert!(matches!(mime_type_to_document_type("image/tif"), ChargebackDocumentType::Tiff));
+        assert!(matches!(mime_type_to_document_type("image/png"), ChargebackDocumentType::Png));
+        assert!(matches!(mime_type_to_document_type("image/jpeg"), ChargebackDocumentType::Jpg));
+        assert!(matches!(mime_type_to_document_type("image/jpg"), ChargebackDocumentType::Jpg));
+        assert!(matches!(mime_type_to_document_type("image/gif"), ChargebackDocumentType::Image));
+        assert!(matches!(mime_type_to_document_type("image/webp"), ChargebackDocumentType::Image));
+        assert!(matches!(mime_type_to_document_type("text/plain"), ChargebackDocumentType::Text));
+        assert!(matches!(mime_type_to_document_type("application/octet-stream"), ChargebackDocumentType::Other));
+    }
 }
