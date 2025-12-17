@@ -12,6 +12,7 @@
 //!
 //! - [`merchant_onboarding`] - Onboard new merchants with business info, bank accounts, and owners
 //! - [`dispute_handling`] - Handle chargeback disputes with compile-time state enforcement
+//! - [`webhook_setup`] - Set up webhook alerts for real-time event notifications
 //!
 //! # Example
 //!
@@ -33,6 +34,7 @@
 
 pub mod dispute_handling;
 pub mod merchant_onboarding;
+pub mod webhook_setup;
 
 // Re-export key types for convenience
 pub use merchant_onboarding::{
@@ -48,4 +50,10 @@ pub use dispute_handling::{
     evidence_from_base64_url, evidence_from_bytes, evidence_from_path,
     get_actionable_disputes, get_disputes_by_cycle, get_disputes_for_transaction,
     MAX_DOCUMENTS, MAX_DOCUMENT_SIZE, MAX_TOTAL_SIZE,
+};
+
+// Re-export webhook setup types
+pub use webhook_setup::{
+    get_webhook_status, remove_webhook_by_id, remove_webhooks, setup_webhooks,
+    WebhookAlertInfo, WebhookConfig, WebhookEventType, WebhookSetupResult, WebhookStatus,
 };

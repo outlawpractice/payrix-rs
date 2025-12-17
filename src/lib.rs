@@ -104,6 +104,8 @@
 //! ## Feature Flags
 //!
 //! - `sqlx` - Enable `sqlx::FromRow` derives for database storage
+//! - `webhooks` - Enable webhook server for receiving Payrix callbacks
+//! - `webhook-cli` - Enable CLI binary for webhook server management
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![warn(missing_docs)]
@@ -116,6 +118,9 @@ mod rate_limiter;
 pub mod search;
 pub mod types;
 pub mod workflows;
+
+#[cfg(feature = "webhooks")]
+pub mod webhooks;
 
 pub use client::{Config, Environment, PayrixClient};
 pub use entity::EntityType;
@@ -139,4 +144,10 @@ pub use workflows::merchant_onboarding::{
 pub use workflows::dispute_handling::{
     ActiveDispute, ChargebackDispute, ChargebackState, Evidence, EvidenceDocument,
     TypedChargeback, get_actionable_disputes,
+};
+
+// Re-export webhook setup types for convenience
+pub use workflows::webhook_setup::{
+    get_webhook_status, remove_webhooks, setup_webhooks, WebhookConfig, WebhookEventType,
+    WebhookSetupResult, WebhookStatus,
 };
