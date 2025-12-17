@@ -54,6 +54,10 @@ name = "payrix-webhooks"
 path = "src/bin/payrix-webhooks.rs"
 required-features = ["webhook-cli"]
 
+[[example]]
+name = "webhook_dispute_handler"
+required-features = ["webhooks"]
+
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

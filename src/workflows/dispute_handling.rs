@@ -95,12 +95,15 @@
 use std::marker::PhantomData;
 use std::path::Path;
 
+use base64::Engine;
+
 use crate::client::PayrixClient;
 use crate::entity::EntityType;
 use crate::error::{Error, Result};
 use crate::types::{
-    Chargeback, ChargebackCycle, ChargebackMessage, ChargebackMessageType, ChargebackStatusValue,
-    NewChargebackMessage, PayrixId,
+    Chargeback, ChargebackCycle, ChargebackDocument, ChargebackDocumentType, ChargebackMessage,
+    ChargebackMessageType, ChargebackStatusValue, NewChargebackDocument, NewChargebackMessage,
+    PayrixId,
 };
 
 // =============================================================================
@@ -654,12 +657,29 @@ impl TypedChargeback<First> {
             message: Some(evidence.message),
         };
 
-        let _response: ChargebackMessage = client
+        let response: ChargebackMessage = client
             .create(EntityType::ChargebackMessages, &message)
             .await?;
 
-        // TODO: Upload documents to ChargebackDocuments if evidence has documents
-        // This would require additional API calls for each document
+        // Upload documents attached to this chargeback message
+        for doc in evidence.documents {
+            let document_type = mime_type_to_document_type(&doc.mime_type);
+            let encoded_content = base64::engine::general_purpose::STANDARD.encode(&doc.content);
+
+            let new_doc = NewChargebackDocument {
+                chargeback: self.inner.id.to_string(),
+                chargeback_message: Some(response.id.to_string()),
+                name: Some(doc.name),
+                document_type: Some(document_type),
+                mime_type: Some(doc.mime_type),
+                description: None,
+                data: Some(encoded_content),
+            };
+
+            let _doc_response: ChargebackDocument = client
+                .create(EntityType::ChargebackDocuments, &new_doc)
+                .await?;
+        }
 
         // Reload the chargeback to get the updated state
         let updated: Chargeback = client
@@ -776,9 +796,29 @@ impl TypedChargeback<PreArbitration> {
             message: Some(evidence.message),
         };
 
-        let _response: ChargebackMessage = client
+        let response: ChargebackMessage = client
             .create(EntityType::ChargebackMessages, &message)
             .await?;
+
+        // Upload documents attached to this chargeback message
+        for doc in evidence.documents {
+            let document_type = mime_type_to_document_type(&doc.mime_type);
+            let encoded_content = base64::engine::general_purpose::STANDARD.encode(&doc.content);
+
+            let new_doc = NewChargebackDocument {
+                chargeback: self.inner.id.to_string(),
+                chargeback_message: Some(response.id.to_string()),
+                name: Some(doc.name),
+                document_type: Some(document_type),
+                mime_type: Some(doc.mime_type),
+                description: None,
+                data: Some(encoded_content),
+            };
+
+            let _doc_response: ChargebackDocument = client
+                .create(EntityType::ChargebackDocuments, &new_doc)
+                .await?;
+        }
 
         let updated: Chargeback = client
             .get_one(EntityType::Chargebacks, self.inner.id.as_str())
@@ -838,9 +878,29 @@ impl TypedChargeback<SecondChargeback> {
             message: Some(evidence.message),
         };
 
-        let _response: ChargebackMessage = client
+        let response: ChargebackMessage = client
             .create(EntityType::ChargebackMessages, &message)
             .await?;
+
+        // Upload documents attached to this chargeback message
+        for doc in evidence.documents {
+            let document_type = mime_type_to_document_type(&doc.mime_type);
+            let encoded_content = base64::engine::general_purpose::STANDARD.encode(&doc.content);
+
+            let new_doc = NewChargebackDocument {
+                chargeback: self.inner.id.to_string(),
+                chargeback_message: Some(response.id.to_string()),
+                name: Some(doc.name),
+                document_type: Some(document_type),
+                mime_type: Some(doc.mime_type),
+                description: None,
+                data: Some(encoded_content),
+            };
+
+            let _doc_response: ChargebackDocument = client
+                .create(EntityType::ChargebackDocuments, &new_doc)
+                .await?;
+        }
 
         let updated: Chargeback = client
             .get_one(EntityType::Chargebacks, self.inner.id.as_str())
@@ -1155,6 +1215,24 @@ pub async fn get_disputes_for_transaction(
         .into_iter()
         .map(ChargebackDispute::from_chargeback)
         .collect())
+}
+
+// =============================================================================
+// Section 6b: Helper Functions
+// =============================================================================
+
+/// Convert a MIME type to a ChargebackDocumentType.
+fn mime_type_to_document_type(mime_type: &str) -> ChargebackDocumentType {
+    match mime_type.to_lowercase().as_str() {
+        "application/pdf" => ChargebackDocumentType::Pdf,
+        "image/tiff" | "image/tif" => ChargebackDocumentType::Tiff,
+        "image/png" => ChargebackDocumentType::Png,
+        "image/jpeg" | "image/jpg" => ChargebackDocumentType::Jpg,
+        "image/gif" => ChargebackDocumentType::Image,
+        "text/plain" => ChargebackDocumentType::Text,
+        _ if mime_type.starts_with("image/") => ChargebackDocumentType::Image,
+        _ => ChargebackDocumentType::Other,
+    }
 }
 
 // =============================================================================

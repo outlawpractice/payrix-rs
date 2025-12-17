@@ -791,6 +791,9 @@ pub struct ChargebackDocument {
 /// Request to create a new chargeback document.
 ///
 /// **OpenAPI schema:** `chargebackDocumentsRequest`
+///
+/// Note: Document content can be provided via the `data` field as base64-encoded
+/// binary data. Verify with Payrix documentation for the exact format requirements.
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NewChargebackDocument {
@@ -828,6 +831,13 @@ pub struct NewChargebackDocument {
     /// **OpenAPI type:** string
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+
+    /// Base64-encoded document content.
+    ///
+    /// Some payment APIs accept document content as base64-encoded data.
+    /// Verify the exact format with Payrix API documentation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
 }
 
 // =============================================================================
@@ -1257,12 +1267,14 @@ mod tests {
             document_type: Some(ChargebackDocumentType::Pdf),
             mime_type: Some("application/pdf".to_string()),
             description: Some("Supporting evidence".to_string()),
+            data: Some("SGVsbG8gV29ybGQ=".to_string()), // base64 "Hello World"
         };
 
         let json = serde_json::to_string(&doc).unwrap();
         assert!(json.contains("\"chargeback\":\"t1_chb_12345678901234567890123\""));
         assert!(json.contains("\"type\":\"pdf\""));
         assert!(json.contains("\"name\":\"evidence.pdf\""));
+        assert!(json.contains("\"data\":\"SGVsbG8gV29ybGQ=\""));
     }
 
     // =========================================================================
