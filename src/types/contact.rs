@@ -1,446 +1,298 @@
 //! Contact types for the Payrix API.
 //!
-//! Contacts represent individuals associated with entities or merchants.
+//! Contacts represent individuals associated with entities.
+//!
+//! **OpenAPI schema:** `contactsResponse`
 
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use super::{bool_from_int_default_false, option_bool_from_int, PayrixId};
+use super::{bool_from_int_default_false, PayrixId};
 
-/// Contact type values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-pub enum ContactType {
-    /// Primary contact
-    #[default]
-    Primary = 1,
-    /// Billing contact
-    Billing = 2,
-    /// Technical contact
-    Technical = 3,
-    /// Support contact
-    Support = 4,
-}
+// =============================================================================
+// CONTACT STRUCT
+// =============================================================================
 
 /// A Payrix contact.
 ///
-/// Contacts are individuals associated with entities or merchants.
+/// Contacts are individuals associated with entities.
+///
+/// **OpenAPI schema:** `contactsResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Contact {
-    /// Unique identifier (30 characters, e.g., "t1_con_...")
+    /// The ID of this resource.
+    ///
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Entity ID this contact belongs to
-    #[serde(default)]
-    pub entity: Option<PayrixId>,
-
-    /// Merchant ID
-    #[serde(default)]
-    pub merchant: Option<PayrixId>,
-
-    /// Login ID that created this contact
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Contact type
-    #[serde(default, rename = "type")]
-    pub contact_type: Option<ContactType>,
-
-    /// First name
-    #[serde(default)]
-    pub first: Option<String>,
-
-    /// Last name
-    #[serde(default)]
-    pub last: Option<String>,
-
-    /// Title/position
-    #[serde(default)]
-    pub title: Option<String>,
-
-    /// Email address
-    #[serde(default)]
-    pub email: Option<String>,
-
-    /// Primary phone number
-    #[serde(default)]
-    pub phone: Option<String>,
-
-    /// Alternate phone number
-    #[serde(default)]
-    pub phone_alt: Option<String>,
-
-    /// Fax number
-    #[serde(default)]
-    pub fax: Option<String>,
-
-    /// Address line 1
-    #[serde(default)]
-    pub address1: Option<String>,
-
-    /// Address line 2
-    #[serde(default)]
-    pub address2: Option<String>,
-
-    /// City
-    #[serde(default)]
-    pub city: Option<String>,
-
-    /// State/province
-    #[serde(default)]
-    pub state: Option<String>,
-
-    /// ZIP/postal code
-    #[serde(default)]
-    pub zip: Option<String>,
-
-    /// Country code
-    #[serde(default)]
-    pub country: Option<String>,
-
-    /// Description/notes
-    #[serde(default)]
-    pub description: Option<String>,
-
-    /// Custom data field
-    #[serde(default)]
-    pub custom: Option<String>,
-
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive (false=active, true=inactive)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub inactive: bool,
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
 
-    /// Whether resource is frozen
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub frozen: bool,
-}
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
 
-/// Request to create a new contact.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewContact {
-    /// Entity ID (required)
-    pub entity: String,
+    /// The identifier of the Entity that this Contact relates to.
+    ///
+    /// **OpenAPI type:** string (ref: contactsModelEntity)
+    #[serde(default)]
+    pub entity: Option<PayrixId>,
 
-    /// Merchant ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub merchant: Option<String>,
-
-    /// Contact type
-    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-    pub contact_type: Option<ContactType>,
-
-    /// First name
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The first name associated with this Contact.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
     pub first: Option<String>,
 
-    /// Last name
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The middle name associated with this Contact.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub middle: Option<String>,
+
+    /// The last name associated with this Contact.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
     pub last: Option<String>,
 
-    /// Title/position
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-
-    /// Email address
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub email: Option<String>,
-
-    /// Primary phone number
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub phone: Option<String>,
-
-    /// Alternate phone number
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub phone_alt: Option<String>,
-
-    /// Fax number
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fax: Option<String>,
-
-    /// Address line 1
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub address1: Option<String>,
-
-    /// Address line 2
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub address2: Option<String>,
-
-    /// City
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub city: Option<String>,
-
-    /// State/province
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub state: Option<String>,
-
-    /// ZIP/postal code
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub zip: Option<String>,
-
-    /// Country code
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub country: Option<String>,
-
-    /// Description/notes
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// A description of this Contact.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
     pub description: Option<String>,
 
-    /// Custom data field
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
+    /// The email address of this Contact.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub email: Option<String>,
 
-    /// Whether resource is inactive
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub inactive: Option<bool>,
+    /// The fax number associated with this Contact.
+    ///
+    /// This field is stored as a text string (10-15 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub fax: Option<String>,
+
+    /// The phone number associated with this Contact.
+    ///
+    /// This field is stored as a text string (10-15 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub phone: Option<String>,
+
+    /// The country being used for this Contact.
+    ///
+    /// Default value: `USA`
+    ///
+    /// **OpenAPI type:** string (ref: Country)
+    #[serde(default)]
+    pub country: Option<String>,
+
+    /// The ZIP code in the address associated with this Contact.
+    ///
+    /// This field is stored as a text string (1-20 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub zip: Option<String>,
+
+    /// The U.S. state or Canadian province relevant to the address.
+    ///
+    /// Use 2-character postal abbreviation for US/Canada (e.g., "IL", "CA", "ON").
+    /// For locations outside US/Canada, provide the full state name.
+    /// This field is stored as a text string (2-100 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub state: Option<String>,
+
+    /// The name of the city in the address associated with this Contact.
+    ///
+    /// This field is stored as a text string (1-500 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub city: Option<String>,
+
+    /// The second line of the address associated with this Contact.
+    ///
+    /// This field is stored as a text string (1-500 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub address2: Option<String>,
+
+    /// The first line of the address associated with this Contact.
+    ///
+    /// This field is stored as a text string (1-500 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub address1: Option<String>,
+
+    /// Whether this resource is marked as frozen.
+    ///
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
+    ///
+    /// **OpenAPI type:** integer (ref: Frozen)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub frozen: bool,
+
+    /// Whether this resource is marked as inactive.
+    ///
+    /// - `0` - Active
+    /// - `1` - Inactive
+    ///
+    /// **OpenAPI type:** integer (ref: Inactive)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub inactive: bool,
 }
+
+// =============================================================================
+// TESTS
+// =============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json;
 
-    // ContactType enum tests
-    #[test]
-    fn test_contact_type_default() {
-        assert_eq!(ContactType::default(), ContactType::Primary);
-    }
+    // ==================== Contact Struct Tests ====================
 
     #[test]
-    fn test_contact_type_serialize() {
-        assert_eq!(serde_json::to_string(&ContactType::Primary).unwrap(), "1");
-        assert_eq!(serde_json::to_string(&ContactType::Billing).unwrap(), "2");
-        assert_eq!(serde_json::to_string(&ContactType::Technical).unwrap(), "3");
-        assert_eq!(serde_json::to_string(&ContactType::Support).unwrap(), "4");
-    }
-
-    #[test]
-    fn test_contact_type_deserialize() {
-        assert_eq!(serde_json::from_str::<ContactType>("1").unwrap(), ContactType::Primary);
-        assert_eq!(serde_json::from_str::<ContactType>("2").unwrap(), ContactType::Billing);
-        assert_eq!(serde_json::from_str::<ContactType>("3").unwrap(), ContactType::Technical);
-        assert_eq!(serde_json::from_str::<ContactType>("4").unwrap(), ContactType::Support);
-    }
-
-    // Contact struct tests
-    #[test]
-    fn test_contact_deserialize_full() {
+    fn contact_deserialize_full() {
         let json = r#"{
             "id": "t1_con_12345678901234567890123",
-            "entity": "t1_ent_23456789012345678901234",
-            "merchant": "t1_mer_34567890123456789012345",
-            "login": "t1_tlg_45678901234567890123456",
-            "type": 1,
-            "first": "Jane",
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 23:59:59.9999",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124",
+            "entity": "t1_ent_12345678901234567890123",
+            "first": "John",
+            "middle": "Q",
             "last": "Smith",
-            "title": "CFO",
-            "email": "jane@example.com",
-            "phone": "555-1234",
-            "phoneAlt": "555-5678",
-            "fax": "555-9999",
-            "address1": "456 Contact Ave",
-            "address2": "Floor 3",
-            "city": "Chicago",
-            "state": "IL",
+            "description": "Primary contact",
+            "email": "john@example.com",
+            "fax": "5551234567",
+            "phone": "5559876543",
+            "country": "USA",
             "zip": "60601",
-            "country": "US",
-            "description": "Primary contact for billing",
-            "custom": "{\"key\":\"value\"}",
-            "created": "2024-01-01 12:00:00.000",
-            "modified": "2024-01-02 12:00:00.000",
-            "inactive": 0,
-            "frozen": 1
+            "state": "IL",
+            "city": "Chicago",
+            "address2": "Suite 100",
+            "address1": "123 Main St",
+            "frozen": 0,
+            "inactive": 1
         }"#;
 
         let contact: Contact = serde_json::from_str(json).unwrap();
         assert_eq!(contact.id.as_str(), "t1_con_12345678901234567890123");
-        assert_eq!(contact.entity, Some(PayrixId::new("t1_ent_23456789012345678901234").unwrap()));
-        assert_eq!(contact.merchant, Some(PayrixId::new("t1_mer_34567890123456789012345").unwrap()));
-        assert_eq!(contact.login, Some(PayrixId::new("t1_tlg_45678901234567890123456").unwrap()));
-        assert_eq!(contact.contact_type, Some(ContactType::Primary));
-        assert_eq!(contact.first, Some("Jane".to_string()));
+        assert_eq!(contact.created, Some("2024-01-01 00:00:00.0000".to_string()));
+        assert_eq!(contact.modified, Some("2024-01-02 23:59:59.9999".to_string()));
+        assert_eq!(contact.creator.as_ref().map(|c| c.as_str()), Some("t1_lgn_12345678901234567890123"));
+        assert_eq!(contact.modifier.as_ref().map(|m| m.as_str()), Some("t1_lgn_12345678901234567890124"));
+        assert_eq!(contact.entity.as_ref().map(|e| e.as_str()), Some("t1_ent_12345678901234567890123"));
+        assert_eq!(contact.first, Some("John".to_string()));
+        assert_eq!(contact.middle, Some("Q".to_string()));
         assert_eq!(contact.last, Some("Smith".to_string()));
-        assert_eq!(contact.title, Some("CFO".to_string()));
-        assert_eq!(contact.email, Some("jane@example.com".to_string()));
-        assert_eq!(contact.phone, Some("555-1234".to_string()));
-        assert_eq!(contact.phone_alt, Some("555-5678".to_string()));
-        assert_eq!(contact.fax, Some("555-9999".to_string()));
-        assert_eq!(contact.address1, Some("456 Contact Ave".to_string()));
-        assert_eq!(contact.address2, Some("Floor 3".to_string()));
-        assert_eq!(contact.city, Some("Chicago".to_string()));
-        assert_eq!(contact.state, Some("IL".to_string()));
+        assert_eq!(contact.description, Some("Primary contact".to_string()));
+        assert_eq!(contact.email, Some("john@example.com".to_string()));
+        assert_eq!(contact.fax, Some("5551234567".to_string()));
+        assert_eq!(contact.phone, Some("5559876543".to_string()));
+        assert_eq!(contact.country, Some("USA".to_string()));
         assert_eq!(contact.zip, Some("60601".to_string()));
-        assert_eq!(contact.country, Some("US".to_string()));
-        assert_eq!(contact.description, Some("Primary contact for billing".to_string()));
-        assert_eq!(contact.custom, Some("{\"key\":\"value\"}".to_string()));
-        assert_eq!(contact.created, Some("2024-01-01 12:00:00.000".to_string()));
-        assert_eq!(contact.modified, Some("2024-01-02 12:00:00.000".to_string()));
-        assert_eq!(contact.inactive, false);
-        assert_eq!(contact.frozen, true);
+        assert_eq!(contact.state, Some("IL".to_string()));
+        assert_eq!(contact.city, Some("Chicago".to_string()));
+        assert_eq!(contact.address2, Some("Suite 100".to_string()));
+        assert_eq!(contact.address1, Some("123 Main St".to_string()));
+        assert!(!contact.frozen);
+        assert!(contact.inactive);
     }
 
     #[test]
-    fn test_contact_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_con_12345678901234567890123"
-        }"#;
+    fn contact_deserialize_minimal() {
+        let json = r#"{"id": "t1_con_12345678901234567890123"}"#;
 
         let contact: Contact = serde_json::from_str(json).unwrap();
         assert_eq!(contact.id.as_str(), "t1_con_12345678901234567890123");
-        assert_eq!(contact.entity, None);
-        assert_eq!(contact.merchant, None);
-        assert_eq!(contact.login, None);
-        assert_eq!(contact.contact_type, None);
-        assert_eq!(contact.first, None);
-        assert_eq!(contact.last, None);
-        assert_eq!(contact.title, None);
-        assert_eq!(contact.email, None);
-        assert_eq!(contact.phone, None);
-        assert_eq!(contact.phone_alt, None);
-        assert_eq!(contact.fax, None);
-        assert_eq!(contact.address1, None);
-        assert_eq!(contact.address2, None);
-        assert_eq!(contact.city, None);
-        assert_eq!(contact.state, None);
-        assert_eq!(contact.zip, None);
-        assert_eq!(contact.country, None);
-        assert_eq!(contact.description, None);
-        assert_eq!(contact.custom, None);
-        assert_eq!(contact.created, None);
-        assert_eq!(contact.modified, None);
-        assert_eq!(contact.inactive, false);
-        assert_eq!(contact.frozen, false);
+        assert!(contact.created.is_none());
+        assert!(contact.modified.is_none());
+        assert!(contact.creator.is_none());
+        assert!(contact.modifier.is_none());
+        assert!(contact.entity.is_none());
+        assert!(contact.first.is_none());
+        assert!(contact.middle.is_none());
+        assert!(contact.last.is_none());
+        assert!(contact.description.is_none());
+        assert!(contact.email.is_none());
+        assert!(contact.fax.is_none());
+        assert!(contact.phone.is_none());
+        assert!(contact.country.is_none());
+        assert!(contact.zip.is_none());
+        assert!(contact.state.is_none());
+        assert!(contact.city.is_none());
+        assert!(contact.address2.is_none());
+        assert!(contact.address1.is_none());
+        assert!(!contact.frozen);
+        assert!(!contact.inactive);
     }
 
     #[test]
-    fn test_contact_bool_from_int() {
-        // Test inactive field with int values
-        let json = r#"{"id": "t1_con_12345678901234567890123", "inactive": 1}"#;
+    fn contact_bool_from_int() {
+        let json = r#"{"id": "t1_con_12345678901234567890123", "inactive": 1, "frozen": 1}"#;
         let contact: Contact = serde_json::from_str(json).unwrap();
-        assert_eq!(contact.inactive, true);
+        assert!(contact.inactive);
+        assert!(contact.frozen);
 
-        let json = r#"{"id": "t1_con_12345678901234567890123", "inactive": 0}"#;
+        let json = r#"{"id": "t1_con_12345678901234567890123", "inactive": 0, "frozen": 0}"#;
         let contact: Contact = serde_json::from_str(json).unwrap();
-        assert_eq!(contact.inactive, false);
+        assert!(!contact.inactive);
+        assert!(!contact.frozen);
+    }
 
-        // Test frozen field with int values
-        let json = r#"{"id": "t1_con_12345678901234567890123", "frozen": 1}"#;
+    #[test]
+    fn contact_serialize_roundtrip() {
+        let json = r#"{
+            "id": "t1_con_12345678901234567890123",
+            "entity": "t1_ent_12345678901234567890123",
+            "first": "Jane",
+            "last": "Doe"
+        }"#;
+
         let contact: Contact = serde_json::from_str(json).unwrap();
-        assert_eq!(contact.frozen, true);
-
-        let json = r#"{"id": "t1_con_12345678901234567890123", "frozen": 0}"#;
-        let contact: Contact = serde_json::from_str(json).unwrap();
-        assert_eq!(contact.frozen, false);
-    }
-
-    // NewContact struct tests
-    #[test]
-    fn test_new_contact_serialize_full() {
-        let new_contact = NewContact {
-            entity: "t1_ent_23456789012345678901234".to_string(),
-            merchant: Some("t1_mer_34567890123456789012345".to_string()),
-            contact_type: Some(ContactType::Billing),
-            first: Some("Jane".to_string()),
-            last: Some("Smith".to_string()),
-            title: Some("CFO".to_string()),
-            email: Some("jane@example.com".to_string()),
-            phone: Some("555-1234".to_string()),
-            phone_alt: Some("555-5678".to_string()),
-            fax: Some("555-9999".to_string()),
-            address1: Some("456 Contact Ave".to_string()),
-            address2: Some("Floor 3".to_string()),
-            city: Some("Chicago".to_string()),
-            state: Some("IL".to_string()),
-            zip: Some("60601".to_string()),
-            country: Some("US".to_string()),
-            description: Some("Primary contact for billing".to_string()),
-            custom: Some("{\"key\":\"value\"}".to_string()),
-            inactive: Some(true),
-        };
-
-        let json = serde_json::to_string(&new_contact).unwrap();
-        assert!(json.contains("\"entity\":\"t1_ent_23456789012345678901234\""));
-        assert!(json.contains("\"merchant\":\"t1_mer_34567890123456789012345\""));
-        assert!(json.contains("\"type\":2"));
-        assert!(json.contains("\"first\":\"Jane\""));
-        assert!(json.contains("\"last\":\"Smith\""));
-        assert!(json.contains("\"phoneAlt\":\"555-5678\""));
-        assert!(json.contains("\"inactive\":1"));
-    }
-
-    #[test]
-    fn test_new_contact_serialize_minimal() {
-        let new_contact = NewContact {
-            entity: "t1_ent_23456789012345678901234".to_string(),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_contact).unwrap();
-        assert!(json.contains("\"entity\":\"t1_ent_23456789012345678901234\""));
-        assert!(!json.contains("merchant"));
-        assert!(!json.contains("type"));
-        assert!(!json.contains("first"));
-        assert!(!json.contains("inactive"));
-    }
-
-    #[test]
-    fn test_new_contact_serialize_with_inactive() {
-        // Test with inactive = true (should serialize as 1)
-        let new_contact = NewContact {
-            entity: "t1_ent_23456789012345678901234".to_string(),
-            inactive: Some(true),
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&new_contact).unwrap();
-        assert!(json.contains("\"inactive\":1"));
-
-        // Test with inactive = false (should serialize as 0)
-        let new_contact = NewContact {
-            entity: "t1_ent_23456789012345678901234".to_string(),
-            inactive: Some(false),
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&new_contact).unwrap();
-        assert!(json.contains("\"inactive\":0"));
-
-        // Test with inactive = None (should not serialize)
-        let new_contact = NewContact {
-            entity: "t1_ent_23456789012345678901234".to_string(),
-            inactive: None,
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&new_contact).unwrap();
-        assert!(!json.contains("inactive"));
-    }
-
-    #[test]
-    fn test_new_contact_serialize_contact_type() {
-        // Test all contact type variants
-        let variants = vec![
-            (ContactType::Primary, "1"),
-            (ContactType::Billing, "2"),
-            (ContactType::Technical, "3"),
-            (ContactType::Support, "4"),
-        ];
-
-        for (variant, expected) in variants {
-            let new_contact = NewContact {
-                entity: "t1_ent_23456789012345678901234".to_string(),
-                contact_type: Some(variant),
-                ..Default::default()
-            };
-            let json = serde_json::to_string(&new_contact).unwrap();
-            assert!(json.contains(&format!("\"type\":{}", expected)));
-        }
+        let serialized = serde_json::to_string(&contact).unwrap();
+        let deserialized: Contact = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(contact.id, deserialized.id);
+        assert_eq!(contact.entity, deserialized.entity);
+        assert_eq!(contact.first, deserialized.first);
+        assert_eq!(contact.last, deserialized.last);
     }
 }

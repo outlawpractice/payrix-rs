@@ -14,6 +14,12 @@ rust-version = "1.75"
 [features]
 default = []
 sqlx = ["dep:sqlx"]
+# Include financial/reporting types (settlements, statements, billing, profit shares, etc.)
+financial = []
+# Include terminal/physical device types (terminals, terminal transactions, etc.)
+terminal = []
+# Include all optional types
+full = ["financial", "terminal"]
 
 [dependencies]
 chrono = "0.4"

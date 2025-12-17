@@ -8,6 +8,13 @@ This document catalogs discrepancies between the Payrix API documentation (OpenA
 
 **Important:** Our integration tests run against a test instance with limited, sometimes stale data (some records are 2+ years old). This affects how we interpret test results:
 
+### Test Environment Limitations
+
+- **Payouts:** The test environment does NOT process payouts. The `/payouts` endpoint will always return empty results in test mode.
+- **Chargebacks:** Can create chargebacks with documentation, but cannot move them through the lifecycle (close, arbitration, etc.) without Payrix Support involvement. Existing resolved chargebacks from production merchants can be used for read testing.
+- **Disbursements:** May contain stale or limited data.
+- **TeamLogins:** Access may be restricted based on API key permissions.
+
 1. **OpenAPI spec values are authoritative** - The OpenAPI specification defines the valid enum values. We include all spec values even if we didn't observe them in tests. Absence of evidence in limited test data is NOT evidence of absence.
 
 2. **Test observations that differ from spec are suspect** - When we observe values NOT in the OpenAPI spec, this likely indicates:
@@ -403,27 +410,27 @@ These are cases where field names match but have different meanings.
 
 ---
 
-## Integer vs String in Transaction Enums
+## Integer vs String in Transaction Fields
 
-### Various Transaction Enums
+### POST vs GET Response Format Inconsistency
 
-**Official Documentation:** Transaction fields use string-encoded integers:
-- `"type": "1"` for card sale, `"type": "5"` for card refund
-- `"status": "1"` for Approved, `"status": "3"` for Captured
-- `"origin": "2"` for eCommerce
+**Critical Finding:** The API returns different types for the same fields depending on HTTP method:
 
-**Actual API returns:** String-encoded integers
-- `"1"` instead of `1`
-- Observed at column 1156 in transaction responses
+| Field | POST (Create) Response | GET Response |
+|-------|------------------------|--------------|
+| status | `"status":"1"` (string) | `"status": 1` (integer) |
+| approved | `"approved":"100"` (string) | `"approved": 10000` (integer) |
+| fundingEnabled | `"fundingEnabled":"1"` (string) | `"fundingEnabled": 1` (integer) |
+| type | `"type": 1` (integer) | `"type": 1` (integer) |
+| origin | `"origin": 2` (integer) | `"origin": 2` (integer) |
 
-**Library solution:** Created `impl_flexible_i32_enum_deserialize!` macro that accepts both integer (`1`) and string (`"1"`) formats. Applied to all transaction enums:
-- TransactionType
-- TransactionStatus
-- TransactionOrigin
-- TerminalCapability
-- EntryMode
-- TxnResultType
-- TxnResultCode
+**Summary:**
+- POST responses return `status`, `approved`, `fundingEnabled` as STRINGS
+- GET responses return the same fields as INTEGERS
+- `type` and `origin` are integers in both cases
+
+**Library solution:** Created `impl_flexible_i32_enum_deserialize!` macro that accepts both integer (`1`) and string (`"1"`) formats. Applied to:
+- TransactionStatus (required - POST returns string, GET returns int)
 
 ### Missing Enum Values
 
@@ -487,59 +494,34 @@ These are cases where field names match but have different meanings.
 
 ---
 
-## Test Results Summary
+## Test Results Summary (Strict OpenAPI Types)
 
-**Passing tests (47/48):**
-- test_customer_crud
-- test_error_handling
-- test_get_accounts
-- test_get_account_verifications
-- test_get_adjustments
-- test_get_alerts
-- test_get_alert_actions
-- test_get_alert_triggers
-- test_get_batches
-- test_get_chargebacks
-- test_get_chargeback_documents
-- test_get_chargeback_messages
-- test_get_chargeback_message_results
-- test_get_chargeback_statuses
-- test_get_contacts
-- test_get_disbursements
-- test_get_disbursement_entries
-- test_get_customers
-- test_get_entities
-- test_get_entity_reserves
-- test_get_entries
-- test_get_fee_rules
-- test_get_fees
-- test_get_funds
-- test_get_logins
-- test_get_members
-- test_get_merchants
-- test_get_notes
-- test_get_note_documents
-- test_get_orgs
-- test_get_org_entities
-- test_get_payouts
-- test_get_pending_entries
-- test_get_plans
-- test_get_refunds
-- test_get_reserves
-- test_get_reserve_entries
-- test_get_subscriptions
-- test_get_tokens
-- test_get_transactions
-- test_get_vendors
-- test_search_with_pagination
-- test_token_creation
-- test_transaction_flow
-- test_discover_chargeback_status_values
-- test_chargeback_raw_json_status
-- test_chargeback_status_history_raw
+**Current Approach:** Types strictly follow OpenAPI specification. Failing tests document real API inconsistencies.
 
-**Failing tests (1/48):**
-- **test_get_team_logins:** API returns empty body - likely account access/permission issue
+**Passing tests (51/55):**
+- All CRUD and read tests pass for most entity types
+- Customer, token, transaction creation tests pass
+- Most GET tests pass
+
+**Failing tests that document API inconsistencies (4/55):**
+
+| Test | Error | API Inconsistency |
+|------|-------|-------------------|
+| `test_get_disbursement_entries` | `invalid type: floating point 1855189.609, expected i64` | **Amount fields return floats instead of integers** |
+| `test_get_funds` | `invalid type: floating point 3524255.258, expected i64` | **Balance fields return floats instead of integers** |
+| `test_get_disbursements` | `DateYmd must contain only digits, got '2025-10-09 10:47:48'` | **Date fields return datetime instead of YYYYMMDD** |
+| `test_get_team_logins` | `EOF while parsing a value` | Empty response body (access issue) |
+
+**Key Inconsistencies Proven by Tests:**
+
+1. **Transaction Status (RESOLVED):** POST responses return `status` as string (`"1"`), GET responses return integer (`1`). Fixed with flexible deserializer.
+
+2. **Monetary Fields (CRITICAL):** OpenAPI specifies integer cents, but API returns floats:
+   - Fund: `available`, `pending`, `reserved`, `total`
+   - DisbursementEntry: `amount`, `fee`, `net`
+
+3. **Date Fields (CRITICAL):** OpenAPI specifies YYYYMMDD format, but API returns full datetimes:
+   - Disbursement: `scheduled`, `processed`
 
 ---
 

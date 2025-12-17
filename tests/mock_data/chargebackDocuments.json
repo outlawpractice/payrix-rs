@@ -1,0 +1,32 @@
+{
+  "response": {
+    "data": [
+      {
+        "id": "t1_chd_6674682736b9b7bf2671e7e",
+        "created": "2024-06-20 13:34:31.2242",
+        "modified": "2024-06-20 13:34:32.6579",
+        "creator": "t1_log_657202cb80bcfc9df78676f",
+        "modifier": "t1_log_657202cb80bcfc9df78676f",
+        "chargeback": "t1_chb_6616a9f7c19a47bea938957",
+        "ref": "t1_chd_6674682736b9b7bf2671e7e.TIFF",
+        "type": "tiff",
+        "name": "invoice 1.TIFF",
+        "description": null,
+        "status": "processed",
+        "inactive": 0,
+        "frozen": 0,
+        "documentSource": null
+      }
+    ],
+    "details": {
+      "requestId": 1,
+      "totals": [],
+      "page": {
+        "current": 1,
+        "last": 1,
+        "hasMore": false
+      }
+    },
+    "errors": []
+  }
+}

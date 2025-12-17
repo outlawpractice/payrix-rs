@@ -1,657 +1,446 @@
 //! Note types for the Payrix API.
 //!
 //! Notes allow adding comments and annotations to various resources.
+//!
+//! **OpenAPI schema:** `notesResponse`, `noteDocumentsResponse`
 
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use super::{bool_from_int_default_false, option_bool_from_int, PayrixId};
+use super::{bool_from_int_default_false, PayrixId};
 
-/// Note type values.
-/// NOTE: API returns camelCase string values (e.g., "note", "general", "customerService")
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum NoteType {
-    /// General note
-    #[default]
-    General,
-    /// Note (generic)
-    Note,
-    /// Customer service note
-    CustomerService,
-    /// Risk/compliance note
-    Risk,
-    /// Internal note
-    Internal,
-    /// System-generated note
-    System,
-}
-
-/// Note visibility values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-pub enum NoteVisibility {
-    /// Private (only creator can see)
-    #[default]
-    Private = 1,
-    /// Internal (organization members can see)
-    Internal = 2,
-    /// Public (visible to all with access to the resource)
-    Public = 3,
-}
+// =============================================================================
+// NOTE STRUCT
+// =============================================================================
 
 /// A Payrix note.
 ///
-/// Notes are comments or annotations attached to resources like
-/// merchants, transactions, chargebacks, etc.
+/// Notes are comments or annotations attached to holds, transactions,
+/// terminal transactions, or entities.
+///
+/// **OpenAPI schema:** `notesResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
-    /// Unique identifier (30 characters, e.g., "t1_nte_...")
+    /// The ID of this resource.
+    ///
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Entity ID this note belongs to
-    #[serde(default)]
-    pub entity: Option<PayrixId>,
-
-    /// Login ID that created this note
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Resource type this note is attached to (e.g., "merchant", "txn", "chargeback")
-    #[serde(default)]
-    pub for_type: Option<String>,
-
-    /// Resource ID this note is attached to
-    #[serde(default)]
-    pub for_id: Option<PayrixId>,
-
-    /// Note type
-    #[serde(default, rename = "type")]
-    pub note_type: Option<NoteType>,
-
-    /// Note visibility
-    #[serde(default)]
-    pub visibility: Option<NoteVisibility>,
-
-    /// Note subject/title
-    #[serde(default)]
-    pub subject: Option<String>,
-
-    /// Note body/content
-    #[serde(default)]
-    pub body: Option<String>,
-
-    /// Whether the note is pinned/sticky
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub pinned: bool,
-
-    /// Custom data field
-    #[serde(default)]
-    pub custom: Option<String>,
-
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive (false=active, true=inactive)
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
+
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+
+    /// The identifier of the Login that owns this notes resource.
+    ///
+    /// **OpenAPI type:** string (ref: notesModelLogin)
+    #[serde(default)]
+    pub login: Option<PayrixId>,
+
+    /// The identifier of the Hold that relates to this notes resource.
+    ///
+    /// **OpenAPI type:** string (ref: notesModelHold)
+    #[serde(default)]
+    pub hold: Option<PayrixId>,
+
+    /// The identifier of the Txn that relates to this notes resource.
+    ///
+    /// **OpenAPI type:** string (ref: notesModelTxn)
+    #[serde(default)]
+    pub txn: Option<PayrixId>,
+
+    /// The identifier of the TerminalTxn that relates to this notes resource.
+    ///
+    /// **OpenAPI type:** string (ref: notesModelTerminalTxn)
+    #[serde(default)]
+    pub terminal_txn: Option<PayrixId>,
+
+    /// The identifier of the Entity that relates to this notes resource.
+    ///
+    /// **OpenAPI type:** string (ref: notesModelEntity)
+    #[serde(default)]
+    pub entity: Option<PayrixId>,
+
+    /// The desired type to take on the referenced Note.
+    ///
+    /// **OpenAPI type:** string (ref: noteType)
+    ///
+    /// Valid values: `note`, `release`, `review`, `reReview`, `amexSales`, `businessSales`,
+    /// `consumerSales`, `deliverySchedule`, `immediateDeliveryPercent`, `sevenDayDeliveryPercent`,
+    /// `fourteenDayDeliveryPercent`, `thirtyDayDeliveryPercent`, `cardPresentSales`, `motoSales`,
+    /// `ecommerceSales`, `siteVisit`, `goodsSold`, `authorizationFlatFee`, `capturePercentFee`,
+    /// `captureFlatFee`, `riskApproved`, `riskPending`, `riskCancelled`, `riskDenied`,
+    /// `riskClosed`, `riskInvestigation`, `riskPendingData`, `riskFundsReleased`, `riskActivityApproved`
+    #[serde(default, rename = "type")]
+    pub note_type: Option<String>,
+
+    /// A Message/Note regarding this notes resource.
+    ///
+    /// This field is stored as a text string.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub note: Option<String>,
+
+    /// Free-form text for adding a message along with the type.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub data: Option<String>,
+
+    /// Flag to determine if a note has been pinned or not.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub pinned: Option<i32>,
+
+    /// The timestamp indicating the date and time when a note was pinned.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$`)
+    #[serde(default)]
+    pub pinned_date: Option<String>,
+
+    /// Whether this resource is marked as inactive.
+    ///
+    /// - `0` - Active
+    /// - `1` - Inactive
+    ///
+    /// **OpenAPI type:** integer (ref: Inactive)
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
-    /// Whether resource is frozen
+    /// Whether this resource is marked as frozen.
+    ///
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
+    ///
+    /// **OpenAPI type:** integer (ref: Frozen)
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }
 
-/// Request to create a new note.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewNote {
-    /// Entity ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub entity: Option<String>,
-
-    /// Resource type this note is attached to (required)
-    pub for_type: String,
-
-    /// Resource ID this note is attached to (required)
-    pub for_id: String,
-
-    /// Note type
-    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-    pub note_type: Option<NoteType>,
-
-    /// Note visibility
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub visibility: Option<NoteVisibility>,
-
-    /// Note subject/title
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subject: Option<String>,
-
-    /// Note body/content (required)
-    pub body: String,
-
-    /// Whether the note is pinned/sticky
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub pinned: Option<bool>,
-
-    /// Custom data field
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
-}
-
-/// Document type values for note documents.
-/// NOTE: API returns lowercase string values (e.g., "pdf", "image", "png")
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum NoteDocumentType {
-    /// Image file
-    #[default]
-    Image,
-    /// PDF document
-    Pdf,
-    /// Text file
-    Text,
-    /// Spreadsheet
-    Spreadsheet,
-    /// PNG image file
-    Png,
-    /// JPG/JPEG image file
-    Jpg,
-    /// TIFF image file
-    Tiff,
-    /// Other/generic
-    Other,
-}
+// =============================================================================
+// NOTE DOCUMENT STRUCT
+// =============================================================================
 
 /// A Payrix note document.
 ///
 /// Documents are file attachments for notes.
+///
+/// **OpenAPI schema:** `noteDocumentsResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct NoteDocument {
-    /// Unique identifier (30 characters, e.g., "t1_ntd_...")
+    /// The ID of this resource.
+    ///
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Note ID this document belongs to (required)
-    pub note: PayrixId,
-
-    /// Login ID that uploaded this document
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Document name/filename
-    #[serde(default)]
-    pub name: Option<String>,
-
-    /// Document type
-    #[serde(default, rename = "type")]
-    pub document_type: Option<NoteDocumentType>,
-
-    /// MIME type
-    #[serde(default)]
-    pub mime_type: Option<String>,
-
-    /// File size in bytes
-    #[serde(default)]
-    pub size: Option<i64>,
-
-    /// Document URL or path
-    #[serde(default)]
-    pub url: Option<String>,
-
-    /// Document description
-    #[serde(default)]
-    pub description: Option<String>,
-
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive (false=active, true=inactive)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub inactive: bool,
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
 
-    /// Whether resource is frozen
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub frozen: bool,
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+
+    /// The identifier of the Note that owns this note documents resource.
+    ///
+    /// **OpenAPI type:** string (ref: noteDocumentsModelNote)
+    #[serde(default)]
+    pub note: Option<PayrixId>,
+
+    /// The identifier of the Custom that relates to this notes resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub custom: Option<String>,
+
+    /// The desired type to take on the referenced Note Document.
+    ///
+    /// **OpenAPI type:** string (ref: noteDocumentType)
+    ///
+    /// Valid values: `jpg`, `jpeg`, `gif`, `png`, `pdf`, `tif`, `tiff`, `txt`, `xml`, `asc`
+    #[serde(default, rename = "type")]
+    pub document_type: Option<String>,
 }
 
-/// Request to create a new note document.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewNoteDocument {
-    /// Note ID (required)
-    pub note: String,
-
-    /// Document name/filename
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-
-    /// Document type
-    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-    pub document_type: Option<NoteDocumentType>,
-
-    /// MIME type
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub mime_type: Option<String>,
-
-    /// Document description
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-}
+// =============================================================================
+// TESTS
+// =============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json;
-
-    // ==================== Enum Tests ====================
-
-    #[test]
-    fn note_type_default() {
-        assert_eq!(NoteType::default(), NoteType::General);
-    }
-
-    #[test]
-    fn note_type_all_variants_serialize() {
-        // NOTE: API returns string values for note type
-        let test_cases = [
-            (NoteType::General, "\"general\""),
-            (NoteType::Note, "\"note\""),
-            (NoteType::CustomerService, "\"customerService\""),
-            (NoteType::Risk, "\"risk\""),
-            (NoteType::Internal, "\"internal\""),
-            (NoteType::System, "\"system\""),
-        ];
-
-        for (variant, expected_json) in test_cases {
-            let json = serde_json::to_string(&variant).unwrap();
-            assert_eq!(json, expected_json);
-        }
-    }
-
-    #[test]
-    fn note_type_all_variants_deserialize() {
-        // NOTE: API returns string values for note type
-        let test_cases = [
-            ("\"general\"", NoteType::General),
-            ("\"note\"", NoteType::Note),
-            ("\"customerService\"", NoteType::CustomerService),
-            ("\"risk\"", NoteType::Risk),
-            ("\"internal\"", NoteType::Internal),
-            ("\"system\"", NoteType::System),
-        ];
-
-        for (json, expected_variant) in test_cases {
-            let variant: NoteType = serde_json::from_str(json).unwrap();
-            assert_eq!(variant, expected_variant);
-        }
-    }
-
-    #[test]
-    fn note_visibility_default() {
-        assert_eq!(NoteVisibility::default(), NoteVisibility::Private);
-    }
-
-    #[test]
-    fn note_visibility_all_variants_serialize() {
-        let test_cases = [
-            (NoteVisibility::Private, "1"),
-            (NoteVisibility::Internal, "2"),
-            (NoteVisibility::Public, "3"),
-        ];
-
-        for (variant, expected_json) in test_cases {
-            let json = serde_json::to_string(&variant).unwrap();
-            assert_eq!(json, expected_json);
-        }
-    }
-
-    #[test]
-    fn note_visibility_all_variants_deserialize() {
-        let test_cases = [
-            ("1", NoteVisibility::Private),
-            ("2", NoteVisibility::Internal),
-            ("3", NoteVisibility::Public),
-        ];
-
-        for (json, expected_variant) in test_cases {
-            let variant: NoteVisibility = serde_json::from_str(json).unwrap();
-            assert_eq!(variant, expected_variant);
-        }
-    }
-
-    #[test]
-    fn note_document_type_default() {
-        assert_eq!(NoteDocumentType::default(), NoteDocumentType::Image);
-    }
-
-    #[test]
-    fn note_document_type_all_variants_serialize() {
-        // NOTE: API returns string values for document type
-        let test_cases = [
-            (NoteDocumentType::Image, "\"image\""),
-            (NoteDocumentType::Pdf, "\"pdf\""),
-            (NoteDocumentType::Text, "\"text\""),
-            (NoteDocumentType::Spreadsheet, "\"spreadsheet\""),
-            (NoteDocumentType::Png, "\"png\""),
-            (NoteDocumentType::Jpg, "\"jpg\""),
-            (NoteDocumentType::Tiff, "\"tiff\""),
-            (NoteDocumentType::Other, "\"other\""),
-        ];
-
-        for (variant, expected_json) in test_cases {
-            let json = serde_json::to_string(&variant).unwrap();
-            assert_eq!(json, expected_json);
-        }
-    }
-
-    #[test]
-    fn note_document_type_all_variants_deserialize() {
-        // NOTE: API returns string values for document type
-        let test_cases = [
-            ("\"image\"", NoteDocumentType::Image),
-            ("\"pdf\"", NoteDocumentType::Pdf),
-            ("\"text\"", NoteDocumentType::Text),
-            ("\"spreadsheet\"", NoteDocumentType::Spreadsheet),
-            ("\"png\"", NoteDocumentType::Png),
-            ("\"jpg\"", NoteDocumentType::Jpg),
-            ("\"tiff\"", NoteDocumentType::Tiff),
-            ("\"other\"", NoteDocumentType::Other),
-        ];
-
-        for (json, expected_variant) in test_cases {
-            let variant: NoteDocumentType = serde_json::from_str(json).unwrap();
-            assert_eq!(variant, expected_variant);
-        }
-    }
 
     // ==================== Note Struct Tests ====================
 
     #[test]
     fn note_deserialize_full() {
-        // NOTE: API returns string values for note type
         let json = r#"{
             "id": "t1_nte_12345678901234567890123",
-            "entity": "t1_ety_12345678901234567890123",
-            "login": "t1_log_12345678901234567890123",
-            "forType": "merchant",
-            "forId": "t1_mer_12345678901234567890123",
-            "type": "customerService",
-            "visibility": 3,
-            "subject": "Account Review",
-            "body": "Reviewed account for compliance",
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 23:59:59.9999",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124",
+            "login": "t1_lgn_12345678901234567890125",
+            "hold": "t1_hld_12345678901234567890123",
+            "txn": "t1_txn_12345678901234567890123",
+            "terminalTxn": "t1_ttx_12345678901234567890123",
+            "entity": "t1_ent_12345678901234567890123",
+            "type": "note",
+            "note": "Account reviewed for compliance",
+            "data": "Additional details here",
             "pinned": 1,
-            "custom": "custom_data",
-            "created": "2024-01-01 10:00:00.000",
-            "modified": "2024-01-01 15:30:00.000",
+            "pinnedDate": "2024-01-01 10:00:00",
             "inactive": 0,
             "frozen": 1
         }"#;
 
         let note: Note = serde_json::from_str(json).unwrap();
         assert_eq!(note.id.as_str(), "t1_nte_12345678901234567890123");
-        assert_eq!(note.entity.as_ref().unwrap().as_str(), "t1_ety_12345678901234567890123");
-        assert_eq!(note.login.as_ref().unwrap().as_str(), "t1_log_12345678901234567890123");
-        assert_eq!(note.for_type.as_ref().unwrap(), "merchant");
-        assert_eq!(note.for_id.as_ref().unwrap().as_str(), "t1_mer_12345678901234567890123");
-        assert_eq!(note.note_type.unwrap(), NoteType::CustomerService);
-        assert_eq!(note.visibility.unwrap(), NoteVisibility::Public);
-        assert_eq!(note.subject.as_ref().unwrap(), "Account Review");
-        assert_eq!(note.body.as_ref().unwrap(), "Reviewed account for compliance");
-        assert_eq!(note.pinned, true);
-        assert_eq!(note.custom.as_ref().unwrap(), "custom_data");
-        assert_eq!(note.created.as_ref().unwrap(), "2024-01-01 10:00:00.000");
-        assert_eq!(note.modified.as_ref().unwrap(), "2024-01-01 15:30:00.000");
-        assert_eq!(note.inactive, false);
-        assert_eq!(note.frozen, true);
+        assert_eq!(note.created, Some("2024-01-01 00:00:00.0000".to_string()));
+        assert_eq!(note.modified, Some("2024-01-02 23:59:59.9999".to_string()));
+        assert_eq!(
+            note.creator.as_ref().map(|c| c.as_str()),
+            Some("t1_lgn_12345678901234567890123")
+        );
+        assert_eq!(
+            note.modifier.as_ref().map(|m| m.as_str()),
+            Some("t1_lgn_12345678901234567890124")
+        );
+        assert_eq!(
+            note.login.as_ref().map(|l| l.as_str()),
+            Some("t1_lgn_12345678901234567890125")
+        );
+        assert_eq!(
+            note.hold.as_ref().map(|h| h.as_str()),
+            Some("t1_hld_12345678901234567890123")
+        );
+        assert_eq!(
+            note.txn.as_ref().map(|t| t.as_str()),
+            Some("t1_txn_12345678901234567890123")
+        );
+        assert_eq!(
+            note.terminal_txn.as_ref().map(|t| t.as_str()),
+            Some("t1_ttx_12345678901234567890123")
+        );
+        assert_eq!(
+            note.entity.as_ref().map(|e| e.as_str()),
+            Some("t1_ent_12345678901234567890123")
+        );
+        assert_eq!(note.note_type, Some("note".to_string()));
+        assert_eq!(
+            note.note,
+            Some("Account reviewed for compliance".to_string())
+        );
+        assert_eq!(note.data, Some("Additional details here".to_string()));
+        assert_eq!(note.pinned, Some(1));
+        assert_eq!(note.pinned_date, Some("2024-01-01 10:00:00".to_string()));
+        assert!(!note.inactive);
+        assert!(note.frozen);
     }
 
     #[test]
     fn note_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_nte_12345678901234567890123"
-        }"#;
+        let json = r#"{"id": "t1_nte_12345678901234567890123"}"#;
 
         let note: Note = serde_json::from_str(json).unwrap();
         assert_eq!(note.id.as_str(), "t1_nte_12345678901234567890123");
-        assert!(note.entity.is_none());
-        assert!(note.login.is_none());
-        assert!(note.for_type.is_none());
-        assert!(note.for_id.is_none());
-        assert!(note.note_type.is_none());
-        assert!(note.visibility.is_none());
-        assert!(note.subject.is_none());
-        assert!(note.body.is_none());
-        assert_eq!(note.pinned, false);
-        assert!(note.custom.is_none());
         assert!(note.created.is_none());
         assert!(note.modified.is_none());
-        assert_eq!(note.inactive, false);
-        assert_eq!(note.frozen, false);
+        assert!(note.creator.is_none());
+        assert!(note.modifier.is_none());
+        assert!(note.login.is_none());
+        assert!(note.hold.is_none());
+        assert!(note.txn.is_none());
+        assert!(note.terminal_txn.is_none());
+        assert!(note.entity.is_none());
+        assert!(note.note_type.is_none());
+        assert!(note.note.is_none());
+        assert!(note.data.is_none());
+        assert!(note.pinned.is_none());
+        assert!(note.pinned_date.is_none());
+        assert!(!note.inactive);
+        assert!(!note.frozen);
     }
 
     #[test]
-    fn note_deserialize_bool_from_int() {
-        // Test bool_from_int deserialization
+    fn note_various_types() {
+        let types = vec![
+            "note",
+            "release",
+            "review",
+            "reReview",
+            "riskApproved",
+            "riskPending",
+            "riskDenied",
+        ];
+
+        for note_type in types {
+            let json = format!(
+                r#"{{"id": "t1_nte_12345678901234567890123", "type": "{}"}}"#,
+                note_type
+            );
+            let note: Note = serde_json::from_str(&json).unwrap();
+            assert_eq!(note.note_type, Some(note_type.to_string()));
+        }
+    }
+
+    #[test]
+    fn note_bool_from_int() {
+        let json = r#"{"id": "t1_nte_12345678901234567890123", "inactive": 1, "frozen": 0}"#;
+        let note: Note = serde_json::from_str(json).unwrap();
+        assert!(note.inactive);
+        assert!(!note.frozen);
+    }
+
+    #[test]
+    fn note_serialize_roundtrip() {
         let json = r#"{
             "id": "t1_nte_12345678901234567890123",
-            "pinned": 1,
-            "inactive": 1,
-            "frozen": 0
+            "entity": "t1_ent_12345678901234567890123",
+            "type": "note",
+            "note": "Test note"
         }"#;
 
         let note: Note = serde_json::from_str(json).unwrap();
-        assert_eq!(note.pinned, true);
-        assert_eq!(note.inactive, true);
-        assert_eq!(note.frozen, false);
-    }
-
-    // ==================== NewNote Tests ====================
-
-    #[test]
-    fn new_note_serialize_full() {
-        let note = NewNote {
-            entity: Some("t1_ety_12345678901234567890123".to_string()),
-            for_type: "merchant".to_string(),
-            for_id: "t1_mer_12345678901234567890123".to_string(),
-            note_type: Some(NoteType::Risk),
-            visibility: Some(NoteVisibility::Internal),
-            subject: Some("Risk Assessment".to_string()),
-            body: "Risk assessment completed".to_string(),
-            pinned: Some(true),
-            custom: Some("custom_data".to_string()),
-        };
-
-        let json = serde_json::to_string(&note).unwrap();
-        assert!(json.contains("\"entity\":\"t1_ety_12345678901234567890123\""));
-        assert!(json.contains("\"forType\":\"merchant\""));
-        assert!(json.contains("\"forId\":\"t1_mer_12345678901234567890123\""));
-        // NOTE: API returns string values for note type
-        assert!(json.contains("\"type\":\"risk\""));
-        assert!(json.contains("\"visibility\":2"));
-        assert!(json.contains("\"subject\":\"Risk Assessment\""));
-        assert!(json.contains("\"body\":\"Risk assessment completed\""));
-        assert!(json.contains("\"pinned\":1"));
-        assert!(json.contains("\"custom\":\"custom_data\""));
-    }
-
-    #[test]
-    fn new_note_serialize_minimal() {
-        let note = NewNote {
-            entity: None,
-            for_type: "merchant".to_string(),
-            for_id: "t1_mer_12345678901234567890123".to_string(),
-            note_type: None,
-            visibility: None,
-            subject: None,
-            body: "Simple note".to_string(),
-            pinned: None,
-            custom: None,
-        };
-
-        let json = serde_json::to_string(&note).unwrap();
-        assert!(!json.contains("\"entity\""));
-        assert!(json.contains("\"forType\":\"merchant\""));
-        assert!(json.contains("\"forId\":\"t1_mer_12345678901234567890123\""));
-        assert!(!json.contains("\"type\""));
-        assert!(!json.contains("\"visibility\""));
-        assert!(!json.contains("\"subject\""));
-        assert!(json.contains("\"body\":\"Simple note\""));
-        assert!(!json.contains("\"pinned\""));
-        assert!(!json.contains("\"custom\""));
-    }
-
-    #[test]
-    fn new_note_serialize_pinned_false() {
-        let note = NewNote {
-            entity: None,
-            for_type: "merchant".to_string(),
-            for_id: "t1_mer_12345678901234567890123".to_string(),
-            note_type: None,
-            visibility: None,
-            subject: None,
-            body: "Note".to_string(),
-            pinned: Some(false),
-            custom: None,
-        };
-
-        let json = serde_json::to_string(&note).unwrap();
-        assert!(json.contains("\"pinned\":0"));
-    }
-
-    #[test]
-    fn new_note_default() {
-        let note = NewNote::default();
-        assert!(note.entity.is_none());
-        assert_eq!(note.for_type, "");
-        assert_eq!(note.for_id, "");
-        assert!(note.note_type.is_none());
-        assert!(note.visibility.is_none());
-        assert!(note.subject.is_none());
-        assert_eq!(note.body, "");
-        assert!(note.pinned.is_none());
-        assert!(note.custom.is_none());
+        let serialized = serde_json::to_string(&note).unwrap();
+        let deserialized: Note = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(note.id, deserialized.id);
+        assert_eq!(note.entity, deserialized.entity);
+        assert_eq!(note.note_type, deserialized.note_type);
+        assert_eq!(note.note, deserialized.note);
     }
 
     // ==================== NoteDocument Tests ====================
 
     #[test]
     fn note_document_deserialize_full() {
-        // NOTE: API returns string values for document type
         let json = r#"{
             "id": "t1_ntd_12345678901234567890123",
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 23:59:59.9999",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124",
             "note": "t1_nte_12345678901234567890123",
-            "login": "t1_log_12345678901234567890123",
-            "name": "attachment.pdf",
-            "type": "pdf",
-            "mimeType": "application/pdf",
-            "size": 102400,
-            "url": "https://example.com/files/attachment.pdf",
-            "description": "Supporting document",
-            "created": "2024-01-01 10:00:00.000",
-            "modified": "2024-01-01 15:30:00.000",
-            "inactive": 0,
-            "frozen": 1
+            "custom": "custom data",
+            "type": "pdf"
         }"#;
 
         let doc: NoteDocument = serde_json::from_str(json).unwrap();
         assert_eq!(doc.id.as_str(), "t1_ntd_12345678901234567890123");
-        assert_eq!(doc.note.as_str(), "t1_nte_12345678901234567890123");
-        assert_eq!(doc.login.as_ref().unwrap().as_str(), "t1_log_12345678901234567890123");
-        assert_eq!(doc.name.as_ref().unwrap(), "attachment.pdf");
-        assert_eq!(doc.document_type.unwrap(), NoteDocumentType::Pdf);
-        assert_eq!(doc.mime_type.as_ref().unwrap(), "application/pdf");
-        assert_eq!(doc.size.unwrap(), 102400);
-        assert_eq!(doc.url.as_ref().unwrap(), "https://example.com/files/attachment.pdf");
-        assert_eq!(doc.description.as_ref().unwrap(), "Supporting document");
-        assert_eq!(doc.created.as_ref().unwrap(), "2024-01-01 10:00:00.000");
-        assert_eq!(doc.modified.as_ref().unwrap(), "2024-01-01 15:30:00.000");
-        assert_eq!(doc.inactive, false);
-        assert_eq!(doc.frozen, true);
+        assert_eq!(doc.created, Some("2024-01-01 00:00:00.0000".to_string()));
+        assert_eq!(doc.modified, Some("2024-01-02 23:59:59.9999".to_string()));
+        assert_eq!(
+            doc.creator.as_ref().map(|c| c.as_str()),
+            Some("t1_lgn_12345678901234567890123")
+        );
+        assert_eq!(
+            doc.modifier.as_ref().map(|m| m.as_str()),
+            Some("t1_lgn_12345678901234567890124")
+        );
+        assert_eq!(
+            doc.note.as_ref().map(|n| n.as_str()),
+            Some("t1_nte_12345678901234567890123")
+        );
+        assert_eq!(doc.custom, Some("custom data".to_string()));
+        assert_eq!(doc.document_type, Some("pdf".to_string()));
     }
 
     #[test]
     fn note_document_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_ntd_12345678901234567890123",
-            "note": "t1_nte_12345678901234567890123"
-        }"#;
+        let json = r#"{"id": "t1_ntd_12345678901234567890123"}"#;
 
         let doc: NoteDocument = serde_json::from_str(json).unwrap();
         assert_eq!(doc.id.as_str(), "t1_ntd_12345678901234567890123");
-        assert_eq!(doc.note.as_str(), "t1_nte_12345678901234567890123");
-        assert!(doc.login.is_none());
-        assert!(doc.name.is_none());
-        assert!(doc.document_type.is_none());
-        assert!(doc.mime_type.is_none());
-        assert!(doc.size.is_none());
-        assert!(doc.url.is_none());
-        assert!(doc.description.is_none());
         assert!(doc.created.is_none());
         assert!(doc.modified.is_none());
-        assert_eq!(doc.inactive, false);
-        assert_eq!(doc.frozen, false);
-    }
-
-    // ==================== NewNoteDocument Tests ====================
-
-    #[test]
-    fn new_note_document_serialize_full() {
-        let doc = NewNoteDocument {
-            note: "t1_nte_12345678901234567890123".to_string(),
-            name: Some("document.xlsx".to_string()),
-            document_type: Some(NoteDocumentType::Spreadsheet),
-            mime_type: Some("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".to_string()),
-            description: Some("Financial data".to_string()),
-        };
-
-        let json = serde_json::to_string(&doc).unwrap();
-        assert!(json.contains("\"note\":\"t1_nte_12345678901234567890123\""));
-        assert!(json.contains("\"name\":\"document.xlsx\""));
-        // NOTE: API returns string values for document type
-        assert!(json.contains("\"type\":\"spreadsheet\""));
-        assert!(json.contains("\"mimeType\":\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\""));
-        assert!(json.contains("\"description\":\"Financial data\""));
-    }
-
-    #[test]
-    fn new_note_document_serialize_minimal() {
-        let doc = NewNoteDocument {
-            note: "t1_nte_12345678901234567890123".to_string(),
-            name: None,
-            document_type: None,
-            mime_type: None,
-            description: None,
-        };
-
-        let json = serde_json::to_string(&doc).unwrap();
-        assert!(json.contains("\"note\":\"t1_nte_12345678901234567890123\""));
-        assert!(!json.contains("\"name\""));
-        assert!(!json.contains("\"type\""));
-        assert!(!json.contains("\"mimeType\""));
-        assert!(!json.contains("\"description\""));
-    }
-
-    #[test]
-    fn new_note_document_default() {
-        let doc = NewNoteDocument::default();
-        assert_eq!(doc.note, "");
-        assert!(doc.name.is_none());
+        assert!(doc.creator.is_none());
+        assert!(doc.modifier.is_none());
+        assert!(doc.note.is_none());
+        assert!(doc.custom.is_none());
         assert!(doc.document_type.is_none());
-        assert!(doc.mime_type.is_none());
-        assert!(doc.description.is_none());
+    }
+
+    #[test]
+    fn note_document_various_types() {
+        let types = vec!["jpg", "jpeg", "gif", "png", "pdf", "tif", "tiff", "txt", "xml", "asc"];
+
+        for doc_type in types {
+            let json = format!(
+                r#"{{"id": "t1_ntd_12345678901234567890123", "type": "{}"}}"#,
+                doc_type
+            );
+            let doc: NoteDocument = serde_json::from_str(&json).unwrap();
+            assert_eq!(doc.document_type, Some(doc_type.to_string()));
+        }
+    }
+
+    #[test]
+    fn note_document_serialize_roundtrip() {
+        let json = r#"{
+            "id": "t1_ntd_12345678901234567890123",
+            "note": "t1_nte_12345678901234567890123",
+            "type": "pdf"
+        }"#;
+
+        let doc: NoteDocument = serde_json::from_str(json).unwrap();
+        let serialized = serde_json::to_string(&doc).unwrap();
+        let deserialized: NoteDocument = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(doc.id, deserialized.id);
+        assert_eq!(doc.note, deserialized.note);
+        assert_eq!(doc.document_type, deserialized.document_type);
     }
 }

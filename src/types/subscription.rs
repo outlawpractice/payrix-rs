@@ -1,321 +1,280 @@
 //! Subscription types for the Payrix API.
 //!
-//! Subscriptions represent recurring payment schedules for customers.
+//! Subscriptions represent recurring payment schedules for customers,
+//! associated with a Plan that defines the payment terms.
+//!
+//! **OpenAPI schema:** `subscriptionsResponse`
 
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use super::{bool_from_int_default_false, option_bool_from_int, DateYmd, PayrixId};
+use super::{bool_from_int_default_false, PayrixId};
 
-/// Subscription status values.
+// =============================================================================
+// SUBSCRIPTION ENUMS
+// =============================================================================
+
+/// Subscription transaction origin values.
+///
+/// Indicates how the subscription transaction was originated.
+///
+/// **OpenAPI schema:** `subscriptionOrigin`
+///
+/// Valid values:
+/// - `2` - eCommerce (customer subscribing online)
+/// - `3` - Mail Order/Telephone (MOTO)
+/// - `4` - Apple Pay
+/// - `5` - Successful 3D Secure transaction
+/// - `6` - Attempted 3D Secure transaction
+/// - `8` - Payframe
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
-pub enum SubscriptionStatus {
-    /// Subscription is pending activation
+pub enum SubscriptionOrigin {
+    /// Customer subscribing through eCommerce.
     #[default]
-    Pending = 0,
-    /// Subscription is active and billing
-    Active = 1,
-    /// Subscription is paused (temporarily stopped)
-    Paused = 2,
-    /// Subscription is canceled
-    Canceled = 3,
-    /// Subscription has past due payments
-    PastDue = 4,
-    /// Subscription trial period
-    Trial = 5,
-    /// Subscription completed (finite subscriptions)
-    Completed = 6,
+    ECommerce = 2,
+
+    /// Customer subscribing by Mail Order/Telephone.
+    MailOrderTelephone = 3,
+
+    /// Originated with Apple Pay.
+    ApplePay = 4,
+
+    /// Originated as a Successful 3D Secure transaction.
+    ThreeDsSuccessful = 5,
+
+    /// Originated as an Attempted 3D Secure transaction.
+    ThreeDsAttempted = 6,
+
+    /// Originated in a Payframe.
+    Payframe = 8,
 }
 
-/// Subscription schedule/frequency values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-pub enum SubscriptionSchedule {
-    /// Daily billing
-    Daily = 1,
-    /// Weekly billing
-    Weekly = 2,
-    /// Bi-weekly billing (every 2 weeks)
-    BiWeekly = 3,
-    /// Monthly billing
-    #[default]
-    Monthly = 4,
-    /// Quarterly billing (every 3 months)
-    Quarterly = 5,
-    /// Semi-annual billing (every 6 months)
-    SemiAnnual = 6,
-    /// Annual billing
-    Annual = 7,
-}
+// =============================================================================
+// SUBSCRIPTION STRUCT
+// =============================================================================
 
 /// A Payrix subscription.
 ///
-/// Subscriptions define recurring payment schedules for customers.
-/// The payment amount is in **cents**.
+/// Subscriptions define recurring payment relationships with Plans.
+///
+/// **OpenAPI schema:** `subscriptionsResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Subscription {
-    /// Unique identifier (30 characters, e.g., "t1_sub_...")
+    /// The ID of this resource.
+    ///
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Merchant ID that owns this subscription
-    #[serde(default)]
-    pub merchant: Option<PayrixId>,
-
-    /// Customer ID for this subscription
-    #[serde(default)]
-    pub customer: Option<PayrixId>,
-
-    /// Token ID for the payment method
-    #[serde(default)]
-    pub token: Option<PayrixId>,
-
-    /// Plan ID (if using a predefined plan)
-    #[serde(default)]
-    pub plan: Option<PayrixId>,
-
-    /// Entity ID
-    #[serde(default)]
-    pub entity: Option<PayrixId>,
-
-    /// Login ID that created this subscription
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Subscription status
-    #[serde(default)]
-    pub status: Option<SubscriptionStatus>,
-
-    /// Billing schedule/frequency
-    #[serde(default)]
-    pub schedule: Option<SubscriptionSchedule>,
-
-    /// Payment amount in cents
-    #[serde(default)]
-    pub amount: Option<i64>,
-
-    /// Currency code (e.g., "USD")
-    #[serde(default)]
-    pub currency: Option<String>,
-
-    /// Number of billing cycles (0 = infinite)
-    #[serde(default)]
-    pub cycles: Option<i32>,
-
-    /// Number of cycles completed
-    #[serde(default)]
-    pub cycles_completed: Option<i32>,
-
-    /// Interval between billings (e.g., 1 = every period, 2 = every other period)
-    #[serde(default)]
-    pub interval: Option<i32>,
-
-    /// Day of month for billing (1-31)
-    #[serde(default)]
-    pub day: Option<i32>,
-
-    /// Start date (YYYYMMDD format)
-    #[serde(default)]
-    pub start: Option<DateYmd>,
-
-    /// Next billing date (YYYYMMDD format)
-    #[serde(default)]
-    pub next: Option<DateYmd>,
-
-    /// End date (YYYYMMDD format)
-    #[serde(default)]
-    pub end: Option<DateYmd>,
-
-    /// Trial end date (YYYYMMDD format)
-    #[serde(default)]
-    pub trial_end: Option<DateYmd>,
-
-    /// Subscription name/description
-    #[serde(default)]
-    pub name: Option<String>,
-
-    /// Description/memo
-    #[serde(default)]
-    pub description: Option<String>,
-
-    /// Number of failed payment attempts
-    #[serde(default)]
-    pub failed_attempts: Option<i32>,
-
-    /// Maximum failed attempts before suspension
-    #[serde(default)]
-    pub max_failed_attempts: Option<i32>,
-
-    /// Last transaction ID
-    #[serde(default)]
-    pub last_txn: Option<PayrixId>,
-
-    /// Custom data field
-    #[serde(default)]
-    pub custom: Option<String>,
-
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive (false=active, true=inactive)
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
+
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+
+    /// The identifier of the Plan that this Subscription is associated with.
+    ///
+    /// The Plan determines the frequency and amount of each payment.
+    ///
+    /// **OpenAPI type:** string (ref: subscriptionsModelPlan)
+    #[serde(default)]
+    pub plan: Option<PayrixId>,
+
+    /// For a plan attached to a billing, this is the paying entity to match
+    /// to the generated statements for which recurring payments will be made.
+    ///
+    /// **OpenAPI type:** string (ref: subscriptionsModelStatementEntity)
+    #[serde(default)]
+    pub statement_entity: Option<PayrixId>,
+
+    /// The identification of the first transaction processed through this subscription.
+    ///
+    /// Used internally to process subsequent transactions.
+    ///
+    /// **OpenAPI type:** string (ref: subscriptionsModelFirstTxn)
+    #[serde(default)]
+    pub first_txn: Option<PayrixId>,
+
+    /// The date on which the Subscription should start.
+    ///
+    /// Format: YYYYMMDD (e.g., `20160120` for January 20, 2016).
+    /// Value must represent a date in the future.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub start: Option<i32>,
+
+    /// The date on which the Subscription should finish.
+    ///
+    /// Format: YYYYMMDD (e.g., `20160120` for January 20, 2016).
+    /// Value must represent a date in the future.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub finish: Option<i32>,
+
+    /// The amount of the total sum of this Subscription that is made up of tax.
+    ///
+    /// This field is specified as an integer in cents.
+    ///
+    /// **OpenAPI type:** integer (int64)
+    #[serde(default)]
+    pub tax: Option<i64>,
+
+    /// The descriptor used in this Subscription.
+    ///
+    /// This field is stored as a text string (1-50 characters).
+    /// If not set, defaults from merchant information.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub descriptor: Option<String>,
+
+    /// The description of the Txn that will be created through this Subscription.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub txn_description: Option<String>,
+
+    /// The order of the Txn that will be created through this Subscription.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub order: Option<String>,
+
+    /// The origin of the Txn that will be created through this Subscription.
+    ///
+    /// - `2` - eCommerce
+    /// - `3` - Mail Order/Telephone
+    /// - `4` - Apple Pay
+    /// - `5` - Successful 3D Secure
+    /// - `6` - Attempted 3D Secure
+    /// - `8` - Payframe
+    ///
+    /// **OpenAPI type:** integer (ref: subscriptionOrigin)
+    #[serde(default)]
+    pub origin: Option<SubscriptionOrigin>,
+
+    /// Authentication token for 3D Secure transactions.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub authentication: Option<String>,
+
+    /// Authentication reference ID for 3D Secure transactions.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub authentication_id: Option<String>,
+
+    /// The current count of consecutive payment failures for this subscription.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub failures: Option<i32>,
+
+    /// The maximum consecutive payment failures to allow before inactivating.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub max_failures: Option<i32>,
+
+    /// Whether this resource is marked as inactive.
+    ///
+    /// - `0` - Active
+    /// - `1` - Inactive
+    ///
+    /// **OpenAPI type:** integer (ref: Inactive)
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
-    /// Whether resource is frozen
+    /// Whether this resource is marked as frozen.
+    ///
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
+    ///
+    /// **OpenAPI type:** integer (ref: Frozen)
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
+
+    // =========================================================================
+    // NESTED RELATIONS (expandable via API)
+    // =========================================================================
+
+    /// Invoices associated with this subscription.
+    ///
+    /// **OpenAPI type:** array of invoicesResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub invoices: Option<Vec<serde_json::Value>>,
+
+    /// Subscription tokens associated with this subscription.
+    ///
+    /// **OpenAPI type:** array of subscriptionTokensResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub subscription_tokens: Option<Vec<serde_json::Value>>,
 }
 
-/// Request to create a new subscription.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewSubscription {
-    /// Merchant ID (required)
-    pub merchant: String,
-
-    /// Customer ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub customer: Option<String>,
-
-    /// Token ID for the payment method (required for automatic billing)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub token: Option<String>,
-
-    /// Plan ID (if using a predefined plan)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub plan: Option<String>,
-
-    /// Billing schedule/frequency
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub schedule: Option<SubscriptionSchedule>,
-
-    /// Payment amount in cents
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub amount: Option<i64>,
-
-    /// Currency code (e.g., "USD")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub currency: Option<String>,
-
-    /// Number of billing cycles (0 = infinite)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cycles: Option<i32>,
-
-    /// Interval between billings
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub interval: Option<i32>,
-
-    /// Day of month for billing (1-31)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub day: Option<i32>,
-
-    /// Start date (YYYYMMDD format)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub start: Option<String>,
-
-    /// Trial end date (YYYYMMDD format)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub trial_end: Option<String>,
-
-    /// Subscription name/description
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-
-    /// Description/memo
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-
-    /// Maximum failed attempts before suspension
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_failed_attempts: Option<i32>,
-
-    /// Custom data field
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
-
-    /// Whether resource is inactive
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub inactive: Option<bool>,
-}
+// =============================================================================
+// TESTS
+// =============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // ==================== SubscriptionStatus Tests ====================
+    // ==================== SubscriptionOrigin Tests ====================
 
     #[test]
-    fn subscription_status_serialize_all_variants() {
-        assert_eq!(serde_json::to_string(&SubscriptionStatus::Pending).unwrap(), "0");
-        assert_eq!(serde_json::to_string(&SubscriptionStatus::Active).unwrap(), "1");
-        assert_eq!(serde_json::to_string(&SubscriptionStatus::Paused).unwrap(), "2");
-        assert_eq!(serde_json::to_string(&SubscriptionStatus::Canceled).unwrap(), "3");
-        assert_eq!(serde_json::to_string(&SubscriptionStatus::PastDue).unwrap(), "4");
-        assert_eq!(serde_json::to_string(&SubscriptionStatus::Trial).unwrap(), "5");
-        assert_eq!(serde_json::to_string(&SubscriptionStatus::Completed).unwrap(), "6");
+    fn subscription_origin_serialize_all_variants() {
+        assert_eq!(serde_json::to_string(&SubscriptionOrigin::ECommerce).unwrap(), "2");
+        assert_eq!(serde_json::to_string(&SubscriptionOrigin::MailOrderTelephone).unwrap(), "3");
+        assert_eq!(serde_json::to_string(&SubscriptionOrigin::ApplePay).unwrap(), "4");
+        assert_eq!(serde_json::to_string(&SubscriptionOrigin::ThreeDsSuccessful).unwrap(), "5");
+        assert_eq!(serde_json::to_string(&SubscriptionOrigin::ThreeDsAttempted).unwrap(), "6");
+        assert_eq!(serde_json::to_string(&SubscriptionOrigin::Payframe).unwrap(), "8");
     }
 
     #[test]
-    fn subscription_status_deserialize_all_variants() {
-        assert_eq!(serde_json::from_str::<SubscriptionStatus>("0").unwrap(), SubscriptionStatus::Pending);
-        assert_eq!(serde_json::from_str::<SubscriptionStatus>("1").unwrap(), SubscriptionStatus::Active);
-        assert_eq!(serde_json::from_str::<SubscriptionStatus>("2").unwrap(), SubscriptionStatus::Paused);
-        assert_eq!(serde_json::from_str::<SubscriptionStatus>("3").unwrap(), SubscriptionStatus::Canceled);
-        assert_eq!(serde_json::from_str::<SubscriptionStatus>("4").unwrap(), SubscriptionStatus::PastDue);
-        assert_eq!(serde_json::from_str::<SubscriptionStatus>("5").unwrap(), SubscriptionStatus::Trial);
-        assert_eq!(serde_json::from_str::<SubscriptionStatus>("6").unwrap(), SubscriptionStatus::Completed);
+    fn subscription_origin_deserialize_all_variants() {
+        assert_eq!(serde_json::from_str::<SubscriptionOrigin>("2").unwrap(), SubscriptionOrigin::ECommerce);
+        assert_eq!(serde_json::from_str::<SubscriptionOrigin>("3").unwrap(), SubscriptionOrigin::MailOrderTelephone);
+        assert_eq!(serde_json::from_str::<SubscriptionOrigin>("4").unwrap(), SubscriptionOrigin::ApplePay);
+        assert_eq!(serde_json::from_str::<SubscriptionOrigin>("5").unwrap(), SubscriptionOrigin::ThreeDsSuccessful);
+        assert_eq!(serde_json::from_str::<SubscriptionOrigin>("6").unwrap(), SubscriptionOrigin::ThreeDsAttempted);
+        assert_eq!(serde_json::from_str::<SubscriptionOrigin>("8").unwrap(), SubscriptionOrigin::Payframe);
     }
 
     #[test]
-    fn subscription_status_default() {
-        assert_eq!(SubscriptionStatus::default(), SubscriptionStatus::Pending);
-    }
-
-    #[test]
-    fn subscription_status_invalid_value() {
-        assert!(serde_json::from_str::<SubscriptionStatus>("99").is_err());
-    }
-
-    // ==================== SubscriptionSchedule Tests ====================
-
-    #[test]
-    fn subscription_schedule_serialize_all_variants() {
-        assert_eq!(serde_json::to_string(&SubscriptionSchedule::Daily).unwrap(), "1");
-        assert_eq!(serde_json::to_string(&SubscriptionSchedule::Weekly).unwrap(), "2");
-        assert_eq!(serde_json::to_string(&SubscriptionSchedule::BiWeekly).unwrap(), "3");
-        assert_eq!(serde_json::to_string(&SubscriptionSchedule::Monthly).unwrap(), "4");
-        assert_eq!(serde_json::to_string(&SubscriptionSchedule::Quarterly).unwrap(), "5");
-        assert_eq!(serde_json::to_string(&SubscriptionSchedule::SemiAnnual).unwrap(), "6");
-        assert_eq!(serde_json::to_string(&SubscriptionSchedule::Annual).unwrap(), "7");
-    }
-
-    #[test]
-    fn subscription_schedule_deserialize_all_variants() {
-        assert_eq!(serde_json::from_str::<SubscriptionSchedule>("1").unwrap(), SubscriptionSchedule::Daily);
-        assert_eq!(serde_json::from_str::<SubscriptionSchedule>("2").unwrap(), SubscriptionSchedule::Weekly);
-        assert_eq!(serde_json::from_str::<SubscriptionSchedule>("3").unwrap(), SubscriptionSchedule::BiWeekly);
-        assert_eq!(serde_json::from_str::<SubscriptionSchedule>("4").unwrap(), SubscriptionSchedule::Monthly);
-        assert_eq!(serde_json::from_str::<SubscriptionSchedule>("5").unwrap(), SubscriptionSchedule::Quarterly);
-        assert_eq!(serde_json::from_str::<SubscriptionSchedule>("6").unwrap(), SubscriptionSchedule::SemiAnnual);
-        assert_eq!(serde_json::from_str::<SubscriptionSchedule>("7").unwrap(), SubscriptionSchedule::Annual);
-    }
-
-    #[test]
-    fn subscription_schedule_default() {
-        assert_eq!(SubscriptionSchedule::default(), SubscriptionSchedule::Monthly);
-    }
-
-    #[test]
-    fn subscription_schedule_invalid_value() {
-        assert!(serde_json::from_str::<SubscriptionSchedule>("0").is_err());
-        assert!(serde_json::from_str::<SubscriptionSchedule>("99").is_err());
+    fn subscription_origin_default() {
+        assert_eq!(SubscriptionOrigin::default(), SubscriptionOrigin::ECommerce);
     }
 
     // ==================== Subscription Struct Tests ====================
@@ -324,62 +283,76 @@ mod tests {
     fn subscription_deserialize_full() {
         let json = r#"{
             "id": "t1_sub_12345678901234567890123",
-            "merchant": "t1_mer_12345678901234567890123",
-            "customer": "t1_cus_12345678901234567890123",
-            "token": "t1_tok_12345678901234567890123",
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 23:59:59.9999",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124",
             "plan": "t1_pln_12345678901234567890123",
-            "entity": "t1_ent_12345678901234567890123",
-            "login": "t1_log_12345678901234567890123",
-            "status": 1,
-            "schedule": 4,
-            "amount": 2999,
-            "currency": "USD",
-            "cycles": 12,
-            "cyclesCompleted": 3,
-            "interval": 1,
-            "day": 15,
-            "start": "20240101",
-            "next": "20240415",
-            "end": "20241231",
-            "trialEnd": "20240115",
-            "name": "Monthly Premium",
-            "description": "Premium subscription",
-            "failedAttempts": 0,
-            "maxFailedAttempts": 3,
-            "lastTxn": "t1_txn_12345678901234567890123",
-            "custom": "custom data",
-            "created": "2024-01-01 00:00:00.000",
-            "modified": "2024-04-01 12:00:00.000",
+            "statementEntity": "t1_ent_12345678901234567890123",
+            "firstTxn": "t1_txn_12345678901234567890123",
+            "start": 20240101,
+            "finish": 20241231,
+            "tax": 500,
+            "descriptor": "My Store",
+            "txnDescription": "Monthly subscription",
+            "order": "ORD-12345",
+            "origin": 2,
+            "authentication": "auth_token_123",
+            "authenticationId": "auth_id_123",
+            "failures": 0,
+            "maxFailures": 3,
             "inactive": 0,
             "frozen": 1
         }"#;
 
         let sub: Subscription = serde_json::from_str(json).unwrap();
         assert_eq!(sub.id.as_str(), "t1_sub_12345678901234567890123");
-        assert_eq!(sub.merchant.unwrap().as_str(), "t1_mer_12345678901234567890123");
-        assert_eq!(sub.customer.unwrap().as_str(), "t1_cus_12345678901234567890123");
-        assert_eq!(sub.status, Some(SubscriptionStatus::Active));
-        assert_eq!(sub.schedule, Some(SubscriptionSchedule::Monthly));
-        assert_eq!(sub.amount, Some(2999));
-        assert_eq!(sub.currency, Some("USD".to_string()));
-        assert_eq!(sub.cycles, Some(12));
-        assert_eq!(sub.cycles_completed, Some(3));
-        assert_eq!(sub.start.as_ref().unwrap().as_str(), "20240101");
-        assert_eq!(sub.next.as_ref().unwrap().as_str(), "20240415");
+        assert_eq!(sub.created, Some("2024-01-01 00:00:00.0000".to_string()));
+        assert_eq!(sub.modified, Some("2024-01-02 23:59:59.9999".to_string()));
+        assert_eq!(sub.creator.as_ref().map(|c| c.as_str()), Some("t1_lgn_12345678901234567890123"));
+        assert_eq!(sub.modifier.as_ref().map(|m| m.as_str()), Some("t1_lgn_12345678901234567890124"));
+        assert_eq!(sub.plan.as_ref().map(|p| p.as_str()), Some("t1_pln_12345678901234567890123"));
+        assert_eq!(sub.statement_entity.as_ref().map(|e| e.as_str()), Some("t1_ent_12345678901234567890123"));
+        assert_eq!(sub.first_txn.as_ref().map(|t| t.as_str()), Some("t1_txn_12345678901234567890123"));
+        assert_eq!(sub.start, Some(20240101));
+        assert_eq!(sub.finish, Some(20241231));
+        assert_eq!(sub.tax, Some(500));
+        assert_eq!(sub.descriptor, Some("My Store".to_string()));
+        assert_eq!(sub.txn_description, Some("Monthly subscription".to_string()));
+        assert_eq!(sub.order, Some("ORD-12345".to_string()));
+        assert_eq!(sub.origin, Some(SubscriptionOrigin::ECommerce));
+        assert_eq!(sub.authentication, Some("auth_token_123".to_string()));
+        assert_eq!(sub.authentication_id, Some("auth_id_123".to_string()));
+        assert_eq!(sub.failures, Some(0));
+        assert_eq!(sub.max_failures, Some(3));
         assert!(!sub.inactive);
         assert!(sub.frozen);
     }
 
     #[test]
     fn subscription_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_sub_12345678901234567890123"
-        }"#;
+        let json = r#"{"id": "t1_sub_12345678901234567890123"}"#;
 
         let sub: Subscription = serde_json::from_str(json).unwrap();
         assert_eq!(sub.id.as_str(), "t1_sub_12345678901234567890123");
-        assert!(sub.merchant.is_none());
-        assert!(sub.status.is_none());
+        assert!(sub.created.is_none());
+        assert!(sub.modified.is_none());
+        assert!(sub.creator.is_none());
+        assert!(sub.modifier.is_none());
+        assert!(sub.plan.is_none());
+        assert!(sub.statement_entity.is_none());
+        assert!(sub.first_txn.is_none());
+        assert!(sub.start.is_none());
+        assert!(sub.finish.is_none());
+        assert!(sub.tax.is_none());
+        assert!(sub.descriptor.is_none());
+        assert!(sub.txn_description.is_none());
+        assert!(sub.order.is_none());
+        assert!(sub.origin.is_none());
+        assert!(sub.authentication.is_none());
+        assert!(sub.authentication_id.is_none());
+        assert!(sub.failures.is_none());
+        assert!(sub.max_failures.is_none());
         assert!(!sub.inactive);
         assert!(!sub.frozen);
     }
@@ -408,73 +381,53 @@ mod tests {
         assert!(!sub.frozen);
     }
 
-    // ==================== NewSubscription Tests ====================
-
     #[test]
-    fn new_subscription_serialize_full() {
-        let new_sub = NewSubscription {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            customer: Some("t1_cus_12345678901234567890123".to_string()),
-            token: Some("t1_tok_12345678901234567890123".to_string()),
-            plan: Some("t1_pln_12345678901234567890123".to_string()),
-            schedule: Some(SubscriptionSchedule::Monthly),
-            amount: Some(2999),
-            currency: Some("USD".to_string()),
-            cycles: Some(12),
-            interval: Some(1),
-            day: Some(15),
-            start: Some("20240101".to_string()),
-            trial_end: Some("20240115".to_string()),
-            name: Some("Monthly Premium".to_string()),
-            description: Some("Premium subscription".to_string()),
-            max_failed_attempts: Some(3),
-            custom: Some("custom data".to_string()),
-            inactive: Some(false),
-        };
+    fn subscription_origin_variants() {
+        let test_cases = [
+            (2, SubscriptionOrigin::ECommerce),
+            (3, SubscriptionOrigin::MailOrderTelephone),
+            (4, SubscriptionOrigin::ApplePay),
+            (5, SubscriptionOrigin::ThreeDsSuccessful),
+            (6, SubscriptionOrigin::ThreeDsAttempted),
+            (8, SubscriptionOrigin::Payframe),
+        ];
 
-        let json = serde_json::to_string(&new_sub).unwrap();
-        assert!(json.contains("\"merchant\":\"t1_mer_12345678901234567890123\""));
-        assert!(json.contains("\"schedule\":4"));
-        assert!(json.contains("\"amount\":2999"));
-        assert!(json.contains("\"inactive\":0"));
+        for (origin_val, expected_origin) in test_cases {
+            let json = format!(
+                r#"{{"id": "t1_sub_12345678901234567890123", "origin": {}}}"#,
+                origin_val
+            );
+            let sub: Subscription = serde_json::from_str(&json).unwrap();
+            assert_eq!(sub.origin, Some(expected_origin));
+        }
     }
 
     #[test]
-    fn new_subscription_serialize_minimal() {
-        let new_sub = NewSubscription {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            ..Default::default()
-        };
+    fn subscription_with_dates() {
+        let json = r#"{
+            "id": "t1_sub_12345678901234567890123",
+            "start": 20240115,
+            "finish": 20250115
+        }"#;
 
-        let json = serde_json::to_string(&new_sub).unwrap();
-        assert!(json.contains("\"merchant\":\"t1_mer_12345678901234567890123\""));
-        // Optional fields should be omitted
-        assert!(!json.contains("\"customer\""));
-        assert!(!json.contains("\"schedule\""));
-        assert!(!json.contains("\"inactive\""));
+        let sub: Subscription = serde_json::from_str(json).unwrap();
+        assert_eq!(sub.start, Some(20240115));
+        assert_eq!(sub.finish, Some(20250115));
     }
 
     #[test]
-    fn new_subscription_option_bool_to_int_true() {
-        let new_sub = NewSubscription {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            inactive: Some(true),
-            ..Default::default()
-        };
+    #[cfg(not(feature = "sqlx"))]
+    fn subscription_with_nested_relations() {
+        let json = r#"{
+            "id": "t1_sub_12345678901234567890123",
+            "invoices": [{"id": "t1_inv_12345678901234567890123"}],
+            "subscriptionTokens": [{"id": "t1_stk_12345678901234567890123"}]
+        }"#;
 
-        let json = serde_json::to_string(&new_sub).unwrap();
-        assert!(json.contains("\"inactive\":1"));
-    }
-
-    #[test]
-    fn new_subscription_option_bool_to_int_false() {
-        let new_sub = NewSubscription {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            inactive: Some(false),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_sub).unwrap();
-        assert!(json.contains("\"inactive\":0"));
+        let sub: Subscription = serde_json::from_str(json).unwrap();
+        assert!(sub.invoices.is_some());
+        assert_eq!(sub.invoices.as_ref().unwrap().len(), 1);
+        assert!(sub.subscription_tokens.is_some());
+        assert_eq!(sub.subscription_tokens.as_ref().unwrap().len(), 1);
     }
 }

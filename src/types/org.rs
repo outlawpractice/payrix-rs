@@ -1,400 +1,290 @@
 //! Organization types for the Payrix API.
 //!
 //! Organizations group entities together for administrative purposes.
+//!
+//! **OpenAPI schema:** `orgsResponse`
 
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use super::{bool_from_int_default_false, option_bool_from_int, PayrixId};
+use super::PayrixId;
 
-/// Organization status values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-pub enum OrgStatus {
-    /// Organization is inactive
-    Inactive = 0,
-    /// Organization is active
-    #[default]
-    Active = 1,
-    /// Organization is suspended
-    Suspended = 2,
-}
+// =============================================================================
+// ORG STRUCT
+// =============================================================================
 
 /// A Payrix organization.
 ///
 /// Organizations group entities for management and reporting.
+///
+/// **OpenAPI schema:** `orgsResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Org {
-    /// Unique identifier (30 characters, e.g., "t1_org_...")
+    /// The ID of this resource.
+    ///
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Parent organization ID (for hierarchies)
-    #[serde(default)]
-    pub parent: Option<PayrixId>,
-
-    /// Login ID that created this org
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Organization status
-    #[serde(default)]
-    pub status: Option<OrgStatus>,
-
-    /// Organization name
-    #[serde(default)]
-    pub name: Option<String>,
-
-    /// Legal/business name
-    #[serde(default)]
-    pub legal_name: Option<String>,
-
-    /// DBA (doing business as) name
-    #[serde(default)]
-    pub dba: Option<String>,
-
-    /// Tax ID / EIN
-    #[serde(default)]
-    pub tax_id: Option<String>,
-
-    /// Website URL
-    #[serde(default)]
-    pub website: Option<String>,
-
-    /// Primary email
-    #[serde(default)]
-    pub email: Option<String>,
-
-    /// Primary phone
-    #[serde(default)]
-    pub phone: Option<String>,
-
-    /// Address line 1
-    #[serde(default)]
-    pub address1: Option<String>,
-
-    /// Address line 2
-    #[serde(default)]
-    pub address2: Option<String>,
-
-    /// City
-    #[serde(default)]
-    pub city: Option<String>,
-
-    /// State/province
-    #[serde(default)]
-    pub state: Option<String>,
-
-    /// ZIP/postal code
-    #[serde(default)]
-    pub zip: Option<String>,
-
-    /// Country code
-    #[serde(default)]
-    pub country: Option<String>,
-
-    /// Description/notes
-    #[serde(default)]
-    pub description: Option<String>,
-
-    /// Custom data field
-    #[serde(default)]
-    pub custom: Option<String>,
-
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive (false=active, true=inactive)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub inactive: bool,
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
 
-    /// Whether resource is frozen
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub frozen: bool,
-}
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
 
-/// Request to create a new organization.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewOrg {
-    /// Parent organization ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub parent: Option<String>,
+    /// The Login that owns this Org.
+    ///
+    /// **OpenAPI type:** string (ref: orgsModelLogin)
+    #[serde(default)]
+    pub login: Option<PayrixId>,
 
-    /// Organization name (required)
-    pub name: String,
+    /// The name of this Org.
+    ///
+    /// This field is stored as a text string (0-100 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub name: Option<String>,
 
-    /// Legal/business name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub legal_name: Option<String>,
-
-    /// DBA name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dba: Option<String>,
-
-    /// Tax ID / EIN
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tax_id: Option<String>,
-
-    /// Website URL
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub website: Option<String>,
-
-    /// Primary email
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub email: Option<String>,
-
-    /// Primary phone
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub phone: Option<String>,
-
-    /// Address line 1
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub address1: Option<String>,
-
-    /// Address line 2
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub address2: Option<String>,
-
-    /// City
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub city: Option<String>,
-
-    /// State/province
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub state: Option<String>,
-
-    /// ZIP/postal code
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub zip: Option<String>,
-
-    /// Country code
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub country: Option<String>,
-
-    /// Description/notes
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// A description of this Org.
+    ///
+    /// This field is stored as a text string (0-100 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
     pub description: Option<String>,
 
-    /// Custom data field
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
+    /// This is used to specify a default fee for a group.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub default_fee_from_entity: Option<String>,
 
-    /// Whether resource is inactive
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub inactive: Option<bool>,
+    // =========================================================================
+    // NESTED RELATIONS (expandable via API)
+    // =========================================================================
+
+    /// Aggregations associated with this org.
+    ///
+    /// **OpenAPI type:** array of aggregationsResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub aggregations: Option<Vec<serde_json::Value>>,
+
+    /// Billing modifiers associated with this org.
+    ///
+    /// **OpenAPI type:** array of billingModifiersResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub billing_modifiers: Option<Vec<serde_json::Value>>,
+
+    /// Billings associated with this org.
+    ///
+    /// **OpenAPI type:** array of billingsResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub billings: Option<Vec<serde_json::Value>>,
+
+    /// Decisions associated with this org.
+    ///
+    /// **OpenAPI type:** array of decisionsResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub decisions: Option<Vec<serde_json::Value>>,
+
+    /// Embedded finance configuration associated with this org.
+    ///
+    /// **OpenAPI type:** array of embeddedFinanceResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub embedded_finance: Option<Vec<serde_json::Value>>,
+
+    /// Fee modifiers associated with this org.
+    ///
+    /// **OpenAPI type:** array of feeModifiersResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub fee_modifiers: Option<Vec<serde_json::Value>>,
+
+    /// Fees associated with this org.
+    ///
+    /// **OpenAPI type:** array of feesResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub fees: Option<Vec<serde_json::Value>>,
+
+    /// Invoice parameters associated with this org.
+    ///
+    /// **OpenAPI type:** array of invoiceParametersResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub invoice_parameters: Option<Vec<serde_json::Value>>,
+
+    /// Org entities associated with this org.
+    ///
+    /// **OpenAPI type:** array of orgEntitiesResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub org_entities: Option<Vec<serde_json::Value>>,
+
+    /// Omni tokens associated with this org.
+    ///
+    /// **OpenAPI type:** array of omniTokensResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub omni_tokens: Option<Vec<serde_json::Value>>,
+
+    /// Payout flows associated with this org.
+    ///
+    /// **OpenAPI type:** array of payoutFlowsResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub payout_flows: Option<Vec<serde_json::Value>>,
+
+    /// Profit shares associated with this org.
+    ///
+    /// **OpenAPI type:** array of profitSharesResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub profit_shares: Option<Vec<serde_json::Value>>,
+
+    /// Reserves associated with this org.
+    ///
+    /// **OpenAPI type:** array of reservesResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub reserves: Option<Vec<serde_json::Value>>,
+
+    /// Revenue boosts associated with this org.
+    ///
+    /// **OpenAPI type:** array of revenueBoostsResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub revenue_boosts: Option<Vec<serde_json::Value>>,
+
+    /// Secrets associated with this org.
+    ///
+    /// **OpenAPI type:** array of secretsResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub secrets: Option<Vec<serde_json::Value>>,
+
+    /// Safer payments configuration associated with this org.
+    ///
+    /// **OpenAPI type:** array of saferPaymentsResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub safer_payments: Option<Vec<serde_json::Value>>,
 }
+
+// =============================================================================
+// TESTS
+// =============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json;
 
-    // OrgStatus enum tests
-    #[test]
-    fn test_org_status_default() {
-        assert_eq!(OrgStatus::default(), OrgStatus::Active);
-    }
+    // ==================== Org Struct Tests ====================
 
     #[test]
-    fn test_org_status_serialize() {
-        assert_eq!(serde_json::to_string(&OrgStatus::Inactive).unwrap(), "0");
-        assert_eq!(serde_json::to_string(&OrgStatus::Active).unwrap(), "1");
-        assert_eq!(serde_json::to_string(&OrgStatus::Suspended).unwrap(), "2");
-    }
-
-    #[test]
-    fn test_org_status_deserialize() {
-        assert_eq!(serde_json::from_str::<OrgStatus>("0").unwrap(), OrgStatus::Inactive);
-        assert_eq!(serde_json::from_str::<OrgStatus>("1").unwrap(), OrgStatus::Active);
-        assert_eq!(serde_json::from_str::<OrgStatus>("2").unwrap(), OrgStatus::Suspended);
-    }
-
-    // Org struct tests
-    #[test]
-    fn test_org_deserialize_full() {
+    fn org_deserialize_full() {
         let json = r#"{
             "id": "t1_org_12345678901234567890123",
-            "parent": "t1_org_23456789012345678901234",
-            "login": "t1_tlg_34567890123456789012345",
-            "status": 1,
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 23:59:59.9999",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124",
+            "login": "t1_lgn_12345678901234567890125",
             "name": "Test Organization",
-            "legalName": "Test Org Legal Name LLC",
-            "dba": "TestOrg",
-            "taxId": "12-3456789",
-            "website": "https://example.com",
-            "email": "info@example.com",
-            "phone": "555-1234",
-            "address1": "123 Main St",
-            "address2": "Suite 100",
-            "city": "New York",
-            "state": "NY",
-            "zip": "10001",
-            "country": "US",
-            "description": "Test description",
-            "custom": "{\"key\":\"value\"}",
-            "created": "2024-01-01 12:00:00.000",
-            "modified": "2024-01-02 12:00:00.000",
-            "inactive": 0,
-            "frozen": 1
+            "description": "An organization for testing",
+            "defaultFeeFromEntity": "t1_ent_12345678901234567890123"
         }"#;
 
         let org: Org = serde_json::from_str(json).unwrap();
         assert_eq!(org.id.as_str(), "t1_org_12345678901234567890123");
-        assert_eq!(org.parent, Some(PayrixId::new("t1_org_23456789012345678901234").unwrap()));
-        assert_eq!(org.login, Some(PayrixId::new("t1_tlg_34567890123456789012345").unwrap()));
-        assert_eq!(org.status, Some(OrgStatus::Active));
+        assert_eq!(org.created, Some("2024-01-01 00:00:00.0000".to_string()));
+        assert_eq!(org.modified, Some("2024-01-02 23:59:59.9999".to_string()));
+        assert_eq!(org.creator.as_ref().map(|c| c.as_str()), Some("t1_lgn_12345678901234567890123"));
+        assert_eq!(org.modifier.as_ref().map(|m| m.as_str()), Some("t1_lgn_12345678901234567890124"));
+        assert_eq!(org.login.as_ref().map(|l| l.as_str()), Some("t1_lgn_12345678901234567890125"));
         assert_eq!(org.name, Some("Test Organization".to_string()));
-        assert_eq!(org.legal_name, Some("Test Org Legal Name LLC".to_string()));
-        assert_eq!(org.dba, Some("TestOrg".to_string()));
-        assert_eq!(org.tax_id, Some("12-3456789".to_string()));
-        assert_eq!(org.website, Some("https://example.com".to_string()));
-        assert_eq!(org.email, Some("info@example.com".to_string()));
-        assert_eq!(org.phone, Some("555-1234".to_string()));
-        assert_eq!(org.address1, Some("123 Main St".to_string()));
-        assert_eq!(org.address2, Some("Suite 100".to_string()));
-        assert_eq!(org.city, Some("New York".to_string()));
-        assert_eq!(org.state, Some("NY".to_string()));
-        assert_eq!(org.zip, Some("10001".to_string()));
-        assert_eq!(org.country, Some("US".to_string()));
-        assert_eq!(org.description, Some("Test description".to_string()));
-        assert_eq!(org.custom, Some("{\"key\":\"value\"}".to_string()));
-        assert_eq!(org.created, Some("2024-01-01 12:00:00.000".to_string()));
-        assert_eq!(org.modified, Some("2024-01-02 12:00:00.000".to_string()));
-        assert_eq!(org.inactive, false);
-        assert_eq!(org.frozen, true);
+        assert_eq!(org.description, Some("An organization for testing".to_string()));
+        assert_eq!(org.default_fee_from_entity, Some("t1_ent_12345678901234567890123".to_string()));
     }
 
     #[test]
-    fn test_org_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_org_12345678901234567890123"
-        }"#;
+    fn org_deserialize_minimal() {
+        let json = r#"{"id": "t1_org_12345678901234567890123"}"#;
 
         let org: Org = serde_json::from_str(json).unwrap();
         assert_eq!(org.id.as_str(), "t1_org_12345678901234567890123");
-        assert_eq!(org.parent, None);
-        assert_eq!(org.login, None);
-        assert_eq!(org.status, None);
-        assert_eq!(org.name, None);
-        assert_eq!(org.legal_name, None);
-        assert_eq!(org.dba, None);
-        assert_eq!(org.tax_id, None);
-        assert_eq!(org.website, None);
-        assert_eq!(org.email, None);
-        assert_eq!(org.phone, None);
-        assert_eq!(org.address1, None);
-        assert_eq!(org.address2, None);
-        assert_eq!(org.city, None);
-        assert_eq!(org.state, None);
-        assert_eq!(org.zip, None);
-        assert_eq!(org.country, None);
-        assert_eq!(org.description, None);
-        assert_eq!(org.custom, None);
-        assert_eq!(org.created, None);
-        assert_eq!(org.modified, None);
-        assert_eq!(org.inactive, false);
-        assert_eq!(org.frozen, false);
+        assert!(org.created.is_none());
+        assert!(org.modified.is_none());
+        assert!(org.creator.is_none());
+        assert!(org.modifier.is_none());
+        assert!(org.login.is_none());
+        assert!(org.name.is_none());
+        assert!(org.description.is_none());
+        assert!(org.default_fee_from_entity.is_none());
     }
 
     #[test]
-    fn test_org_bool_from_int() {
-        // Test inactive field with int values
-        let json = r#"{"id": "t1_org_12345678901234567890123", "inactive": 1}"#;
+    #[cfg(not(feature = "sqlx"))]
+    fn org_with_nested_relations() {
+        let json = r#"{
+            "id": "t1_org_12345678901234567890123",
+            "fees": [{"id": "t1_fee_12345678901234567890123"}],
+            "reserves": [{"id": "t1_rsv_12345678901234567890123"}],
+            "billings": []
+        }"#;
+
         let org: Org = serde_json::from_str(json).unwrap();
-        assert_eq!(org.inactive, true);
-
-        let json = r#"{"id": "t1_org_12345678901234567890123", "inactive": 0}"#;
-        let org: Org = serde_json::from_str(json).unwrap();
-        assert_eq!(org.inactive, false);
-
-        // Test frozen field with int values
-        let json = r#"{"id": "t1_org_12345678901234567890123", "frozen": 1}"#;
-        let org: Org = serde_json::from_str(json).unwrap();
-        assert_eq!(org.frozen, true);
-
-        let json = r#"{"id": "t1_org_12345678901234567890123", "frozen": 0}"#;
-        let org: Org = serde_json::from_str(json).unwrap();
-        assert_eq!(org.frozen, false);
-    }
-
-    // NewOrg struct tests
-    #[test]
-    fn test_new_org_serialize_full() {
-        let new_org = NewOrg {
-            parent: Some("t1_org_23456789012345678901234".to_string()),
-            name: "Test Organization".to_string(),
-            legal_name: Some("Test Org Legal Name LLC".to_string()),
-            dba: Some("TestOrg".to_string()),
-            tax_id: Some("12-3456789".to_string()),
-            website: Some("https://example.com".to_string()),
-            email: Some("info@example.com".to_string()),
-            phone: Some("555-1234".to_string()),
-            address1: Some("123 Main St".to_string()),
-            address2: Some("Suite 100".to_string()),
-            city: Some("New York".to_string()),
-            state: Some("NY".to_string()),
-            zip: Some("10001".to_string()),
-            country: Some("US".to_string()),
-            description: Some("Test description".to_string()),
-            custom: Some("{\"key\":\"value\"}".to_string()),
-            inactive: Some(true),
-        };
-
-        let json = serde_json::to_string(&new_org).unwrap();
-        assert!(json.contains("\"name\":\"Test Organization\""));
-        assert!(json.contains("\"parent\":\"t1_org_23456789012345678901234\""));
-        assert!(json.contains("\"legalName\":\"Test Org Legal Name LLC\""));
-        assert!(json.contains("\"inactive\":1"));
+        assert!(org.fees.is_some());
+        assert_eq!(org.fees.as_ref().unwrap().len(), 1);
+        assert!(org.reserves.is_some());
+        assert_eq!(org.reserves.as_ref().unwrap().len(), 1);
+        assert!(org.billings.is_some());
+        assert_eq!(org.billings.as_ref().unwrap().len(), 0);
     }
 
     #[test]
-    fn test_new_org_serialize_minimal() {
-        let new_org = NewOrg {
-            name: "Test Organization".to_string(),
-            ..Default::default()
-        };
+    fn org_serialize_roundtrip() {
+        let json = r#"{
+            "id": "t1_org_12345678901234567890123",
+            "name": "Test Org",
+            "description": "Test description"
+        }"#;
 
-        let json = serde_json::to_string(&new_org).unwrap();
-        assert!(json.contains("\"name\":\"Test Organization\""));
-        assert!(!json.contains("parent"));
-        assert!(!json.contains("legalName"));
-        assert!(!json.contains("inactive"));
-    }
-
-    #[test]
-    fn test_new_org_serialize_with_inactive() {
-        // Test with inactive = true (should serialize as 1)
-        let new_org = NewOrg {
-            name: "Test Org".to_string(),
-            inactive: Some(true),
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&new_org).unwrap();
-        assert!(json.contains("\"inactive\":1"));
-
-        // Test with inactive = false (should serialize as 0)
-        let new_org = NewOrg {
-            name: "Test Org".to_string(),
-            inactive: Some(false),
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&new_org).unwrap();
-        assert!(json.contains("\"inactive\":0"));
-
-        // Test with inactive = None (should not serialize)
-        let new_org = NewOrg {
-            name: "Test Org".to_string(),
-            inactive: None,
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&new_org).unwrap();
-        assert!(!json.contains("inactive"));
+        let org: Org = serde_json::from_str(json).unwrap();
+        let serialized = serde_json::to_string(&org).unwrap();
+        let deserialized: Org = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(org.id, deserialized.id);
+        assert_eq!(org.name, deserialized.name);
+        assert_eq!(org.description, deserialized.description);
     }
 }

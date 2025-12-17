@@ -27,16 +27,18 @@
 
 use payrix::{
     Account, AccountVerification, Adjustment, Alert, AlertAction, AlertTrigger, Batch, Chargeback,
-    ChargebackDocument, ChargebackMessage, ChargebackMessageResult, ChargebackStatus, Contact,
-    Customer, Disbursement, DisbursementEntry, Entity, EntityReserve, EntityType, Entry,
-    Environment, Fee, FeeRule, Fund, Login, Member, Merchant, NewCustomer, NewToken,
-    NewTransaction, Note, NoteDocument, Org, OrgEntity, PaymentInfo, PaymentMethod, Payout,
-    PayrixClient, PendingEntry, Plan, Refund, Reserve, ReserveEntry, SearchBuilder, Subscription,
-    TeamLogin, Token, Transaction, TransactionOrigin, Vendor,
+    ChargebackDocument, ChargebackMessage, ChargebackMessageResult, ChargebackStatus,
+    ChargebackStatusValue, Contact, Customer, Disbursement, DisbursementEntry, Entity,
+    EntityReserve, EntityType, Entry, Environment, Fee, FeeRule, Fund, Login, Member, Merchant,
+    NewChargebackMessage, NewCustomer, NewToken, NewTransaction, Note, NoteDocument, Org,
+    OrgEntity, PaymentInfo, PaymentMethod, Payout, PayrixClient, PendingEntry, Plan, Refund,
+    Reserve, ReserveEntry, SearchBuilder, Subscription, TeamLogin, Token, Transaction,
+    TransactionOrigin, Vendor,
     // Workflow types
     onboard_merchant, check_boarding_status, OnboardMerchantRequest, BusinessInfo, MerchantConfig,
     BankAccountInfo, BankAccountMethod, MemberInfo, Address, TermsAcceptance, BoardingStatus,
 };
+use payrix::types::ChargebackMessageType;
 use payrix::types::{
     AccountHolderType, AccountType, DateYmd, MemberType, MerchantEnvironment, MerchantType,
 };
@@ -53,15 +55,20 @@ static INIT: Once = Once::new();
 // Use these for tests that create customers, tokens, transactions, etc.
 
 /// Test entity ID (the business entity)
+#[allow(dead_code)]
 const TEST_ENTITY_ID: &str = "t1_ent_6941bf37e9b488e9ff0392a";
 
-/// Test merchant ID (for processing payments)
+/// Test merchant ID (for creating customers, tokens)
+/// NOTE: This merchant currently has status=NotReady. Once it is approved through
+/// Payrix's underwriting process, it will have status=Boarded and can process transactions.
 const TEST_MERCHANT_ID: &str = "t1_mer_6941bf385591f9e279b1937";
 
 /// Test operating account ID (type=All, primary=true)
+#[allow(dead_code)]
 const TEST_OPERATING_ACCOUNT_ID: &str = "t1_act_6941bf3803046cefe558296";
 
 /// Test trust account ID (type=Credit, primary=false)
+#[allow(dead_code)]
 const TEST_TRUST_ACCOUNT_ID: &str = "t1_act_6941bf38481536ee5afca28";
 
 /// Test context that holds created resources for cleanup.
@@ -325,12 +332,15 @@ async fn test_token_creation() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY and a 'Ready' merchant"]
+#[ignore = "requires PAYRIX_API_KEY and a boarded merchant"]
 async fn test_transaction_flow() {
-    // Note: This test requires a merchant with status "Ready" (boarded).
-    // Merchants with status "NotReady" cannot process transactions.
+    // Note: This test uses TEST_MERCHANT_ID which must have status=Boarded.
     init_logging();
     let mut ctx = TestContext::new().await.expect("Failed to create test context");
+
+    // Override with our known boarded merchant
+    ctx.merchant_id = TEST_MERCHANT_ID.to_string();
+    println!("Using boarded merchant: {}", ctx.merchant_id);
 
     // Create customer
     let customer: Customer = ctx
@@ -496,10 +506,10 @@ async fn test_get_tokens() {
     println!("Found {} tokens", tokens.len());
     for token in tokens.iter().take(5) {
         println!(
-            "  Token: {} - payment: {:?}, last4: {:?}",
+            "  Token: {} - payment: {:?}, status: {:?}",
             token.id.as_str(),
             token.payment,
-            token.last4
+            token.status
         );
     }
 }
@@ -516,9 +526,9 @@ async fn test_get_batches() {
     println!("Found {} batches", batches.len());
     for batch in batches.iter().take(5) {
         println!(
-            "  Batch: {} - opened: {:?}, status: {:?}",
+            "  Batch: {} - date: {:?}, status: {:?}",
             batch.id.as_str(),
-            batch.opened,
+            batch.date,
             batch.status
         );
     }
@@ -556,10 +566,10 @@ async fn test_get_fee_rules() {
     println!("Found {} fee rules", fee_rules.len());
     for rule in fee_rules.iter().take(5) {
         println!(
-            "  FeeRule: {} - type: {:?}, amount: {:?}",
+            "  FeeRule: {} - type: {:?}, value: {:?}",
             rule.id.as_str(),
-            rule.fee_type,
-            rule.amount
+            rule.rule_type,
+            rule.value
         );
     }
 }
@@ -596,9 +606,9 @@ async fn test_get_subscriptions() {
     println!("Found {} subscriptions", subscriptions.len());
     for sub in subscriptions.iter().take(5) {
         println!(
-            "  Subscription: {} - status: {:?}, plan: {:?}",
+            "  Subscription: {} - start: {:?}, plan: {:?}",
             sub.id.as_str(),
-            sub.status,
+            sub.start,
             sub.plan
         );
     }
@@ -697,9 +707,9 @@ async fn test_get_members() {
     println!("Found {} members", members.len());
     for member in members.iter().take(5) {
         println!(
-            "  Member: {} - entity: {:?}",
+            "  Member: {} - merchant: {:?}",
             member.id.as_str(),
-            member.entity
+            member.merchant
         );
     }
 }
@@ -756,10 +766,10 @@ async fn test_get_chargebacks() {
     // Print ALL chargebacks to capture all status values for documentation
     for chargeback in chargebacks.iter() {
         println!(
-            "  Chargeback: {} - status: {:?}, amount: {:?}, reason: {:?}",
+            "  Chargeback: {} - status: {:?}, total: {:?}, reason: {:?}",
             chargeback.id.as_str(),
             chargeback.status,
-            chargeback.amount,
+            chargeback.total,
             chargeback.reason_code
         );
     }
@@ -791,6 +801,8 @@ async fn test_get_customers() {
 #[tokio::test]
 #[ignore = "requires PAYRIX_API_KEY environment variable"]
 async fn test_get_payouts() {
+    // NOTE: The test environment does NOT process payouts, so this endpoint
+    // will always return empty results in test mode.
     init_logging();
     let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
@@ -800,10 +812,10 @@ async fn test_get_payouts() {
     println!("Found {} payouts", payouts.len());
     for payout in payouts.iter().take(5) {
         println!(
-            "  Payout: {} - amount: {:?}, status: {:?}, schedule: {:?}",
+            "  Payout: {} - amount: {:?}, um: {:?}, schedule: {:?}",
             payout.id.as_str(),
             payout.amount,
-            payout.status,
+            payout.um,
             payout.schedule
         );
     }
@@ -821,11 +833,11 @@ async fn test_get_entity_reserves() {
     println!("Found {} entity reserves", reserves.len());
     for reserve in reserves.iter().take(5) {
         println!(
-            "  EntityReserve: {} - entity: {:?}, percent: {:?}, reserve_type: {:?}",
+            "  EntityReserve: {} - fund: {:?}, total: {:?}, name: {:?}",
             reserve.id.as_str(),
-            reserve.entity,
-            reserve.percent,
-            reserve.reserve_type
+            reserve.fund,
+            reserve.total,
+            reserve.name
         );
     }
 }
@@ -862,11 +874,11 @@ async fn test_get_reserve_entries() {
     println!("Found {} reserve entries", entries.len());
     for entry in entries.iter().take(5) {
         println!(
-            "  ReserveEntry: {} - reserve: {:?}, amount: {:?}, entry_type: {:?}",
+            "  ReserveEntry: {} - reserve: {:?}, amount: {:?}, event: {:?}",
             entry.id.as_str(),
             entry.reserve,
             entry.amount,
-            entry.entry_type
+            entry.event
         );
     }
 }
@@ -883,10 +895,10 @@ async fn test_get_reserves() {
     println!("Found {} reserves", reserves.len());
     for reserve in reserves.iter().take(5) {
         println!(
-            "  Reserve: {} - entity: {:?}, amount: {:?}, status: {:?}",
+            "  Reserve: {} - entity: {:?}, max: {:?}, status: {:?}",
             reserve.id.as_str(),
             reserve.entity,
-            reserve.amount,
+            reserve.max,
             reserve.status
         );
     }
@@ -904,11 +916,10 @@ async fn test_get_vendors() {
     println!("Found {} vendors", vendors.len());
     for vendor in vendors.iter().take(5) {
         println!(
-            "  Vendor: {} - name: {:?}, status: {:?}, entity: {:?}",
+            "  Vendor: {} - entity: {:?}, division: {:?}",
             vendor.id.as_str(),
-            vendor.name,
-            vendor.status,
-            vendor.entity
+            vendor.entity,
+            vendor.division
         );
     }
 }
@@ -926,11 +937,11 @@ async fn test_get_account_verifications() {
     println!("Found {} account verifications", verifications.len());
     for v in verifications.iter().take(5) {
         println!(
-            "  AccountVerification: {} - account: {:?}, status: {:?}, amount1: {:?}",
+            "  AccountVerification: {} - account: {:?}, type: {:?}, debit1: {:?}",
             v.id.as_str(),
             v.account,
-            v.status,
-            v.amount1
+            v.verification_type,
+            v.debit1
         );
     }
 }
@@ -947,11 +958,11 @@ async fn test_get_adjustments() {
     println!("Found {} adjustments", adjustments.len());
     for adj in adjustments.iter().take(5) {
         println!(
-            "  Adjustment: {} - entity: {:?}, amount: {:?}, adjustment_type: {:?}",
+            "  Adjustment: {} - entity: {:?}, amount: {:?}, description: {:?}",
             adj.id.as_str(),
             adj.entity,
             adj.amount,
-            adj.adjustment_type
+            adj.description
         );
     }
 }
@@ -1035,14 +1046,252 @@ async fn test_get_chargeback_statuses() {
     // Print ALL statuses to capture all possible status values for API documentation
     for s in statuses.iter() {
         println!(
-            "  ChargebackStatus: {} - chargeback: {:?}, from_status: {:?}, to_status: {:?}, name: {:?}",
+            "  ChargebackStatus: {} - chargeback: {:?}, status: {:?}, message: {:?}",
             s.id.as_str(),
             s.chargeback,
-            s.from_status,
-            s.to_status,
-            s.name
+            s.status,
+            s.chargeback_message
         );
     }
+}
+
+// ==================== Chargeback Workflow Tests ====================
+// NOTE: Chargebacks cannot be created via API - they are initiated by card issuers.
+// These tests work with existing chargebacks in the test environment.
+// Lifecycle changes (close, arbitration, etc.) require Payrix Support involvement.
+
+/// Test constant: An open chargeback that can be used for message/document tests.
+/// Update this ID if the chargeback status changes or a new open chargeback is available.
+const TEST_OPEN_CHARGEBACK_ID: &str = "t1_chb_6616a9de06fd751e5ae91e5";
+
+/// Test constant: A closed chargeback for read-only testing.
+const TEST_CLOSED_CHARGEBACK_ID: &str = "t1_chb_6616a9f7c19a47bea938957";
+
+/// Test constant: A won chargeback for read-only testing.
+const TEST_WON_CHARGEBACK_ID: &str = "t1_chb_6615a4fbc5e0e79dac81419";
+
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY environment variable"]
+async fn test_get_specific_chargeback() {
+    // Test reading a specific chargeback by ID and validating response fields
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let chargeback: Option<Chargeback> = client
+        .get_one(EntityType::Chargebacks, TEST_OPEN_CHARGEBACK_ID)
+        .await
+        .expect("Failed to get chargeback");
+
+    assert!(chargeback.is_some(), "Chargeback should exist");
+    let cb = chargeback.unwrap();
+
+    println!("=== CHARGEBACK DETAILS ===");
+    println!("ID: {}", cb.id.as_str());
+    println!("Status: {:?}", cb.status);
+    println!("Cycle: {:?}", cb.cycle);
+    println!("Reason Code: {:?}", cb.reason_code);
+    println!("Reason: {:?}", cb.reason);
+    println!("Total: {:?}", cb.total);
+    println!("Currency: {:?}", cb.currency);
+    println!("Issued: {:?}", cb.issued);
+    println!("Received: {:?}", cb.received);
+    println!("Merchant: {:?}", cb.merchant);
+    println!("Transaction: {:?}", cb.txn);
+    println!("Bank Ref: {:?}", cb.bank_ref);
+    println!("Chargeback Ref: {:?}", cb.chargeback_ref);
+    println!("Payment Method: {:?}", cb.payment_method);
+
+    // Validate the chargeback has expected fields populated
+    assert_eq!(cb.id.as_str(), TEST_OPEN_CHARGEBACK_ID);
+    assert!(cb.status.is_some(), "Status should be present");
+}
+
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY - creates data in Payrix"]
+async fn test_create_chargeback_message() {
+    // Test creating a message on an existing open chargeback.
+    // NOTE: This creates real data in the test environment.
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    // First verify the chargeback exists and is open
+    let chargeback: Option<Chargeback> = client
+        .get_one(EntityType::Chargebacks, TEST_OPEN_CHARGEBACK_ID)
+        .await
+        .expect("Failed to get chargeback");
+
+    let cb = chargeback.expect("Test chargeback should exist");
+    println!("Creating message on chargeback: {} (status: {:?})", cb.id.as_str(), cb.status);
+
+    // Note: Some message types require specific chargeback states.
+    // "notate" is generally safe for adding notes to any chargeback.
+    let new_message = NewChargebackMessage {
+        chargeback: TEST_OPEN_CHARGEBACK_ID.to_string(),
+        message_type: Some(ChargebackMessageType::Notate),
+        subject: Some("Integration Test Note".to_string()),
+        message: Some(format!(
+            "Test message created by payrix-rs integration tests at timestamp {}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        )),
+    };
+
+    let result: Result<ChargebackMessage, _> = client
+        .create(EntityType::ChargebackMessages, &new_message)
+        .await;
+
+    match result {
+        Ok(msg) => {
+            println!("=== MESSAGE CREATED SUCCESSFULLY ===");
+            println!("ID: {}", msg.id.as_str());
+            println!("Chargeback: {:?}", msg.chargeback);
+            println!("Type: {:?}", msg.message_type);
+            println!("Status: {:?}", msg.status);
+            println!("Subject: {:?}", msg.subject);
+            println!("Message: {:?}", msg.message);
+            println!("Direction: {:?}", msg.direction);
+            println!("Created: {:?}", msg.created);
+        }
+        Err(e) => {
+            println!("=== MESSAGE CREATION FAILED ===");
+            println!("Error: {:?}", e);
+            // Don't panic - document the error for analysis
+            println!("NOTE: Message creation may fail if the chargeback state doesn't allow this message type");
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY environment variable"]
+async fn test_get_chargeback_status_history() {
+    // Test getting the status history for a specific chargeback
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    // Get status records for the closed chargeback (should have status history)
+    let search = SearchBuilder::new()
+        .field("chargeback", TEST_CLOSED_CHARGEBACK_ID)
+        .build();
+
+    let statuses: Vec<ChargebackStatus> = client
+        .search(EntityType::ChargebackStatuses, &search)
+        .await
+        .expect("Failed to get chargeback statuses");
+
+    println!("=== STATUS HISTORY FOR {} ===", TEST_CLOSED_CHARGEBACK_ID);
+    println!("Found {} status records", statuses.len());
+
+    for status in &statuses {
+        println!(
+            "  {} - status: {:?}, chargeback: {:?}, message: {:?}",
+            status.id.as_str(),
+            status.status,
+            status.chargeback,
+            status.chargeback_message
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY environment variable"]
+async fn test_get_chargeback_messages_for_chargeback() {
+    // Test getting messages for a specific chargeback
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let search = SearchBuilder::new()
+        .field("chargeback", TEST_OPEN_CHARGEBACK_ID)
+        .build();
+
+    let messages: Vec<ChargebackMessage> = client
+        .search(EntityType::ChargebackMessages, &search)
+        .await
+        .expect("Failed to get chargeback messages");
+
+    println!("=== MESSAGES FOR {} ===", TEST_OPEN_CHARGEBACK_ID);
+    println!("Found {} messages", messages.len());
+
+    for msg in &messages {
+        println!(
+            "  {} - type: {:?}, status: {:?}, subject: {:?}",
+            msg.id.as_str(),
+            msg.message_type,
+            msg.status,
+            msg.subject
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY environment variable"]
+async fn test_get_chargeback_documents_for_chargeback() {
+    // Test getting documents for a specific chargeback
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let search = SearchBuilder::new()
+        .field("chargeback", TEST_OPEN_CHARGEBACK_ID)
+        .build();
+
+    let documents: Vec<ChargebackDocument> = client
+        .search(EntityType::ChargebackDocuments, &search)
+        .await
+        .expect("Failed to get chargeback documents");
+
+    println!("=== DOCUMENTS FOR {} ===", TEST_OPEN_CHARGEBACK_ID);
+    println!("Found {} documents", documents.len());
+
+    for doc in &documents {
+        println!(
+            "  {} - name: {:?}, type: {:?}, size: {:?}",
+            doc.id.as_str(),
+            doc.name,
+            doc.document_type,
+            doc.size
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY environment variable"]
+async fn test_chargeback_outcomes_by_status() {
+    // Test aggregating chargebacks by outcome status
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let chargebacks: Vec<Chargeback> = client.get_all(EntityType::Chargebacks).await.unwrap();
+
+    let mut open = 0;
+    let mut won = 0;
+    let mut lost = 0;
+    let mut closed = 0;
+    let mut other = 0;
+
+    for cb in &chargebacks {
+        match cb.status {
+            Some(ChargebackStatusValue::Open) => open += 1,
+            Some(ChargebackStatusValue::Won) => won += 1,
+            Some(ChargebackStatusValue::Lost) => lost += 1,
+            Some(ChargebackStatusValue::Closed) => closed += 1,
+            None => other += 1,
+        }
+    }
+
+    println!("=== CHARGEBACK STATUS SUMMARY ===");
+    println!("Total: {}", chargebacks.len());
+    println!("  Open: {}", open);
+    println!("  Won: {}", won);
+    println!("  Lost: {}", lost);
+    println!("  Closed: {}", closed);
+    println!("  Other/Unknown: {}", other);
 }
 
 #[tokio::test]
@@ -1100,11 +1349,11 @@ async fn test_get_entries() {
     println!("Found {} entries", entries.len());
     for e in entries.iter().take(5) {
         println!(
-            "  Entry: {} - entity: {:?}, net: {:?}, entry_type: {:?}",
+            "  Entry: {} - entity: {:?}, amount: {:?}, event: {:?}",
             e.id.as_str(),
             e.entity,
-            e.net,
-            e.entry_type
+            e.amount,
+            e.event
         );
     }
 }
@@ -1121,11 +1370,11 @@ async fn test_get_pending_entries() {
     println!("Found {} pending entries", entries.len());
     for e in entries.iter().take(5) {
         println!(
-            "  PendingEntry: {} - entity: {:?}, net: {:?}, entry_type: {:?}",
+            "  PendingEntry: {} - entity: {:?}, amount: {:?}, event: {:?}",
             e.id.as_str(),
             e.entity,
-            e.net,
-            e.entry_type
+            e.amount,
+            e.event
         );
     }
 }
@@ -1142,11 +1391,11 @@ async fn test_get_refunds() {
     println!("Found {} refunds", refunds.len());
     for r in refunds.iter().take(5) {
         println!(
-            "  Refund: {} - txn: {:?}, amount: {:?}, status: {:?}",
+            "  Refund: {} - entry: {:?}, amount: {:?}, description: {:?}",
             r.id.as_str(),
-            r.txn,
+            r.entry,
             r.amount,
-            r.status
+            r.description
         );
     }
 }
@@ -1163,10 +1412,10 @@ async fn test_get_alerts() {
     println!("Found {} alerts", alerts.len());
     for a in alerts.iter().take(5) {
         println!(
-            "  Alert: {} - name: {:?}, entity: {:?}",
+            "  Alert: {} - name: {:?}, login: {:?}",
             a.id.as_str(),
             a.name,
-            a.entity
+            a.login
         );
     }
 }
@@ -1203,10 +1452,10 @@ async fn test_get_alert_triggers() {
     println!("Found {} alert triggers", triggers.len());
     for t in triggers.iter().take(5) {
         println!(
-            "  AlertTrigger: {} - alert: {:?}, trigger_type: {:?}",
+            "  AlertTrigger: {} - alert: {:?}, event: {:?}",
             t.id.as_str(),
             t.alert,
-            t.trigger_type
+            t.event
         );
     }
 }
@@ -1223,10 +1472,10 @@ async fn test_get_notes() {
     println!("Found {} notes", notes.len());
     for n in notes.iter().take(5) {
         println!(
-            "  Note: {} - entity: {:?}, subject: {:?}, note_type: {:?}",
+            "  Note: {} - entity: {:?}, note: {:?}, note_type: {:?}",
             n.id.as_str(),
             n.entity,
-            n.subject,
+            n.note,
             n.note_type
         );
     }
@@ -1244,10 +1493,10 @@ async fn test_get_note_documents() {
     println!("Found {} note documents", docs.len());
     for d in docs.iter().take(5) {
         println!(
-            "  NoteDocument: {} - note: {:?}, name: {:?}, document_type: {:?}",
+            "  NoteDocument: {} - note: {:?}, custom: {:?}, document_type: {:?}",
             d.id.as_str(),
             d.note,
-            d.name,
+            d.custom,
             d.document_type
         );
     }
@@ -1287,25 +1536,21 @@ async fn test_discover_chargeback_status_values() {
     }
 
     // 2. Get all chargeback status records (status change history)
-    println!("\n--- Checking ChargebackStatus.from_status/to_status fields ---");
+    println!("\n--- Checking ChargebackStatus.status field ---");
     let statuses: Vec<ChargebackStatus> = client.get_all(EntityType::ChargebackStatuses).await.unwrap();
     println!("Total chargeback status records: {}", statuses.len());
 
     for s in &statuses {
-        if let Some(from) = &s.from_status {
-            let status_str = format!("{:?}", from);
-            unique_statuses.insert(status_str.clone());
-        }
-        if let Some(to) = &s.to_status {
-            let status_str = format!("{:?}", to);
-            unique_statuses.insert(status_str.clone());
+        if let Some(status_val) = &s.status {
+            let status_str = format!("{:?}", status_val);
+            unique_statuses.insert(status_str);
         }
         println!(
-            "  {} -> from: {:?}, to: {:?}, name: {:?}",
+            "  {} -> status: {:?}, chargeback: {:?}, message: {:?}",
             s.id.as_str(),
-            s.from_status,
-            s.to_status,
-            s.name
+            s.status,
+            s.chargeback,
+            s.chargeback_message
         );
     }
 
@@ -1830,11 +2075,11 @@ async fn test_merchant_onboarding_with_multiple_members() {
             println!("\nCreated members:");
             for member in &onboard_result.members {
                 println!(
-                    "  - {}: {:?} {:?}, type={:?}, ownership={:?}",
+                    "  - {}: {:?} {:?}, title={:?}, ownership={:?}",
                     member.id.as_str(),
                     member.first,
                     member.last,
-                    member.member_type,
+                    member.title,
                     member.ownership
                 );
             }
@@ -1980,11 +2225,9 @@ async fn test_create_token_validate_response() {
             assert!(!token.id.as_str().is_empty(), "ID should not be empty");
             assert!(token.id.as_str().starts_with("t1_tok_"), "ID should start with t1_tok_");
 
-            // Note: last4/first6 may not be returned immediately on create
-            // These fields are populated asynchronously - verify via GET instead
-            println!("Last4: {:?}", token.last4);
-            println!("First6: {:?}", token.first6);
+            // Note: payment info is stored in the payment object
             println!("Payment method: {:?}", token.payment);
+            println!("Token status: {:?}", token.status);
 
             // Validate expiration
             assert!(token.expiration.is_some(), "Expiration should be set");
@@ -1994,7 +2237,7 @@ async fn test_create_token_validate_response() {
 
             println!("\nAll response fields validated successfully!");
             println!("Token ID: {}", token.id.as_str());
-            println!("Last4: {:?}", token.last4);
+            println!("Token status: {:?}", token.status);
             println!("Payment Method: {:?}", token.payment);
         }
         Err(e) => {
@@ -2006,11 +2249,11 @@ async fn test_create_token_validate_response() {
 /// Create a transaction and validate response fields match OpenAPI spec.
 /// This test validates integer enums are returned correctly.
 ///
-/// NOTE: Requires a fully boarded merchant (status=Boarded). The test merchant
-/// created in test_merchant_onboarding_with_trust_account has status=NotReady
-/// because it uses dummy data. Use an existing boarded merchant for this test.
+/// NOTE: Requires TEST_MERCHANT_ID to have status=Boarded. The test merchant
+/// currently has status=NotReady because it was created with test data.
+/// This test documents the expected behavior once a merchant is properly boarded.
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY and a BOARDED merchant - TEST_MERCHANT_ID must be Boarded"]
+#[ignore = "requires PAYRIX_API_KEY and TEST_MERCHANT_ID to be Boarded"]
 async fn test_create_transaction_validate_response() {
     init_logging();
     let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");

@@ -1,123 +1,120 @@
 //! Entity reserve types for the Payrix API.
 //!
-//! Entity reserves configure reserve requirements at the entity level.
+//! Entity reserves represent reserve accounts associated with entities.
+//!
+//! **OpenAPI schema:** `entityReservesResponse`
 
 use serde::{Deserialize, Serialize};
 
-use super::{bool_from_int_default_false, option_bool_from_int, PayrixId, ReserveType};
+use super::PayrixId;
 
-/// A Payrix entity reserve configuration.
+// =============================================================================
+// ENTITY RESERVE STRUCT
+// =============================================================================
+
+/// A Payrix entity reserve.
 ///
-/// Entity reserves define default reserve settings for merchants under an entity.
-/// All monetary values are in **cents**.
+/// Entity reserves represent reserve accounts where funds are held for an entity.
+///
+/// **OpenAPI schema:** `entityReservesResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct EntityReserve {
-    /// Unique identifier (30 characters, e.g., "t1_ers_...")
+    /// The ID of this resource.
+    ///
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Entity ID that owns this configuration
-    #[serde(default)]
-    pub entity: Option<PayrixId>,
-
-    /// Login ID that created this configuration
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Reserve type
-    #[serde(default, rename = "type")]
-    pub reserve_type: Option<ReserveType>,
-
-    /// Default reserve percentage
-    #[serde(default)]
-    pub percent: Option<i32>,
-
-    /// Default cap amount in cents
-    #[serde(default)]
-    pub cap: Option<i64>,
-
-    /// Default hold days
-    #[serde(default)]
-    pub hold_days: Option<i32>,
-
-    /// Currency code (e.g., "USD")
-    #[serde(default)]
-    pub currency: Option<String>,
-
-    /// Configuration name/label
-    #[serde(default)]
-    pub name: Option<String>,
-
-    /// Description/notes
-    #[serde(default)]
-    pub description: Option<String>,
-
-    /// Custom data field
-    #[serde(default)]
-    pub custom: Option<String>,
-
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive (false=active, true=inactive)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub inactive: bool,
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
 
-    /// Whether resource is frozen
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub frozen: bool,
-}
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
 
-/// Request to create a new entity reserve configuration.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewEntityReserve {
-    /// Entity ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub entity: Option<String>,
+    /// The Login that owns this resource.
+    ///
+    /// **OpenAPI type:** string (ref: entityReservesModelLogin)
+    #[serde(default)]
+    pub login: Option<PayrixId>,
 
-    /// Reserve type
-    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-    pub reserve_type: Option<ReserveType>,
+    /// The identifier of the Fund that this entityReserves resource relates to.
+    ///
+    /// **OpenAPI type:** string (ref: entityReservesModelFund)
+    #[serde(default)]
+    pub fund: Option<PayrixId>,
 
-    /// Default reserve percentage
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub percent: Option<i32>,
+    /// The amount held in this entityReserve.
+    ///
+    /// This field is specified as an integer in cents.
+    ///
+    /// **OpenAPI type:** integer (int64)
+    #[serde(default)]
+    pub total: Option<i64>,
 
-    /// Default cap amount in cents
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cap: Option<i64>,
+    /// The current sequentially numbered activity requested for this entityReserve.
+    ///
+    /// **OpenAPI type:** integer (int64)
+    #[serde(default)]
+    pub request_sequence: Option<i64>,
 
-    /// Default hold days
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hold_days: Option<i32>,
+    /// The current sequentially numbered activity processed for this entityReserve.
+    ///
+    /// **OpenAPI type:** integer (int64)
+    #[serde(default)]
+    pub processed_sequence: Option<i64>,
 
-    /// Currency code
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub currency: Option<String>,
-
-    /// Configuration name/label
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The name of this EntityReserve.
+    ///
+    /// This field is stored as a text string and must be between 0 and 50 characters long.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
     pub name: Option<String>,
 
-    /// Description/notes
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// A description of this EntityReserve.
+    ///
+    /// This field is stored as a text string and must be between 0 and 100 characters long.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
     pub description: Option<String>,
 
-    /// Custom data field
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
-
-    /// Whether resource is inactive
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub inactive: Option<bool>,
+    /// Reserve entries associated with this entity reserve.
+    ///
+    /// **OpenAPI type:** array of reserveEntriesResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub reserve_entries: Option<Vec<serde_json::Value>>,
 }
+
+// =============================================================================
+// TESTS
+// =============================================================================
 
 #[cfg(test)]
 mod tests {
@@ -129,371 +126,94 @@ mod tests {
     fn entity_reserve_deserialize_full() {
         let json = r#"{
             "id": "t1_ers_12345678901234567890123",
-            "entity": "t1_ent_12345678901234567890123",
-            "login": "t1_log_12345678901234567890123",
-            "type": 1,
-            "percent": 10,
-            "cap": 100000,
-            "holdDays": 30,
-            "currency": "USD",
-            "name": "Default Reserve",
-            "description": "Default reserve configuration",
-            "custom": "custom data",
-            "created": "2024-01-01 00:00:00.000",
-            "modified": "2024-04-01 12:00:00.000",
-            "inactive": 0,
-            "frozen": 1
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 23:59:59.9999",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124",
+            "login": "t1_lgn_12345678901234567890125",
+            "fund": "t1_fnd_12345678901234567890123",
+            "total": 5000000,
+            "requestSequence": 100,
+            "processedSequence": 99,
+            "name": "Merchant Reserve",
+            "description": "Reserve account for merchant"
         }"#;
 
-        let entity_reserve: EntityReserve = serde_json::from_str(json).unwrap();
-        assert_eq!(entity_reserve.id.as_str(), "t1_ers_12345678901234567890123");
-        assert_eq!(entity_reserve.entity.unwrap().as_str(), "t1_ent_12345678901234567890123");
-        assert_eq!(entity_reserve.login.unwrap().as_str(), "t1_log_12345678901234567890123");
-        assert_eq!(entity_reserve.reserve_type, Some(ReserveType::Rolling));
-        assert_eq!(entity_reserve.percent, Some(10));
-        assert_eq!(entity_reserve.cap, Some(100000));
-        assert_eq!(entity_reserve.hold_days, Some(30));
-        assert_eq!(entity_reserve.currency, Some("USD".to_string()));
-        assert_eq!(entity_reserve.name, Some("Default Reserve".to_string()));
-        assert_eq!(entity_reserve.description, Some("Default reserve configuration".to_string()));
-        assert_eq!(entity_reserve.custom, Some("custom data".to_string()));
-        assert_eq!(entity_reserve.created, Some("2024-01-01 00:00:00.000".to_string()));
-        assert_eq!(entity_reserve.modified, Some("2024-04-01 12:00:00.000".to_string()));
-        assert!(!entity_reserve.inactive);
-        assert!(entity_reserve.frozen);
+        let er: EntityReserve = serde_json::from_str(json).unwrap();
+        assert_eq!(er.id.as_str(), "t1_ers_12345678901234567890123");
+        assert_eq!(er.created, Some("2024-01-01 00:00:00.0000".to_string()));
+        assert_eq!(er.modified, Some("2024-01-02 23:59:59.9999".to_string()));
+        assert_eq!(
+            er.creator.as_ref().map(|c| c.as_str()),
+            Some("t1_lgn_12345678901234567890123")
+        );
+        assert_eq!(
+            er.modifier.as_ref().map(|m| m.as_str()),
+            Some("t1_lgn_12345678901234567890124")
+        );
+        assert_eq!(
+            er.login.as_ref().map(|l| l.as_str()),
+            Some("t1_lgn_12345678901234567890125")
+        );
+        assert_eq!(
+            er.fund.as_ref().map(|f| f.as_str()),
+            Some("t1_fnd_12345678901234567890123")
+        );
+        assert_eq!(er.total, Some(5000000));
+        assert_eq!(er.request_sequence, Some(100));
+        assert_eq!(er.processed_sequence, Some(99));
+        assert_eq!(er.name, Some("Merchant Reserve".to_string()));
+        assert_eq!(er.description, Some("Reserve account for merchant".to_string()));
     }
 
     #[test]
     fn entity_reserve_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_ers_12345678901234567890123"
-        }"#;
-
-        let entity_reserve: EntityReserve = serde_json::from_str(json).unwrap();
-        assert_eq!(entity_reserve.id.as_str(), "t1_ers_12345678901234567890123");
-        assert!(entity_reserve.entity.is_none());
-        assert!(entity_reserve.login.is_none());
-        assert!(entity_reserve.reserve_type.is_none());
-        assert!(entity_reserve.percent.is_none());
-        assert!(entity_reserve.cap.is_none());
-        assert!(entity_reserve.hold_days.is_none());
-        assert!(entity_reserve.currency.is_none());
-        assert!(entity_reserve.name.is_none());
-        assert!(entity_reserve.description.is_none());
-        assert!(entity_reserve.custom.is_none());
-        assert!(entity_reserve.created.is_none());
-        assert!(entity_reserve.modified.is_none());
-        assert!(!entity_reserve.inactive);
-        assert!(!entity_reserve.frozen);
-    }
-
-    #[test]
-    fn entity_reserve_bool_from_int_zero_is_false() {
-        let json = r#"{"id": "t1_ers_12345678901234567890123", "inactive": 0, "frozen": 0}"#;
-        let entity_reserve: EntityReserve = serde_json::from_str(json).unwrap();
-        assert!(!entity_reserve.inactive);
-        assert!(!entity_reserve.frozen);
-    }
-
-    #[test]
-    fn entity_reserve_bool_from_int_one_is_true() {
-        let json = r#"{"id": "t1_ers_12345678901234567890123", "inactive": 1, "frozen": 1}"#;
-        let entity_reserve: EntityReserve = serde_json::from_str(json).unwrap();
-        assert!(entity_reserve.inactive);
-        assert!(entity_reserve.frozen);
-    }
-
-    #[test]
-    fn entity_reserve_bool_from_int_missing_defaults_false() {
         let json = r#"{"id": "t1_ers_12345678901234567890123"}"#;
-        let entity_reserve: EntityReserve = serde_json::from_str(json).unwrap();
-        assert!(!entity_reserve.inactive);
-        assert!(!entity_reserve.frozen);
-    }
 
-    #[test]
-    fn entity_reserve_all_reserve_type_variants() {
-        let test_cases = vec![
-            (1, ReserveType::Rolling),
-            (2, ReserveType::Fixed),
-            (3, ReserveType::Upfront),
-        ];
-
-        for (type_val, expected_type) in test_cases {
-            let json = format!(
-                r#"{{"id": "t1_ers_12345678901234567890123", "type": {}}}"#,
-                type_val
-            );
-            let entity_reserve: EntityReserve = serde_json::from_str(&json).unwrap();
-            assert_eq!(entity_reserve.reserve_type, Some(expected_type));
-        }
-    }
-
-    #[test]
-    fn entity_reserve_rolling_reserve_config() {
-        let json = r#"{
-            "id": "t1_ers_12345678901234567890123",
-            "type": 1,
-            "percent": 10,
-            "cap": 50000,
-            "holdDays": 30
-        }"#;
-
-        let entity_reserve: EntityReserve = serde_json::from_str(json).unwrap();
-        assert_eq!(entity_reserve.reserve_type, Some(ReserveType::Rolling));
-        assert_eq!(entity_reserve.percent, Some(10));
-        assert_eq!(entity_reserve.cap, Some(50000));
-        assert_eq!(entity_reserve.hold_days, Some(30));
-    }
-
-    #[test]
-    fn entity_reserve_fixed_reserve_config() {
-        let json = r#"{
-            "id": "t1_ers_12345678901234567890123",
-            "type": 2,
-            "cap": 100000
-        }"#;
-
-        let entity_reserve: EntityReserve = serde_json::from_str(json).unwrap();
-        assert_eq!(entity_reserve.reserve_type, Some(ReserveType::Fixed));
-        assert_eq!(entity_reserve.cap, Some(100000));
+        let er: EntityReserve = serde_json::from_str(json).unwrap();
+        assert_eq!(er.id.as_str(), "t1_ers_12345678901234567890123");
+        assert!(er.created.is_none());
+        assert!(er.modified.is_none());
+        assert!(er.creator.is_none());
+        assert!(er.modifier.is_none());
+        assert!(er.login.is_none());
+        assert!(er.fund.is_none());
+        assert!(er.total.is_none());
+        assert!(er.request_sequence.is_none());
+        assert!(er.processed_sequence.is_none());
+        assert!(er.name.is_none());
+        assert!(er.description.is_none());
     }
 
     #[test]
     fn entity_reserve_serialize_roundtrip() {
-        let entity_reserve = EntityReserve {
-            id: "t1_ers_12345678901234567890123".parse().unwrap(),
-            entity: Some("t1_ent_12345678901234567890123".parse().unwrap()),
-            login: Some("t1_log_12345678901234567890123".parse().unwrap()),
-            reserve_type: Some(ReserveType::Rolling),
-            percent: Some(15),
-            cap: Some(75000),
-            hold_days: Some(45),
-            currency: Some("USD".to_string()),
-            name: Some("Test Reserve".to_string()),
-            description: Some("Test".to_string()),
-            custom: Some("custom".to_string()),
-            created: Some("2024-01-01 00:00:00.000".to_string()),
-            modified: Some("2024-01-02 00:00:00.000".to_string()),
-            inactive: false,
-            frozen: true,
-        };
-
-        let json = serde_json::to_string(&entity_reserve).unwrap();
-        let deserialized: EntityReserve = serde_json::from_str(&json).unwrap();
-        assert_eq!(entity_reserve, deserialized);
-    }
-
-    #[test]
-    fn entity_reserve_zero_percent() {
         let json = r#"{
             "id": "t1_ers_12345678901234567890123",
-            "percent": 0
+            "fund": "t1_fnd_12345678901234567890123",
+            "total": 1000000,
+            "name": "Test Reserve"
         }"#;
 
-        let entity_reserve: EntityReserve = serde_json::from_str(json).unwrap();
-        assert_eq!(entity_reserve.percent, Some(0));
+        let er: EntityReserve = serde_json::from_str(json).unwrap();
+        let serialized = serde_json::to_string(&er).unwrap();
+        let deserialized: EntityReserve = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(er.id, deserialized.id);
+        assert_eq!(er.fund, deserialized.fund);
+        assert_eq!(er.total, deserialized.total);
+        assert_eq!(er.name, deserialized.name);
     }
 
     #[test]
-    fn entity_reserve_max_percent() {
-        let json = r#"{
-            "id": "t1_ers_12345678901234567890123",
-            "percent": 100
-        }"#;
-
-        let entity_reserve: EntityReserve = serde_json::from_str(json).unwrap();
-        assert_eq!(entity_reserve.percent, Some(100));
-    }
-
-    // ==================== NewEntityReserve Tests ====================
-
-    #[test]
-    fn new_entity_reserve_serialize_full() {
-        let new_entity_reserve = NewEntityReserve {
-            entity: Some("t1_ent_12345678901234567890123".to_string()),
-            reserve_type: Some(ReserveType::Rolling),
-            percent: Some(10),
-            cap: Some(100000),
-            hold_days: Some(30),
-            currency: Some("USD".to_string()),
-            name: Some("Default Reserve".to_string()),
-            description: Some("Default reserve configuration".to_string()),
-            custom: Some("custom data".to_string()),
-            inactive: Some(false),
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(json.contains("\"entity\":\"t1_ent_12345678901234567890123\""));
-        assert!(json.contains("\"type\":1"));
-        assert!(json.contains("\"percent\":10"));
-        assert!(json.contains("\"cap\":100000"));
-        assert!(json.contains("\"holdDays\":30"));
-        assert!(json.contains("\"currency\":\"USD\""));
-        assert!(json.contains("\"name\":\"Default Reserve\""));
-        assert!(json.contains("\"description\":\"Default reserve configuration\""));
-        assert!(json.contains("\"custom\":\"custom data\""));
-        assert!(json.contains("\"inactive\":0"));
+    fn entity_reserve_large_total() {
+        let json = r#"{"id": "t1_ers_12345678901234567890123", "total": 9999999999}"#;
+        let er: EntityReserve = serde_json::from_str(json).unwrap();
+        assert_eq!(er.total, Some(9999999999));
     }
 
     #[test]
-    fn new_entity_reserve_serialize_minimal() {
-        let new_entity_reserve = NewEntityReserve {
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        // All optional fields should be omitted
-        assert!(!json.contains("\"entity\""));
-        assert!(!json.contains("\"type\""));
-        assert!(!json.contains("\"percent\""));
-        assert!(!json.contains("\"cap\""));
-        assert!(!json.contains("\"holdDays\""));
-        assert!(!json.contains("\"currency\""));
-        assert!(!json.contains("\"name\""));
-        assert!(!json.contains("\"description\""));
-        assert!(!json.contains("\"custom\""));
-        assert!(!json.contains("\"inactive\""));
-    }
-
-    #[test]
-    fn new_entity_reserve_option_bool_to_int_true() {
-        let new_entity_reserve = NewEntityReserve {
-            inactive: Some(true),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(json.contains("\"inactive\":1"));
-    }
-
-    #[test]
-    fn new_entity_reserve_option_bool_to_int_false() {
-        let new_entity_reserve = NewEntityReserve {
-            inactive: Some(false),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(json.contains("\"inactive\":0"));
-    }
-
-    #[test]
-    fn new_entity_reserve_option_bool_none_omitted() {
-        let new_entity_reserve = NewEntityReserve {
-            inactive: None,
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(!json.contains("\"inactive\""));
-    }
-
-    #[test]
-    fn new_entity_reserve_all_reserve_type_variants() {
-        let test_cases = vec![
-            (ReserveType::Rolling, 1),
-            (ReserveType::Fixed, 2),
-            (ReserveType::Upfront, 3),
-        ];
-
-        for (reserve_type, expected_val) in test_cases {
-            let new_entity_reserve = NewEntityReserve {
-                reserve_type: Some(reserve_type),
-                ..Default::default()
-            };
-
-            let json = serde_json::to_string(&new_entity_reserve).unwrap();
-            assert!(json.contains(&format!("\"type\":{}", expected_val)));
-        }
-    }
-
-    #[test]
-    fn new_entity_reserve_rolling_config() {
-        let new_entity_reserve = NewEntityReserve {
-            reserve_type: Some(ReserveType::Rolling),
-            percent: Some(15),
-            cap: Some(50000),
-            hold_days: Some(60),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(json.contains("\"type\":1"));
-        assert!(json.contains("\"percent\":15"));
-        assert!(json.contains("\"cap\":50000"));
-        assert!(json.contains("\"holdDays\":60"));
-    }
-
-    #[test]
-    fn new_entity_reserve_fixed_config() {
-        let new_entity_reserve = NewEntityReserve {
-            reserve_type: Some(ReserveType::Fixed),
-            cap: Some(100000),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(json.contains("\"type\":2"));
-        assert!(json.contains("\"cap\":100000"));
-        // Percent should not be present
-        assert!(!json.contains("\"percent\""));
-    }
-
-    #[test]
-    fn new_entity_reserve_upfront_config() {
-        let new_entity_reserve = NewEntityReserve {
-            reserve_type: Some(ReserveType::Upfront),
-            cap: Some(25000),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(json.contains("\"type\":3"));
-        assert!(json.contains("\"cap\":25000"));
-    }
-
-    #[test]
-    fn new_entity_reserve_zero_percent() {
-        let new_entity_reserve = NewEntityReserve {
-            percent: Some(0),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(json.contains("\"percent\":0"));
-    }
-
-    #[test]
-    fn new_entity_reserve_max_percent() {
-        let new_entity_reserve = NewEntityReserve {
-            percent: Some(100),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(json.contains("\"percent\":100"));
-    }
-
-    #[test]
-    fn new_entity_reserve_zero_hold_days() {
-        let new_entity_reserve = NewEntityReserve {
-            hold_days: Some(0),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(json.contains("\"holdDays\":0"));
-    }
-
-    #[test]
-    fn new_entity_reserve_large_cap() {
-        let new_entity_reserve = NewEntityReserve {
-            cap: Some(999999999),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_entity_reserve).unwrap();
-        assert!(json.contains("\"cap\":999999999"));
+    fn entity_reserve_zero_total() {
+        let json = r#"{"id": "t1_ers_12345678901234567890123", "total": 0}"#;
+        let er: EntityReserve = serde_json::from_str(json).unwrap();
+        assert_eq!(er.total, Some(0));
     }
 }

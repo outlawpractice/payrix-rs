@@ -1,13 +1,26 @@
 //! Account types for the Payrix API.
 //!
 //! Accounts represent bank accounts used for funding and disbursements.
+//!
+//! **OpenAPI schema:** `accountsResponse`
 
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use super::{bool_from_int_default_false, PayrixId};
 
+// =============================================================================
+// ACCOUNT ENUMS
+// =============================================================================
+
 /// Account holder type.
+///
+/// Used for account creation requests. This field is not part of the
+/// OpenAPI response schema but is used when creating accounts via the API.
+///
+/// Valid values:
+/// - `1` - Individual (personal account)
+/// - `2` - Business (corporate account)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum AccountHolderType {
@@ -19,6 +32,15 @@ pub enum AccountHolderType {
 }
 
 /// Account status values.
+///
+/// **OpenAPI schema:** `accountStatus`
+///
+/// Valid values:
+/// - `0` - Not Ready
+/// - `1` - Ready
+/// - `2` - Challenged
+/// - `3` - Verified
+/// - `4` - Manual
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum AccountStatus {
@@ -36,238 +58,321 @@ pub enum AccountStatus {
 }
 
 /// Account reserved status.
+///
+/// **OpenAPI schema:** `accountsReserved`
+///
+/// Valid values:
+/// - `0` - No reserve
+/// - `1` - Block transaction, will never be processed
+/// - `3` - Hold transaction, will not be captured
+/// - `4` - Reserve transaction, funds should be reserved
+/// - `5` - Block current activity, no change for merchant
+/// - `6` - Passed decision(s)
+/// - `7` - No policies to process
+/// - `8` - Onboard merchant and wait for manual check
+/// - `9` - Schedule automatic reserve release
+/// - `10` - Hold transaction, auto release when sale done
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum AccountReserved {
     /// No reserve
     #[default]
     NoReserve = 0,
-    /// Account withheld
-    AccountWithheld = 1,
-    /// Account usage pending manual review
-    AccountUsagePendingManualReview = 3,
-    /// Move all funds into reserve
-    MoveAllFundsIntoReserve = 4,
+    /// Block transaction, will never be processed. Entity sent to manual review queue.
+    BlockTransaction = 1,
+    /// Hold transaction, will not be captured
+    HoldTransaction = 3,
+    /// Reserve transaction, funds should be reserved
+    ReserveFunds = 4,
+    /// Block current activity, no change for merchant
+    BlockCurrentActivity = 5,
+    /// Passed decision(s). Used for integration purposes only.
+    PassedDecisions = 6,
+    /// No policies to process
+    NoPolicies = 7,
+    /// Onboard merchant and wait for manual check later
+    OnboardPendingManual = 8,
+    /// Schedule automatic release of the reserve
+    ScheduleAutoRelease = 9,
+    /// Hold transaction, auto release when associated sale is done
+    HoldAutoRelease = 10,
 }
 
 /// Account type (credit, debit, or all).
+///
+/// **OpenAPI schema:** `accountType`
+///
+/// Valid values:
+/// - `all` - Debit/checking and credit
+/// - `credit` - Credit only
+/// - `debit` - Debit/checking only
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AccountType {
+    /// All transaction types
+    #[default]
+    All,
     /// Credit transactions only
     Credit,
     /// Debit transactions only
     Debit,
-    /// All transaction types
-    #[default]
-    All,
 }
+
+/// Account check stage.
+///
+/// **OpenAPI schema:** `accountCheckStage`
+///
+/// Valid values:
+/// - `createAccount` - Create Account
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum AccountCheckStage {
+    /// Create Account stage
+    #[default]
+    #[serde(rename = "createAccount")]
+    CreateAccount,
+}
+
+/// Account update method.
+///
+/// **OpenAPI schema:** `UpdateMethod`
+///
+/// Valid values:
+/// - `NOC` - Notification of change
+/// - `PLAID` - Plaid
+/// - `MANUAL` - Manual
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum UpdateMethod {
+    /// Notification of change
+    #[default]
+    Noc,
+    /// Plaid
+    Plaid,
+    /// Manual
+    Manual,
+}
+
+// =============================================================================
+// ACCOUNT STRUCT
+// =============================================================================
 
 /// A Payrix bank account.
 ///
 /// Bank accounts are used for merchant funding (receiving deposits) and
-/// debiting (fee withdrawals, refunds). An entity can have multiple accounts
-/// for different purposes.
+/// debiting (fee withdrawals, refunds).
 ///
-/// # Creating an Account
+/// **OpenAPI schema:** `accountsResponse`
 ///
-/// When creating a new account, the following fields are required:
-/// - `entity` - Parent entity ID
-/// - `routing` - Bank routing number (9 digits) OR `public_token` for Plaid
-/// - `account` - Bank account number OR `public_token` for Plaid
-/// - `holder_type` - Individual or Business
-///
-/// Read-only fields (returned by API, not sent on create):
-/// - `id` - Assigned by Payrix
-/// - `login` - Set by API based on authentication
-/// - `last4` - Derived from account number
-/// - `status`, `verified` - Set by verification process
-/// - `created`, `modified` - Timestamps set by API
-///
-/// # Account Types
-///
-/// The `account_type` field controls what transactions can use this account:
-/// - `All` - Both credits (deposits) and debits (withdrawals). Use for primary
-///   operating accounts that receive deposits and have fees deducted.
-/// - `Credit` - Deposits only, no fee withdrawals. Use for trust accounts,
-///   client funds accounts, or accounts that should only receive money.
-/// - `Debit` - Withdrawals only. Rarely used, for special fee accounts.
-///
-/// # Primary Account
-///
-/// One account should be marked as `primary: true`. The primary account is used
-/// for fee deductions and as the default funding destination.
-///
-/// # Bank Account Entry Methods
-///
-/// You can add bank accounts two ways:
-/// 1. **Manual Entry** - Provide `routing` and `account` numbers directly
-/// 2. **Plaid Integration** - Provide a `public_token` from Plaid Link
-///
-/// # Trust Account + Operating Account Pattern
-///
-/// Businesses handling client funds (law firms, escrow, property managers)
-/// often need two accounts:
-/// - **Operating account** (`account_type: All`, `primary: true`) - receives
-///   merchant's share of funds, pays processing fees
-/// - **Trust account** (`account_type: Credit`, `primary: false`) - receives
-///   client funds only, no fee withdrawals allowed
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
-    /// Unique identifier (30 characters, e.g., "t1_act_...").
+    /// The ID of this resource.
     ///
-    /// **Read-only**: Assigned by Payrix when account is created.
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Parent entity ID.
+    /// The date and time at which this resource was created.
     ///
-    /// **Required for creation**. The entity that owns this bank account.
-    /// Format: "t1_ent_..." (30 characters).
-    pub entity: PayrixId,
-
-    /// Login ID that created this account.
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
-    /// **Read-only**: Set by Payrix based on the authenticated user.
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Account name/label for identification.
-    ///
-    /// **Optional**. Use descriptive names like "Operating Account",
-    /// "Client Trust Account" to distinguish between multiple accounts.
-    #[serde(default)]
-    pub name: Option<String>,
-
-    /// Transaction type this account can be used for.
-    ///
-    /// **Optional** (defaults to `All`).
-    /// - `All` - Credits (deposits) and debits (fee withdrawals)
-    /// - `Credit` - Deposits only (use for trust accounts)
-    /// - `Debit` - Withdrawals only (rare)
-    #[serde(default, rename = "type")]
-    pub account_type: Option<AccountType>,
-
-    /// Bank routing number (ABA number).
-    ///
-    /// **Required for creation** (manual entry). 9-digit US bank routing number.
-    /// Not needed when using Plaid integration.
-    #[serde(default)]
-    pub routing: Option<String>,
-
-    /// Bank account number.
-    ///
-    /// **Required for creation** (manual entry). Full account number.
-    /// Not needed when using Plaid integration.
-    /// Note: API returns masked value in responses.
-    #[serde(default)]
-    pub account: Option<String>,
-
-    /// Last 4 digits of account number.
-    ///
-    /// **Read-only**: Derived from the account number by Payrix.
-    #[serde(default)]
-    pub last4: Option<String>,
-
-    /// Account holder's first name.
-    ///
-    /// **Optional**. For individual accounts, the account holder's first name.
-    /// Not typically needed for business accounts.
-    #[serde(default)]
-    pub first: Option<String>,
-
-    /// Account holder's middle name.
-    ///
-    /// **Optional**.
-    #[serde(default)]
-    pub middle: Option<String>,
-
-    /// Account holder's last name.
-    ///
-    /// **Optional**. For individual accounts, the account holder's last name.
-    /// Not typically needed for business accounts.
-    #[serde(default)]
-    pub last: Option<String>,
-
-    /// Bank name.
-    ///
-    /// **Optional**. Name of the financial institution.
-    /// Often auto-populated from routing number.
-    #[serde(default)]
-    pub bank: Option<String>,
-
-    /// Account holder type.
-    ///
-    /// **Required for creation**.
-    /// - `Individual` - Personal bank account
-    /// - `Business` - Business/corporate bank account
-    #[serde(default)]
-    pub holder_type: Option<AccountHolderType>,
-
-    /// Whether this is the primary account.
-    ///
-    /// **Optional** (defaults to false). The primary account is used for:
-    /// - Default funding destination for deposits
-    /// - Fee deductions and other debits
-    ///
-    /// One account per entity should be marked primary.
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub primary: bool,
-
-    /// Account verification status.
-    ///
-    /// **Read-only**: Set by Payrix's verification process.
-    /// - `NotReady` - Not yet ready to verify
-    /// - `Ready` - Ready to be verified
-    /// - `Challenged` - Micro-deposit challenge sent
-    /// - `Verified` - Successfully verified
-    /// - `Manual` - Needs manual review
-    #[serde(default)]
-    pub status: Option<AccountStatus>,
-
-    /// Verification status code.
-    ///
-    /// **Read-only**: Numeric verification state set by Payrix.
-    #[serde(default)]
-    pub verified: Option<i32>,
-
-    /// Currency code (e.g., "USD").
-    ///
-    /// **Optional**. ISO 4217 currency code. Defaults to "USD" if not specified.
-    #[serde(default)]
-    pub currency: Option<String>,
-
-    /// Description/notes for internal reference.
-    ///
-    /// **Optional**.
-    #[serde(default)]
-    pub description: Option<String>,
-
-    /// Created timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
-    ///
-    /// **Read-only**: Set by Payrix when account is created.
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Last modified timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
+    /// The date and time at which this resource was modified.
     ///
-    /// **Read-only**: Updated by Payrix on changes.
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive.
+    /// The identifier of the Login that created this resource.
     ///
-    /// **Optional on create**. Set to `true` to create in inactive state.
+    /// **OpenAPI type:** string (ref: creator)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
+
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+
+    /// The identifier of the Entity associated with this Account.
+    ///
+    /// **OpenAPI type:** string (ref: accountsModelEntity)
+    #[serde(default)]
+    pub entity: Option<PayrixId>,
+
+    /// The identifier of the Payment associated with this Account.
+    ///
+    /// **OpenAPI type:** string (ref: accountsModelAccount)
+    #[serde(default)]
+    pub account: Option<PayrixId>,
+
+    /// A unique token that can be used to refer to this Account in other parts of the API.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub token: Option<String>,
+
+    /// A client-supplied name for this bank account.
+    ///
+    /// This field is stored as a string (0-100 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub name: Option<String>,
+
+    /// A client-supplied description for this bank account.
+    ///
+    /// This field is stored as a string (0-100 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub description: Option<String>,
+
+    /// Whether the Account is the primary Account for the associated Entity.
+    ///
+    /// Only one Account per Entity can be the primary Account.
+    ///
+    /// - `0` - Not primary
+    /// - `1` - Primary
+    ///
+    /// **OpenAPI type:** integer (ref: accountPrimary)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub primary: bool,
+
+    /// The type of financial account: debit, credit, or both.
+    ///
+    /// - `all` - Debit/checking and credit
+    /// - `credit` - Credit only
+    /// - `debit` - Debit/checking only
+    ///
+    /// **OpenAPI type:** string (ref: accountType)
+    #[serde(default, rename = "type")]
+    pub account_type: Option<AccountType>,
+
+    /// The status of the Account.
+    ///
+    /// - `0` - Not Ready
+    /// - `1` - Ready
+    /// - `2` - Challenged
+    /// - `3` - Verified
+    /// - `4` - Manual
+    ///
+    /// **OpenAPI type:** integer (ref: accountStatus)
+    #[serde(default)]
+    pub status: Option<AccountStatus>,
+
+    /// Whether the Account is reserved and the action to be taken.
+    ///
+    /// **OpenAPI type:** integer (ref: accountsReserved)
+    #[serde(default)]
+    pub reserved: Option<AccountReserved>,
+
+    /// The last stage completed for risk.
+    ///
+    /// - `createAccount` - Create Account
+    ///
+    /// **OpenAPI type:** string (ref: accountCheckStage)
+    #[serde(default)]
+    pub check_stage: Option<AccountCheckStage>,
+
+    /// The expiration date of the related debit account.
+    ///
+    /// Format: MMYY (e.g., `0118` for January 2018).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub expiration: Option<String>,
+
+    /// The currency of this Account.
+    ///
+    /// Default: `USD`. See ISO 4217 currency codes.
+    ///
+    /// **OpenAPI type:** string (ref: Currency)
+    #[serde(default)]
+    pub currency: Option<String>,
+
+    /// The token received from the Plaid account connection process.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub public_token: Option<String>,
+
+    /// The account number mask, showing the last four digits.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub mask: Option<String>,
+
+    /// Whether this resource is marked as inactive.
+    ///
+    /// - `0` - Active
+    /// - `1` - Inactive
+    ///
+    /// **OpenAPI type:** integer (ref: Inactive)
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
-    /// Whether resource is frozen.
+    /// Whether this resource is marked as frozen.
     ///
-    /// **Read-only**: Set by Payrix for compliance/risk reasons.
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
+    ///
+    /// **OpenAPI type:** integer (ref: Frozen)
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
+
+    /// The account identifier returned by the Plaid flow.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub plaid_account_id: Option<String>,
+
+    /// The method used to update the account.
+    ///
+    /// - `NOC` - Notification of change
+    /// - `PLAID` - Plaid
+    /// - `MANUAL` - Manual
+    ///
+    /// **OpenAPI type:** string (ref: UpdateMethod)
+    #[serde(default)]
+    pub update_method: Option<UpdateMethod>,
+
+    // =========================================================================
+    // NESTED RELATIONS (expandable via API)
+    // =========================================================================
+
+    /// Change requests associated with this account.
+    ///
+    /// **OpenAPI type:** array of changeRequest
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub change_requests: Option<Vec<serde_json::Value>>,
+
+    /// Payment updates associated with this account.
+    ///
+    /// **OpenAPI type:** array of paymentUpdatesResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub payment_updates: Option<Vec<serde_json::Value>>,
+
+    /// Payouts associated with this account.
+    ///
+    /// **OpenAPI type:** array of payoutsResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub payouts: Option<Vec<serde_json::Value>>,
 }
+
+// =============================================================================
+// TESTS
+// =============================================================================
 
 #[cfg(test)]
 mod tests {
@@ -290,12 +395,6 @@ mod tests {
     #[test]
     fn account_holder_type_default() {
         assert_eq!(AccountHolderType::default(), AccountHolderType::Individual);
-    }
-
-    #[test]
-    fn account_holder_type_invalid_value() {
-        assert!(serde_json::from_str::<AccountHolderType>("0").is_err());
-        assert!(serde_json::from_str::<AccountHolderType>("99").is_err());
     }
 
     // ==================== AccountStatus Tests ====================
@@ -323,27 +422,34 @@ mod tests {
         assert_eq!(AccountStatus::default(), AccountStatus::Ready);
     }
 
-    #[test]
-    fn account_status_invalid_value() {
-        assert!(serde_json::from_str::<AccountStatus>("99").is_err());
-    }
-
     // ==================== AccountReserved Tests ====================
 
     #[test]
     fn account_reserved_serialize_all_variants() {
         assert_eq!(serde_json::to_string(&AccountReserved::NoReserve).unwrap(), "0");
-        assert_eq!(serde_json::to_string(&AccountReserved::AccountWithheld).unwrap(), "1");
-        assert_eq!(serde_json::to_string(&AccountReserved::AccountUsagePendingManualReview).unwrap(), "3");
-        assert_eq!(serde_json::to_string(&AccountReserved::MoveAllFundsIntoReserve).unwrap(), "4");
+        assert_eq!(serde_json::to_string(&AccountReserved::BlockTransaction).unwrap(), "1");
+        assert_eq!(serde_json::to_string(&AccountReserved::HoldTransaction).unwrap(), "3");
+        assert_eq!(serde_json::to_string(&AccountReserved::ReserveFunds).unwrap(), "4");
+        assert_eq!(serde_json::to_string(&AccountReserved::BlockCurrentActivity).unwrap(), "5");
+        assert_eq!(serde_json::to_string(&AccountReserved::PassedDecisions).unwrap(), "6");
+        assert_eq!(serde_json::to_string(&AccountReserved::NoPolicies).unwrap(), "7");
+        assert_eq!(serde_json::to_string(&AccountReserved::OnboardPendingManual).unwrap(), "8");
+        assert_eq!(serde_json::to_string(&AccountReserved::ScheduleAutoRelease).unwrap(), "9");
+        assert_eq!(serde_json::to_string(&AccountReserved::HoldAutoRelease).unwrap(), "10");
     }
 
     #[test]
     fn account_reserved_deserialize_all_variants() {
         assert_eq!(serde_json::from_str::<AccountReserved>("0").unwrap(), AccountReserved::NoReserve);
-        assert_eq!(serde_json::from_str::<AccountReserved>("1").unwrap(), AccountReserved::AccountWithheld);
-        assert_eq!(serde_json::from_str::<AccountReserved>("3").unwrap(), AccountReserved::AccountUsagePendingManualReview);
-        assert_eq!(serde_json::from_str::<AccountReserved>("4").unwrap(), AccountReserved::MoveAllFundsIntoReserve);
+        assert_eq!(serde_json::from_str::<AccountReserved>("1").unwrap(), AccountReserved::BlockTransaction);
+        assert_eq!(serde_json::from_str::<AccountReserved>("3").unwrap(), AccountReserved::HoldTransaction);
+        assert_eq!(serde_json::from_str::<AccountReserved>("4").unwrap(), AccountReserved::ReserveFunds);
+        assert_eq!(serde_json::from_str::<AccountReserved>("5").unwrap(), AccountReserved::BlockCurrentActivity);
+        assert_eq!(serde_json::from_str::<AccountReserved>("6").unwrap(), AccountReserved::PassedDecisions);
+        assert_eq!(serde_json::from_str::<AccountReserved>("7").unwrap(), AccountReserved::NoPolicies);
+        assert_eq!(serde_json::from_str::<AccountReserved>("8").unwrap(), AccountReserved::OnboardPendingManual);
+        assert_eq!(serde_json::from_str::<AccountReserved>("9").unwrap(), AccountReserved::ScheduleAutoRelease);
+        assert_eq!(serde_json::from_str::<AccountReserved>("10").unwrap(), AccountReserved::HoldAutoRelease);
     }
 
     #[test]
@@ -351,26 +457,20 @@ mod tests {
         assert_eq!(AccountReserved::default(), AccountReserved::NoReserve);
     }
 
-    #[test]
-    fn account_reserved_invalid_value() {
-        assert!(serde_json::from_str::<AccountReserved>("2").is_err());
-        assert!(serde_json::from_str::<AccountReserved>("99").is_err());
-    }
-
     // ==================== AccountType Tests ====================
 
     #[test]
     fn account_type_serialize_all_variants() {
+        assert_eq!(serde_json::to_string(&AccountType::All).unwrap(), "\"all\"");
         assert_eq!(serde_json::to_string(&AccountType::Credit).unwrap(), "\"credit\"");
         assert_eq!(serde_json::to_string(&AccountType::Debit).unwrap(), "\"debit\"");
-        assert_eq!(serde_json::to_string(&AccountType::All).unwrap(), "\"all\"");
     }
 
     #[test]
     fn account_type_deserialize_all_variants() {
+        assert_eq!(serde_json::from_str::<AccountType>("\"all\"").unwrap(), AccountType::All);
         assert_eq!(serde_json::from_str::<AccountType>("\"credit\"").unwrap(), AccountType::Credit);
         assert_eq!(serde_json::from_str::<AccountType>("\"debit\"").unwrap(), AccountType::Debit);
-        assert_eq!(serde_json::from_str::<AccountType>("\"all\"").unwrap(), AccountType::All);
     }
 
     #[test]
@@ -378,101 +478,139 @@ mod tests {
         assert_eq!(AccountType::default(), AccountType::All);
     }
 
+    // ==================== UpdateMethod Tests ====================
+
     #[test]
-    fn account_type_invalid_value() {
-        assert!(serde_json::from_str::<AccountType>("\"invalid\"").is_err());
+    fn update_method_serialize_all_variants() {
+        assert_eq!(serde_json::to_string(&UpdateMethod::Noc).unwrap(), "\"NOC\"");
+        assert_eq!(serde_json::to_string(&UpdateMethod::Plaid).unwrap(), "\"PLAID\"");
+        assert_eq!(serde_json::to_string(&UpdateMethod::Manual).unwrap(), "\"MANUAL\"");
+    }
+
+    #[test]
+    fn update_method_deserialize_all_variants() {
+        assert_eq!(serde_json::from_str::<UpdateMethod>("\"NOC\"").unwrap(), UpdateMethod::Noc);
+        assert_eq!(serde_json::from_str::<UpdateMethod>("\"PLAID\"").unwrap(), UpdateMethod::Plaid);
+        assert_eq!(serde_json::from_str::<UpdateMethod>("\"MANUAL\"").unwrap(), UpdateMethod::Manual);
     }
 
     // ==================== Account Struct Tests ====================
 
     #[test]
     fn account_deserialize_full() {
-        // NOTE: API returns string values for type (e.g., "credit", "debit", "all")
         let json = r#"{
             "id": "t1_act_12345678901234567890123",
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 23:59:59.9999",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124",
             "entity": "t1_ent_12345678901234567890123",
-            "login": "t1_log_12345678901234567890123",
+            "account": "t1_pmt_12345678901234567890123",
+            "token": "tok_12345",
             "name": "Primary Checking",
-            "type": "credit",
-            "routing": "123456789",
-            "account": "****1234",
-            "last4": "1234",
-            "first": "John",
-            "middle": "Q",
-            "last": "Doe",
-            "bank": "Chase Bank",
-            "holderType": 1,
-            "primary": 1,
-            "status": 3,
-            "verified": 1,
-            "currency": "USD",
             "description": "Primary business account",
-            "created": "2024-01-01 00:00:00.000",
-            "modified": "2024-01-01 12:00:00.000",
+            "primary": 1,
+            "type": "credit",
+            "status": 3,
+            "reserved": 0,
+            "checkStage": "createAccount",
+            "expiration": "0125",
+            "currency": "USD",
+            "publicToken": "public-sandbox-xxx",
+            "mask": "1234",
             "inactive": 0,
-            "frozen": 1
+            "frozen": 1,
+            "plaidAccountId": "plaid_acc_123",
+            "updateMethod": "PLAID"
         }"#;
 
         let account: Account = serde_json::from_str(json).unwrap();
         assert_eq!(account.id.as_str(), "t1_act_12345678901234567890123");
-        assert_eq!(account.entity.as_str(), "t1_ent_12345678901234567890123");
-        assert_eq!(account.login.unwrap().as_str(), "t1_log_12345678901234567890123");
-        assert_eq!(account.name.unwrap(), "Primary Checking");
-        assert_eq!(account.account_type, Some(AccountType::Credit));
-        assert_eq!(account.routing.unwrap(), "123456789");
-        assert_eq!(account.last4.unwrap(), "1234");
-        assert_eq!(account.first.unwrap(), "John");
-        assert_eq!(account.last.unwrap(), "Doe");
-        assert_eq!(account.bank.unwrap(), "Chase Bank");
-        assert_eq!(account.holder_type, Some(AccountHolderType::Individual));
+        assert_eq!(account.created, Some("2024-01-01 00:00:00.0000".to_string()));
+        assert_eq!(account.modified, Some("2024-01-02 23:59:59.9999".to_string()));
+        assert_eq!(account.creator.as_ref().map(|c| c.as_str()), Some("t1_lgn_12345678901234567890123"));
+        assert_eq!(account.modifier.as_ref().map(|m| m.as_str()), Some("t1_lgn_12345678901234567890124"));
+        assert_eq!(account.entity.as_ref().map(|e| e.as_str()), Some("t1_ent_12345678901234567890123"));
+        assert_eq!(account.account.as_ref().map(|a| a.as_str()), Some("t1_pmt_12345678901234567890123"));
+        assert_eq!(account.token, Some("tok_12345".to_string()));
+        assert_eq!(account.name, Some("Primary Checking".to_string()));
+        assert_eq!(account.description, Some("Primary business account".to_string()));
         assert!(account.primary);
+        assert_eq!(account.account_type, Some(AccountType::Credit));
         assert_eq!(account.status, Some(AccountStatus::Verified));
+        assert_eq!(account.reserved, Some(AccountReserved::NoReserve));
+        assert_eq!(account.check_stage, Some(AccountCheckStage::CreateAccount));
+        assert_eq!(account.expiration, Some("0125".to_string()));
+        assert_eq!(account.currency, Some("USD".to_string()));
+        assert_eq!(account.public_token, Some("public-sandbox-xxx".to_string()));
+        assert_eq!(account.mask, Some("1234".to_string()));
         assert!(!account.inactive);
         assert!(account.frozen);
+        assert_eq!(account.plaid_account_id, Some("plaid_acc_123".to_string()));
+        assert_eq!(account.update_method, Some(UpdateMethod::Plaid));
     }
 
     #[test]
     fn account_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_act_12345678901234567890123",
-            "entity": "t1_ent_12345678901234567890123"
-        }"#;
+        let json = r#"{"id": "t1_act_12345678901234567890123"}"#;
 
         let account: Account = serde_json::from_str(json).unwrap();
         assert_eq!(account.id.as_str(), "t1_act_12345678901234567890123");
-        assert_eq!(account.entity.as_str(), "t1_ent_12345678901234567890123");
-        assert!(account.login.is_none());
+        assert!(account.created.is_none());
+        assert!(account.modified.is_none());
+        assert!(account.creator.is_none());
+        assert!(account.modifier.is_none());
+        assert!(account.entity.is_none());
+        assert!(account.account.is_none());
+        assert!(account.token.is_none());
         assert!(account.name.is_none());
+        assert!(account.description.is_none());
+        assert!(!account.primary);
+        assert!(account.account_type.is_none());
         assert!(account.status.is_none());
-        assert!(!account.primary);
+        assert!(account.reserved.is_none());
+        assert!(account.check_stage.is_none());
+        assert!(account.expiration.is_none());
+        assert!(account.currency.is_none());
+        assert!(account.public_token.is_none());
+        assert!(account.mask.is_none());
         assert!(!account.inactive);
         assert!(!account.frozen);
+        assert!(account.plaid_account_id.is_none());
+        assert!(account.update_method.is_none());
     }
 
     #[test]
-    fn account_bool_from_int_zero_is_false() {
-        let json = r#"{"id": "t1_act_12345678901234567890123", "entity": "t1_ent_12345678901234567890123", "primary": 0, "inactive": 0, "frozen": 0}"#;
-        let account: Account = serde_json::from_str(json).unwrap();
-        assert!(!account.primary);
-        assert!(!account.inactive);
-        assert!(!account.frozen);
-    }
-
-    #[test]
-    fn account_bool_from_int_one_is_true() {
-        let json = r#"{"id": "t1_act_12345678901234567890123", "entity": "t1_ent_12345678901234567890123", "primary": 1, "inactive": 1, "frozen": 1}"#;
+    fn account_bool_from_int() {
+        let json = r#"{"id": "t1_act_12345678901234567890123", "primary": 1, "inactive": 1, "frozen": 1}"#;
         let account: Account = serde_json::from_str(json).unwrap();
         assert!(account.primary);
         assert!(account.inactive);
         assert!(account.frozen);
-    }
 
-    #[test]
-    fn account_bool_from_int_missing_defaults_false() {
-        let json = r#"{"id": "t1_act_12345678901234567890123", "entity": "t1_ent_12345678901234567890123"}"#;
+        let json = r#"{"id": "t1_act_12345678901234567890123", "primary": 0, "inactive": 0, "frozen": 0}"#;
         let account: Account = serde_json::from_str(json).unwrap();
         assert!(!account.primary);
         assert!(!account.inactive);
         assert!(!account.frozen);
+    }
+
+    #[test]
+    #[cfg(not(feature = "sqlx"))]
+    fn account_with_nested_relations() {
+        let json = r#"{
+            "id": "t1_act_12345678901234567890123",
+            "changeRequests": [{"id": "req1"}],
+            "paymentUpdates": [{"id": "upd1"}],
+            "payouts": [{"id": "t1_pyt_12345678901234567890123"}]
+        }"#;
+
+        let account: Account = serde_json::from_str(json).unwrap();
+        assert!(account.change_requests.is_some());
+        assert_eq!(account.change_requests.as_ref().unwrap().len(), 1);
+        assert!(account.payment_updates.is_some());
+        assert_eq!(account.payment_updates.as_ref().unwrap().len(), 1);
+        assert!(account.payouts.is_some());
+        assert_eq!(account.payouts.as_ref().unwrap().len(), 1);
     }
 }

@@ -1,0 +1,96 @@
+{
+  "response": {
+    "data": [
+      {
+        "id": "t1_chm_6674683807ae211f3855942",
+        "created": "2024-06-20 13:34:48.0318",
+        "modified": "2024-06-20 13:34:48.0855",
+        "creator": "t1_log_657202cb80bcfc9df78676f",
+        "modifier": "t1_log_657202cb80bcfc9df78676f",
+        "chargeback": "t1_chb_6616a9f7c19a47bea938957",
+        "date": 20240620,
+        "type": "represent",
+        "fromQueue": null,
+        "toQueue": null,
+        "contact": "swaroopa.muralidhar@payrix.com",
+        "amount": null,
+        "currency": "USD",
+        "note": "dfafd",
+        "status": "processed",
+        "inactive": 0,
+        "frozen": 0,
+        "imported": 0
+      },
+      {
+        "id": "t1_chm_661763e7189cd01177a2312",
+        "created": "2024-04-11 00:15:35.1009",
+        "modified": "2024-04-11 00:15:35.1518",
+        "creator": "t1_log_64ee6855b97877780a5bfef",
+        "modifier": "t1_log_64ee6855b97877780a5bfef",
+        "chargeback": "t1_chb_6616a9de06fd751e5ae91e5",
+        "date": 20240410,
+        "type": "respondToDispute",
+        "fromQueue": null,
+        "toQueue": null,
+        "contact": null,
+        "amount": 0,
+        "currency": "USD",
+        "note": null,
+        "status": "processed",
+        "inactive": 0,
+        "frozen": 0,
+        "imported": 0
+      },
+      {
+        "id": "t1_chm_661736119c04f93b4c762bc",
+        "created": "2024-04-10 21:00:01.6392",
+        "modified": "2024-04-10 21:00:01.6873",
+        "creator": "t1_log_64ee6855b97877780a5bfef",
+        "modifier": "t1_log_64ee6855b97877780a5bfef",
+        "chargeback": "t1_chb_6616a9b87fce852bab31384",
+        "date": 20240410,
+        "type": "acceptLiability",
+        "fromQueue": null,
+        "toQueue": null,
+        "contact": null,
+        "amount": 0,
+        "currency": "USD",
+        "note": null,
+        "status": "processed",
+        "inactive": 0,
+        "frozen": 0,
+        "imported": 0
+      },
+      {
+        "id": "t1_chm_6615a82eab04751513fa42a",
+        "created": "2024-04-09 16:42:22.7006",
+        "modified": "2024-04-09 16:42:22.7516",
+        "creator": "t1_log_618afcdc2543bcabeaf184e",
+        "modifier": "t1_log_618afcdc2543bcabeaf184e",
+        "chargeback": "t1_chb_6615a79ed51d6fe4642db71",
+        "date": 20240409,
+        "type": "acceptLiability",
+        "fromQueue": null,
+        "toQueue": null,
+        "contact": null,
+        "amount": 3000,
+        "currency": "USD",
+        "note": null,
+        "status": "processed",
+        "inactive": 0,
+        "frozen": 0,
+        "imported": 0
+      }
+    ],
+    "details": {
+      "requestId": 1,
+      "totals": [],
+      "page": {
+        "current": 1,
+        "last": 1,
+        "hasMore": false
+      }
+    },
+    "errors": []
+  }
+}

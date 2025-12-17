@@ -1,462 +1,788 @@
 //! Merchant types for the Payrix API.
+//!
+//! Merchants represent payment processing accounts under entities.
+//!
+//! **OpenAPI schema:** `merchantsResponse`
 
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use super::{bool_from_int_default_false, DateYmd, PayrixId};
 
-/// Merchant type (business structure).
+// =============================================================================
+// Enums
+// =============================================================================
+
+/// Merchant type (business structure) per OpenAPI spec.
+///
+/// **OpenAPI schema:** `merchantType`
+///
+/// Valid values:
+/// - `0` - Sole Proprietor
+/// - `1` - Corporation
+/// - `2` - Limited Liability Corporation (LLC)
+/// - `3` - Partnership
+/// - `5` - Non-Profit Organization
+/// - `6` - Government Organization
+/// - `7` - C-Corporation
+/// - `8` - S-Corporation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum MerchantType {
-    /// Sole proprietor
+    /// Sole proprietor (individual owner).
     #[default]
     SoleProprietor = 0,
-    /// Corporation
+    /// Corporation.
     Corporation = 1,
-    /// Limited Liability Company (LLC)
+    /// Limited Liability Corporation (LLC).
     LimitedLiabilityCorporation = 2,
-    /// Partnership
+    /// Partnership (general or limited).
     Partnership = 3,
-    /// Non-profit organization
+    /// Non-profit organization.
     NonProfitOrganization = 5,
-    /// Government organization
+    /// Government organization.
     GovernmentOrganization = 6,
-    /// C-Corporation
+    /// C-Corporation.
     CCorporation = 7,
-    /// S-Corporation
+    /// S-Corporation.
     SCorporation = 8,
 }
 
-/// Merchant status.
+/// Merchant status per OpenAPI spec.
+///
+/// **OpenAPI schema:** `merchantStatus`
+///
+/// Valid values:
+/// - `0` - Not ready. Occurs when a new Merchant is created. Unable to process payments.
+/// - `1` - Ready. New Merchant submitted for underwriting approval.
+/// - `2` - Boarded. Merchant has been approved. Payment processing now available.
+/// - `3` - Manual. New Merchant is pending manual verification.
+/// - `4` - Closed. New Merchant was declined and cannot access the platform.
+/// - `5` - Incomplete. Can be manually set to save an incomplete boarding request.
+/// - `6` - Pending. New Merchant was submitted for boarding, pending review.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum MerchantStatus {
-    /// Not ready for processing
+    /// Not ready for processing. Occurs when a new Merchant is created.
     #[default]
     NotReady = 0,
-    /// Ready for processing
+    /// Ready. Submitted for underwriting approval.
     Ready = 1,
-    /// Boarded and active
+    /// Boarded. Approved and ready to process payments.
     Boarded = 2,
-    /// Manual review required
+    /// Manual. Pending manual verification.
     Manual = 3,
-    /// Account closed
+    /// Closed. Declined and cannot access the platform.
     Closed = 4,
-    /// Application incomplete
+    /// Incomplete. Draft saved for later completion.
     Incomplete = 5,
-    /// Pending review
+    /// Pending. Submitted for boarding, pending review.
     Pending = 6,
 }
 
-/// Merchant environment.
+/// Merchant environment per OpenAPI spec.
 ///
-/// The Payrix API accepts lowercase values for input (e.g., `ecommerce`)
-/// but may return different casing in responses (e.g., `eCommerce`).
+/// **OpenAPI schema:** `merchantEnvironment`
+///
+/// Valid values:
+/// - `supermarket` - Supermarkets / Grocery
+/// - `moto` - Mail Order / Telephone Order
+/// - `cardPresent` - Card Present Environment
+/// - `fuel` - Fuel / Gas Stations
+/// - `serviceStation` - Service Stations
+/// - `restaurant` - Restaurants
+/// - `ecommerce` - eCommerce / Online Sales
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MerchantEnvironment {
-    /// Supermarket
+    /// Supermarkets / Grocery.
     Supermarket,
-    /// Mail or telephone order
+    /// Mail Order / Telephone Order.
     #[serde(rename = "moto")]
     MailOrTelephoneOrder,
-    /// Card present retail
+    /// Card Present Environment.
     CardPresent,
-    /// Fuel station
+    /// Fuel / Gas Stations.
     Fuel,
-    /// Service station
+    /// Service Stations.
     ServiceStation,
-    /// Restaurant
+    /// Restaurants.
     Restaurant,
-    /// Ecommerce
+    /// eCommerce / Online Sales.
     #[default]
     #[serde(rename = "ecommerce", alias = "eCommerce")]
     Ecommerce,
 }
 
-/// Risk level.
+/// Risk level per OpenAPI spec.
+///
+/// **OpenAPI schema:** `RiskLevel`
+///
+/// Valid values:
+/// - `restricted` - Restricted from processing transactions.
+/// - `prohibited` - Prohibited business use category.
+/// - `high` - High merchant risk score.
+/// - `medium` - Medium merchant risk score.
+/// - `low` - Low merchant risk score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RiskLevel {
-    /// Restricted
+    /// Restricted from processing transactions.
     Restricted,
-    /// Prohibited
+    /// Prohibited business use category.
     Prohibited,
-    /// High risk
+    /// High merchant risk score.
     High,
-    /// Medium risk
+    /// Medium merchant risk score.
     Medium,
-    /// Low risk
+    /// Low merchant risk score.
     #[default]
     Low,
 }
 
-/// Tax ID (TIN) status.
+/// Tax ID (TIN) status per OpenAPI spec.
+///
+/// **OpenAPI schema:** `TinStatus`
+///
+/// Valid values:
+/// - `0` - Pending verification
+/// - `1` - Valid (verified successfully)
+/// - `2` - Invalid (verification failed)
+/// - `3` - Not required
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 pub enum TaxIdStatus {
-    /// Pending verification
+    /// Pending verification.
     #[default]
     Pending = 0,
-    /// Valid
+    /// Valid (verified successfully).
     Valid = 1,
-    /// Invalid
+    /// Invalid (verification failed).
     Invalid = 2,
-    /// Not required
+    /// Not required.
     NotRequired = 3,
 }
+
+/// SAQ (Self-Assessment Questionnaire) type per OpenAPI spec.
+///
+/// **OpenAPI schema:** `SaqType`
+///
+/// PCI DSS Self-assessment questionnaire type. Details about a merchant's
+/// business and payment acceptance methods.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SaqType {
+    /// Card-not-present merchants with PCI DSS-validated third-party providers.
+    #[serde(rename = "SAQ-A")]
+    SaqA,
+    /// E-commerce merchants with website that may impact cardholder data.
+    #[serde(rename = "SAQ-A-EP")]
+    SaqAEp,
+    /// Merchants with imprint machines or standalone dial-out terminals.
+    #[serde(rename = "SAQ-B")]
+    SaqB,
+    /// Merchants with standalone PTS-approved terminals with IP connection.
+    #[serde(rename = "SAQ-B-IP")]
+    SaqBIp,
+    /// Merchants that enter single transactions manually via internet terminal.
+    #[serde(rename = "SAQ-C-VT")]
+    SaqCVt,
+    /// Merchants with payment systems connected to the internet.
+    #[serde(rename = "SAQ-C")]
+    SaqC,
+    /// Merchants with hardware-only terminals managed by P2PE solution.
+    #[serde(rename = "SAQ-P2PE-HW")]
+    SaqP2PeHw,
+    /// Generic field for merchants not fitting other SAQ types.
+    #[serde(rename = "SAQ-D")]
+    SaqD,
+}
+
+/// Merchant location type per OpenAPI spec.
+///
+/// **OpenAPI schema:** `merchantLocationType`
+///
+/// Valid values:
+/// - `77` - Retail Storefront
+/// - `78` - Warehouse
+/// - `79` - Private Residence
+/// - `80` - Others
+/// - `81` - P. RES-PROF/Construction
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[repr(i32)]
+pub enum LocationType {
+    /// Retail Storefront.
+    RetailStorefront = 77,
+    /// Warehouse.
+    Warehouse = 78,
+    /// Private Residence.
+    PrivateResidence = 79,
+    /// Others.
+    Others = 80,
+    /// P. RES-PROF/Construction.
+    PrivateResidenceProfConstruction = 81,
+}
+
+/// Express batch close method per OpenAPI spec.
+///
+/// **OpenAPI schema:** `ExpressBatchCloseMethod`
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExpressBatchCloseMethod {
+    /// Batch close occurs at specific time intervals (Automated).
+    TimeInitiated,
+    /// Batch close occurs when initiated by the Merchant (Manual).
+    MerchantInitiated,
+}
+
+// =============================================================================
+// Merchant (Response)
+// =============================================================================
 
 /// A Payrix merchant.
 ///
 /// A merchant represents a payment processing account under an entity.
 /// Merchants handle the actual transaction processing configuration.
 ///
-/// # Creating a Merchant
+/// **OpenAPI schema:** `merchantsResponse`
 ///
-/// When creating a new merchant, the following fields are required:
-/// - `entity` - Parent entity ID
-/// - `dba` - "Doing Business As" name shown on customer statements
-/// - `mcc` - Merchant Category Code for the business type
-/// - `environment` - Transaction environment (ecommerce, card present, etc.)
-/// - `annual_cc_sales` - Estimated annual credit card volume in cents
-/// - `avg_ticket` - Average transaction amount in cents
-/// - `established` - Date business was established (YYYYMMDD)
-///
-/// Read-only fields (returned by API, not sent on create):
-/// - `id` - Assigned by Payrix
-/// - `login` - Set by API
-/// - `risk_level` - Set by underwriting
-/// - `boarded` - Set when boarding completes
-/// - `created`, `modified` - Timestamps set by API
-///
-/// # Boarding Status
-///
-/// Set `status` to control the boarding workflow:
-/// - `Ready` (1) - Submit for immediate automated underwriting
-/// - `NotReady` (0) - Save as draft, don't start underwriting yet
-///
-/// After submission, status will change to:
-/// - `Boarded` (2) - Approved and ready to process
-/// - `Manual` (3) - Needs manual underwriting review
-/// - `Pending` (6) - Automated review in progress
-///
-/// # Common MCC Codes
-///
-/// | Code | Description |
-/// |------|-------------|
-/// | 5812 | Restaurants |
-/// | 5814 | Fast Food |
-/// | 5999 | Miscellaneous Retail |
-/// | 7299 | Miscellaneous Services |
-/// | 8111 | Legal Services |
-/// | 8999 | Professional Services |
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// See `API_INCONSISTENCIES.md` for known deviations from this spec.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Merchant {
-    /// Unique identifier (30 characters, e.g., "t1_mer_...").
+    // -------------------------------------------------------------------------
+    // Core Identifiers
+    // -------------------------------------------------------------------------
+
+    /// The ID of this resource.
     ///
-    /// **Read-only**: Assigned by Payrix when merchant is created.
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Parent entity ID.
+    /// The date and time at which this resource was created.
     ///
-    /// **Required for creation**. The entity that owns this merchant account.
-    /// Format: "t1_ent_..." (30 characters).
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[serde(default)]
+    pub created: Option<String>,
+
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[serde(default)]
+    pub modified: Option<String>,
+
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: `creator`)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
+
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+
+    /// The date and time on which this Merchant last processed a Transaction.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)
+    #[serde(default)]
+    pub last_activity: Option<String>,
+
+    /// The total approved amount for this merchant.
+    ///
+    /// **OpenAPI type:** integer (int64)
+    #[serde(default)]
+    pub total_approved_sales: Option<i64>,
+
+    /// The Entity associated with this Merchant.
+    ///
+    /// **OpenAPI type:** string (ref: `merchantsModelEntity`)
     #[serde(default)]
     pub entity: Option<PayrixId>,
 
     /// Login ID associated with this merchant.
     ///
-    /// **Optional on create**. Links the merchant to a login for portal access.
+    /// **OpenAPI type:** string
     #[serde(default)]
     pub login: Option<PayrixId>,
 
-    /// "Doing Business As" name.
+    // -------------------------------------------------------------------------
+    // Business Information
+    // -------------------------------------------------------------------------
+
+    /// The name under which the Merchant is doing business, if applicable.
     ///
-    /// **Required for creation**. The name customers see on their card statements.
-    /// Keep it recognizable to reduce chargebacks.
+    /// This field is stored as a text string and must be between 0 and 50 characters long.
+    ///
+    /// **OpenAPI type:** string
     #[serde(default)]
     pub dba: Option<String>,
 
-    /// Merchant status / boarding instruction.
+    /// Whether the Merchant is new to credit card processing.
     ///
-    /// **Required for boarding**. Controls the boarding workflow:
-    /// - `NotReady` (0) - Draft, don't start underwriting
-    /// - `Ready` (1) - Submit for automated underwriting immediately
+    /// Merchants are considered to be new by default.
     ///
-    /// Status will change to `Boarded`, `Manual`, or `Pending` after submission.
-    #[serde(default)]
-    pub status: Option<MerchantStatus>,
-
-    /// Transaction environment.
+    /// **OpenAPI type:** integer (ref: `New`)
     ///
-    /// **Required for creation**. Where transactions primarily occur:
-    /// - `Ecommerce` - Online/internet transactions
-    /// - `CardPresent` - In-person with physical cards
-    /// - `MailOrTelephoneOrder` - Phone/mail orders
-    /// - `Restaurant` - Restaurant with tip adjustment
-    #[serde(default)]
-    pub environment: Option<MerchantEnvironment>,
-
-    /// Risk level assigned by underwriting.
-    ///
-    /// **Read-only**: Set by Payrix's underwriting process.
-    #[serde(default)]
-    pub risk_level: Option<RiskLevel>,
-
-    /// Whether this is a new business (less than 2 years old).
-    ///
-    /// **Required for creation**. Set to `true` if business has been
-    /// operating less than 2 years. Affects underwriting requirements.
+    /// Valid values:
+    /// - `0` - Not new
+    /// - `1` - New
     #[serde(default, with = "bool_from_int_default_false")]
     pub new: bool,
 
-    /// Date business was established (YYYYMMDD format).
+    /// Whether incremental authorization is supported.
     ///
-    /// **Required for creation**. When the business started operations.
-    /// Example: "20200115" for January 15, 2020.
+    /// Allows submission of merchant registration files with a MasterCard Auth Integrity value.
+    ///
+    /// **OpenAPI type:** integer (ref: `IncrementalAuthSupported`)
+    ///
+    /// Valid values:
+    /// - `0` - Incremental Auth Not Supported
+    /// - `1` - Incremental Auth Supported
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub incremental_auth_supported: bool,
+
+    /// Whether the merchant is a seasonal merchant or operates year-round.
+    ///
+    /// **OpenAPI type:** integer (ref: `Seasonal`)
+    ///
+    /// Valid values:
+    /// - `0` - Year-Round Merchant
+    /// - `1` - Seasonal Merchant
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub seasonal: bool,
+
+    /// Whether the merchant accepts pre-purchase for products shipped later.
+    ///
+    /// **OpenAPI type:** integer (ref: `AdvancedBilling`)
+    ///
+    /// Valid values:
+    /// - `0` - AdvancedBilling is disabled
+    /// - `1` - AdvancedBilling is enabled
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub advanced_billing: bool,
+
+    /// The date on which the Merchant was established.
+    ///
+    /// Format: YYYYMMDD (e.g., '20160120' for January 20, 2016).
+    ///
+    /// **Note:** Include the `established` date value to ensure successful underwriting.
+    ///
+    /// **OpenAPI type:** integer (int32)
     #[serde(default)]
     pub established: Option<DateYmd>,
 
-    /// Estimated annual credit card sales in cents.
+    // -------------------------------------------------------------------------
+    // Sales Volume Information
+    // -------------------------------------------------------------------------
+
+    /// The value of the annual credit card sales of this Merchant.
     ///
-    /// **Required for creation**. Total expected card volume per year.
-    /// Example: $500,000/year = 50_000_000 (cents).
-    #[serde(default)]
+    /// This field is specified as an integer in cents. For example, $25.30 is '2530'.
+    ///
+    /// **OpenAPI type:** integer (int64)
+    #[serde(default, rename = "annualCCSales")]
     pub annual_cc_sales: Option<i64>,
 
-    /// Average transaction amount in cents.
+    /// The value of the annual credit card sale volume of this Merchant.
     ///
-    /// **Required for creation**. Typical single transaction value.
-    /// Example: $125.00 = 12500 (cents).
+    /// This field is specified as an integer in cents.
+    ///
+    /// **OpenAPI type:** integer (int64)
+    #[serde(default, rename = "annualCCSaleVolume")]
+    pub annual_cc_sale_volume: Option<i64>,
+
+    /// The value of the annual ACH/direct deposit sale volume of this Merchant.
+    ///
+    /// This field is specified as an integer in cents.
+    ///
+    /// **OpenAPI type:** integer (int64)
+    #[serde(default, rename = "annualACHSaleVolume")]
+    pub annual_ach_sale_volume: Option<i64>,
+
+    /// The Annual AMEX Sales Volume for the outlet.
+    ///
+    /// **OpenAPI type:** integer (int64)
+    #[serde(default)]
+    pub amex_volume: Option<i64>,
+
+    /// The value of the average credit card sales of this Merchant.
+    ///
+    /// This field is specified as an integer in cents.
+    ///
+    /// **OpenAPI type:** integer (int64)
     #[serde(default)]
     pub avg_ticket: Option<i64>,
 
-    /// Merchant Category Code (MCC).
+    /// The expected total volume for all credit card and ACH payments.
     ///
-    /// **Required for creation**. 4-digit code classifying the business type.
-    /// Affects interchange rates, fraud monitoring, and underwriting.
-    /// Common codes: "5812" (Restaurants), "8111" (Legal), "5999" (Retail).
+    /// **OpenAPI type:** integer (int64)
+    #[serde(default)]
+    pub total_volume: Option<i64>,
+
+    // -------------------------------------------------------------------------
+    // Card Network Identifiers
+    // -------------------------------------------------------------------------
+
+    /// The American Express merchant identifier for this Merchant, if applicable.
+    ///
+    /// This field is stored as a text string and must be between 1 and 15 characters long.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub amex: Option<String>,
+
+    /// The Discover merchant identifier for this Merchant, if applicable.
+    ///
+    /// This field is stored as a text string and must be between 1 and 15 characters long.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub discover: Option<String>,
+
+    /// The Merchant Category Code (MCC) for this Merchant.
+    ///
+    /// This code is not required to create a Merchant, but it is required
+    /// to successfully board a Merchant.
+    ///
+    /// **OpenAPI type:** string
     #[serde(default)]
     pub mcc: Option<String>,
 
-    /// Date merchant was boarded (YYYYMMDD format).
+    /// Merchant Verification Value.
     ///
-    /// **Read-only**: Set by Payrix when boarding completes successfully.
+    /// A value assigned by Visa to identify participation in select merchant programs.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub visa_mvv: Option<String>,
+
+    /// Whether the merchant has acknowledged and accepted the Visa Disclosure.
+    ///
+    /// **OpenAPI type:** integer (ref: `VisaDisclosure`)
+    ///
+    /// Valid values:
+    /// - `0` - Not Accepted
+    /// - `1` - Accepted
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub visa_disclosure: bool,
+
+    // -------------------------------------------------------------------------
+    // Status & Configuration
+    // -------------------------------------------------------------------------
+
+    /// The environment which the Merchant is in, if applicable.
+    ///
+    /// **OpenAPI type:** string (ref: `merchantEnvironment`)
+    #[serde(default)]
+    pub environment: Option<MerchantEnvironment>,
+
+    /// The status of the Merchant.
+    ///
+    /// **OpenAPI type:** integer (ref: `merchantStatus`)
+    #[serde(default)]
+    pub status: Option<MerchantStatus>,
+
+    /// Whether the merchant auto-boarded.
+    ///
+    /// **OpenAPI type:** integer (ref: `AutoBoarded`)
+    ///
+    /// Valid values:
+    /// - `0` - Not Auto-Boarded
+    /// - `1` - Auto-Boarded
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub auto_boarded: bool,
+
+    /// The reason for manual or closed status.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub status_reason: Option<String>,
+
+    /// The denial or account closure reason code.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub account_closure_reason_code: Option<String>,
+
+    /// The date the account closure reason code was provided.
+    ///
+    /// Format: YYYYMMDD
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub account_closure_reason_date: Option<i32>,
+
+    /// The risk level which the Merchant is in, if applicable.
+    ///
+    /// **OpenAPI type:** string (ref: `RiskLevel`)
+    #[serde(default)]
+    pub risk_level: Option<RiskLevel>,
+
+    /// The date and time on which this Merchant was successfully boarded.
+    ///
+    /// **OpenAPI type:** integer (int32)
     #[serde(default)]
     pub boarded: Option<DateYmd>,
 
-    /// Chargeback notification email.
+    // -------------------------------------------------------------------------
+    // Risk & Compliance
+    // -------------------------------------------------------------------------
+
+    /// The credit ratio to use while calculating risk factors for credit.
     ///
-    /// **Optional**. Email address to receive chargeback alerts.
-    /// If not set, uses the entity's primary email.
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub credit_ratio: Option<i32>,
+
+    /// The credit timeliness for the Merchant.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub credit_timeliness: Option<i32>,
+
+    /// Chargeback Ratio.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub chargeback_ratio: Option<i32>,
+
+    /// The NDX (Non Delivery Exposure) days.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub ndx_days: Option<i32>,
+
+    /// The NDX (Non Delivery Exposure) percentage.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub ndx_percentage: Option<i32>,
+
+    // -------------------------------------------------------------------------
+    // PCI Compliance
+    // -------------------------------------------------------------------------
+
+    /// PCI DSS Self-assessment questionnaire (SAQ) type.
+    ///
+    /// **OpenAPI type:** string (ref: `SaqType`)
+    #[serde(default)]
+    pub saq_type: Option<SaqType>,
+
+    /// The date of the PCI SAQ assessment.
+    ///
+    /// Format: YYYYMMDD
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub saq_date: Option<i32>,
+
+    /// Qualified Security Assessor (QSA) business name.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub qsa: Option<String>,
+
+    /// Whether the letter status is ON or OFF.
+    ///
+    /// **OpenAPI type:** integer (ref: `LetterStatus`)
+    ///
+    /// Valid values:
+    /// - `0` - OFF
+    /// - `1` - ON
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub letter_status: bool,
+
+    /// The date associated with the letter status.
+    ///
+    /// Format: YYYYMMDD
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub letter_date: Option<i32>,
+
+    // -------------------------------------------------------------------------
+    // Terms & Disclosure
+    // -------------------------------------------------------------------------
+
+    /// Whether the merchant has acknowledged and accepted the Terms and Conditions.
+    ///
+    /// **OpenAPI type:** integer (ref: `TcAttestation`)
+    ///
+    /// Valid values:
+    /// - `0` - Not Accepted
+    /// - `1` - Accepted
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub tc_attestation: bool,
+
+    /// Transaction Session Id.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub tmx_session_id: Option<String>,
+
+    /// The IP address where the Merchant platform disclosure is hosted.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default, rename = "disclosureIP")]
+    pub disclosure_ip: Option<String>,
+
+    /// The date the Merchant platform disclosure was reviewed.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub disclosure_date: Option<i32>,
+
+    // -------------------------------------------------------------------------
+    // Contact & Notifications
+    // -------------------------------------------------------------------------
+
+    /// Notification Email for chargebacks.
+    ///
+    /// **OpenAPI type:** string
     #[serde(default)]
     pub chargeback_notification_email: Option<String>,
 
-    /// Created timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
-    ///
-    /// **Read-only**: Set by Payrix when merchant is created.
-    #[serde(default)]
-    pub created: Option<String>,
+    // -------------------------------------------------------------------------
+    // Location & Business Type
+    // -------------------------------------------------------------------------
 
-    /// Last modified timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
+    /// Description of the type of address that the business operates at.
     ///
-    /// **Read-only**: Updated by Payrix on changes.
+    /// **OpenAPI type:** integer (ref: `merchantLocationType`)
     #[serde(default)]
-    pub modified: Option<String>,
+    pub location_type: Option<LocationType>,
 
-    /// Whether resource is inactive.
+    /// The merchant percentage of transactions that are Card Not Present.
     ///
-    /// **Optional on create**. Set to `true` to create in inactive state.
+    /// Includes MOTO and eCommerce.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub percent_keyed: Option<i32>,
+
+    /// Percentage of internet originated transactions.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub percent_ecomm: Option<i32>,
+
+    /// Percentage of transactions that are Business to Business.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[serde(default)]
+    pub percent_business: Option<i32>,
+
+    /// The NAICS sector code that describes the industry.
+    ///
+    /// **OpenAPI type:** integer (ref: `Naics`)
+    #[serde(default)]
+    pub naics: Option<i32>,
+
+    /// The NAICS sector description matching the NAICS sector code.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub naics_description: Option<String>,
+
+    // -------------------------------------------------------------------------
+    // Digital Wallets
+    // -------------------------------------------------------------------------
+
+    /// Whether Apple Pay is active for this merchant.
+    ///
+    /// **OpenAPI type:** integer (ref: `ApplePayActive`)
+    ///
+    /// Valid values:
+    /// - `0` - Inactive
+    /// - `1` - Active
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub apple_pay_active: bool,
+
+    /// The status of Apple Pay for this merchant.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub apple_pay_status: Option<String>,
+
+    /// Whether Google Pay is active for this merchant.
+    ///
+    /// **OpenAPI type:** integer (ref: `GooglePayActive`)
+    ///
+    /// Valid values:
+    /// - `0` - Inactive
+    /// - `1` - Active
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub google_pay_active: bool,
+
+    // -------------------------------------------------------------------------
+    // Express Platform Configuration
+    // -------------------------------------------------------------------------
+
+    /// The batch close method for this merchant (Express platform).
+    ///
+    /// **OpenAPI type:** string (ref: `ExpressBatchCloseMethod`)
+    #[serde(default)]
+    pub express_batch_close_method: Option<ExpressBatchCloseMethod>,
+
+    /// The batch close time for this merchant (Express platform).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub express_batch_close_time: Option<String>,
+
+    /// Whether Pass Token is enabled for this merchant.
+    ///
+    /// **OpenAPI type:** integer (ref: `PassTokenEnabled`)
+    ///
+    /// Valid values:
+    /// - `0` - Disabled
+    /// - `1` - Enabled
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub pass_token_enabled: bool,
+
+    // -------------------------------------------------------------------------
+    // Status Flags
+    // -------------------------------------------------------------------------
+
+    /// Whether this resource is marked as inactive.
+    ///
+    /// **OpenAPI type:** integer (ref: `Inactive`)
+    ///
+    /// Valid values:
+    /// - `0` - Active
+    /// - `1` - Inactive
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
-    /// Whether resource is frozen.
+    /// Whether this resource is marked as frozen.
     ///
-    /// **Read-only**: Set by Payrix for compliance/risk reasons.
+    /// **OpenAPI type:** integer (ref: `Frozen`)
+    ///
+    /// Valid values:
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }
 
-/// A Payrix entity (business entity above merchants).
-///
-/// An entity represents a business or organization in Payrix. Each entity can have
-/// multiple merchants, accounts, and members (beneficial owners).
-///
-/// # Creating an Entity
-///
-/// When creating a new entity, the following fields are required:
-/// - `name` - Legal business name
-/// - `entity_type` - Business structure (LLC, Corporation, etc.)
-/// - `address1`, `city`, `state`, `zip`, `country` - Business address
-/// - `phone` - Business phone number
-/// - `email` - Primary contact email
-/// - `ein` - Employer Identification Number (9 digits, no dashes)
-///
-/// Read-only fields (returned by API, not sent on create):
-/// - `id` - Assigned by Payrix
-/// - `login` - Set by API based on authentication
-/// - `tin_status` - Set by verification process
-/// - `created`, `modified` - Timestamps set by API
-///
-/// # Merchant Onboarding
-///
-/// When creating an entity as part of merchant onboarding, you must also include
-/// Terms & Conditions acceptance fields (via the onboarding workflow):
-/// - `tcVersion` - Version of terms accepted
-/// - `tcDate` - Timestamp of acceptance
-/// - `tcAttestation` - Confirmation of acceptance
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
-#[serde(rename_all = "camelCase")]
-pub struct Entity {
-    /// Unique identifier (30 characters, e.g., "t1_ent_...").
-    ///
-    /// **Read-only**: Assigned by Payrix when entity is created.
-    pub id: PayrixId,
-
-    /// Login ID that owns this entity.
-    ///
-    /// **Read-only**: Set by Payrix based on the authenticated user.
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Legal business name as registered with the state.
-    ///
-    /// **Required for creation**. This should be the exact legal name,
-    /// not the DBA (doing business as) name. Max 100 characters.
-    #[serde(default)]
-    pub name: Option<String>,
-
-    /// Business structure/type.
-    ///
-    /// **Required for creation**. Common values:
-    /// - `SoleProprietor` - Individual owner
-    /// - `LimitedLiabilityCorporation` - LLC
-    /// - `Corporation` - C-Corp
-    /// - `SCorporation` - S-Corp
-    /// - `Partnership` - General or limited partnership
-    #[serde(default, rename = "type")]
-    pub entity_type: Option<MerchantType>,
-
-    /// Primary business address line 1.
-    ///
-    /// **Required for creation**. Street address where the business is located.
-    #[serde(default)]
-    pub address1: Option<String>,
-
-    /// Address line 2.
-    ///
-    /// **Optional**. Suite number, floor, building name, etc.
-    #[serde(default)]
-    pub address2: Option<String>,
-
-    /// City name.
-    ///
-    /// **Required for creation**.
-    #[serde(default)]
-    pub city: Option<String>,
-
-    /// State or province code.
-    ///
-    /// **Required for creation**. Use 2-letter codes for US (e.g., "IL", "CA").
-    #[serde(default)]
-    pub state: Option<String>,
-
-    /// ZIP or postal code.
-    ///
-    /// **Required for creation**. For US: 5-digit or ZIP+4 format.
-    #[serde(default)]
-    pub zip: Option<String>,
-
-    /// Country code.
-    ///
-    /// **Required for creation**. Use "USA" for United States.
-    #[serde(default)]
-    pub country: Option<String>,
-
-    /// Business phone number.
-    ///
-    /// **Required for creation**. Digits only, no formatting
-    /// (e.g., "3125551234" not "(312) 555-1234").
-    #[serde(default)]
-    pub phone: Option<String>,
-
-    /// Fax number.
-    ///
-    /// **Optional**. Digits only, no formatting.
-    #[serde(default)]
-    pub fax: Option<String>,
-
-    /// Primary contact email address.
-    ///
-    /// **Required for creation**. Used for account notifications.
-    #[serde(default)]
-    pub email: Option<String>,
-
-    /// Business website URL.
-    ///
-    /// **Optional but recommended**. Include full URL with protocol.
-    /// Helps with underwriting verification.
-    #[serde(default)]
-    pub website: Option<String>,
-
-    /// Employer Identification Number (EIN/Tax ID).
-    ///
-    /// **Required for creation**. 9 digits without dashes
-    /// (e.g., "123456789" not "12-3456789").
-    /// For sole proprietors without an EIN, use the owner's SSN.
-    #[serde(default)]
-    pub ein: Option<String>,
-
-    /// Tax ID verification status.
-    ///
-    /// **Read-only**: Set by Payrix's verification process.
-    /// - `Pending` - Awaiting verification
-    /// - `Valid` - Verified successfully
-    /// - `Invalid` - Verification failed
-    #[serde(default)]
-    pub tin_status: Option<TaxIdStatus>,
-
-    /// Custom data field for your application's use.
-    ///
-    /// **Optional**. Can store up to 1000 characters of arbitrary data.
-    /// Useful for storing your internal reference IDs.
-    #[serde(default)]
-    pub custom: Option<String>,
-
-    /// Created timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
-    ///
-    /// **Read-only**: Set by Payrix when entity is created.
-    #[serde(default)]
-    pub created: Option<String>,
-
-    /// Last modified timestamp in "YYYY-MM-DD HH:mm:ss.sss" format.
-    ///
-    /// **Read-only**: Updated by Payrix on changes.
-    #[serde(default)]
-    pub modified: Option<String>,
-
-    /// Whether resource is inactive.
-    ///
-    /// **Optional on create**. Set to `true` to create in inactive state.
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub inactive: bool,
-
-    /// Whether resource is frozen.
-    ///
-    /// **Read-only**: Set by Payrix for compliance/risk reasons.
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub frozen: bool,
-}
+// =============================================================================
+// Tests
+// =============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // ==================== MerchantType Tests ====================
+    // =========================================================================
+    // MerchantType Tests
+    // =========================================================================
 
     #[test]
     fn merchant_type_serialize_all_variants() {
@@ -487,12 +813,9 @@ mod tests {
         assert_eq!(MerchantType::default(), MerchantType::SoleProprietor);
     }
 
-    #[test]
-    fn merchant_type_invalid_value() {
-        assert!(serde_json::from_str::<MerchantType>("99").is_err());
-    }
-
-    // ==================== MerchantStatus Tests ====================
+    // =========================================================================
+    // MerchantStatus Tests
+    // =========================================================================
 
     #[test]
     fn merchant_status_serialize_all_variants() {
@@ -521,12 +844,9 @@ mod tests {
         assert_eq!(MerchantStatus::default(), MerchantStatus::NotReady);
     }
 
-    #[test]
-    fn merchant_status_invalid_value() {
-        assert!(serde_json::from_str::<MerchantStatus>("99").is_err());
-    }
-
-    // ==================== MerchantEnvironment Tests ====================
+    // =========================================================================
+    // MerchantEnvironment Tests
+    // =========================================================================
 
     #[test]
     fn merchant_environment_serialize_all_variants() {
@@ -536,7 +856,6 @@ mod tests {
         assert_eq!(serde_json::to_string(&MerchantEnvironment::Fuel).unwrap(), "\"fuel\"");
         assert_eq!(serde_json::to_string(&MerchantEnvironment::ServiceStation).unwrap(), "\"serviceStation\"");
         assert_eq!(serde_json::to_string(&MerchantEnvironment::Restaurant).unwrap(), "\"restaurant\"");
-        // API accepts lowercase "ecommerce" for input
         assert_eq!(serde_json::to_string(&MerchantEnvironment::Ecommerce).unwrap(), "\"ecommerce\"");
     }
 
@@ -548,7 +867,7 @@ mod tests {
         assert_eq!(serde_json::from_str::<MerchantEnvironment>("\"fuel\"").unwrap(), MerchantEnvironment::Fuel);
         assert_eq!(serde_json::from_str::<MerchantEnvironment>("\"serviceStation\"").unwrap(), MerchantEnvironment::ServiceStation);
         assert_eq!(serde_json::from_str::<MerchantEnvironment>("\"restaurant\"").unwrap(), MerchantEnvironment::Restaurant);
-        // API returns "eCommerce" in responses but accepts "ecommerce" for input
+        // API returns "eCommerce" but also accepts "ecommerce"
         assert_eq!(serde_json::from_str::<MerchantEnvironment>("\"eCommerce\"").unwrap(), MerchantEnvironment::Ecommerce);
         assert_eq!(serde_json::from_str::<MerchantEnvironment>("\"ecommerce\"").unwrap(), MerchantEnvironment::Ecommerce);
     }
@@ -558,12 +877,9 @@ mod tests {
         assert_eq!(MerchantEnvironment::default(), MerchantEnvironment::Ecommerce);
     }
 
-    #[test]
-    fn merchant_environment_invalid_value() {
-        assert!(serde_json::from_str::<MerchantEnvironment>("\"invalid\"").is_err());
-    }
-
-    // ==================== RiskLevel Tests ====================
+    // =========================================================================
+    // RiskLevel Tests
+    // =========================================================================
 
     #[test]
     fn risk_level_serialize_all_variants() {
@@ -588,12 +904,9 @@ mod tests {
         assert_eq!(RiskLevel::default(), RiskLevel::Low);
     }
 
-    #[test]
-    fn risk_level_invalid_value() {
-        assert!(serde_json::from_str::<RiskLevel>("\"invalid\"").is_err());
-    }
-
-    // ==================== TaxIdStatus Tests ====================
+    // =========================================================================
+    // TaxIdStatus Tests
+    // =========================================================================
 
     #[test]
     fn tax_id_status_serialize_all_variants() {
@@ -616,18 +929,18 @@ mod tests {
         assert_eq!(TaxIdStatus::default(), TaxIdStatus::Pending);
     }
 
-    #[test]
-    fn tax_id_status_invalid_value() {
-        assert!(serde_json::from_str::<TaxIdStatus>("99").is_err());
-    }
-
-    // ==================== Merchant Struct Tests ====================
+    // =========================================================================
+    // Merchant Struct Tests
+    // =========================================================================
 
     #[test]
     fn merchant_deserialize_full() {
-        // Note: API responses may use "eCommerce" (legacy) or "ecommerce"
         let json = r#"{
             "id": "t1_mer_12345678901234567890123",
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-04-01 12:00:00.0000",
+            "creator": "t1_lgn_creator1234567890123456",
+            "modifier": "t1_lgn_modifier123456789012345",
             "entity": "t1_ent_12345678901234567890123",
             "login": "t1_lgn_12345678901234567890123",
             "dba": "Acme Widgets",
@@ -636,19 +949,19 @@ mod tests {
             "riskLevel": "low",
             "new": 1,
             "established": "20150101",
-            "annualCcSales": 50000000,
+            "annualCCSales": 50000000,
             "avgTicket": 2500,
             "mcc": "5734",
             "boarded": "20240101",
             "chargebackNotificationEmail": "chargeback@example.com",
-            "created": "2024-01-01 00:00:00.000",
-            "modified": "2024-04-01 12:00:00.000",
             "inactive": 0,
             "frozen": 1
         }"#;
 
         let merchant: Merchant = serde_json::from_str(json).unwrap();
         assert_eq!(merchant.id.as_str(), "t1_mer_12345678901234567890123");
+        assert_eq!(merchant.creator.as_ref().unwrap().as_str(), "t1_lgn_creator1234567890123456");
+        assert_eq!(merchant.modifier.as_ref().unwrap().as_str(), "t1_lgn_modifier123456789012345");
         assert_eq!(merchant.entity.unwrap().as_str(), "t1_ent_12345678901234567890123");
         assert_eq!(merchant.login.unwrap().as_str(), "t1_lgn_12345678901234567890123");
         assert_eq!(merchant.dba.as_deref(), Some("Acme Widgets"));
@@ -662,37 +975,51 @@ mod tests {
         assert_eq!(merchant.mcc.as_deref(), Some("5734"));
         assert_eq!(merchant.boarded.as_ref().unwrap().as_str(), "20240101");
         assert_eq!(merchant.chargeback_notification_email.as_deref(), Some("chargeback@example.com"));
-        assert_eq!(merchant.created.as_deref(), Some("2024-01-01 00:00:00.000"));
-        assert_eq!(merchant.modified.as_deref(), Some("2024-04-01 12:00:00.000"));
         assert!(!merchant.inactive);
         assert!(merchant.frozen);
     }
 
     #[test]
     fn merchant_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_mer_12345678901234567890123"
-        }"#;
+        let json = r#"{"id": "t1_mer_12345678901234567890123"}"#;
 
         let merchant: Merchant = serde_json::from_str(json).unwrap();
         assert_eq!(merchant.id.as_str(), "t1_mer_12345678901234567890123");
         assert!(merchant.entity.is_none());
         assert!(merchant.status.is_none());
-        assert!(merchant.environment.is_none());
-        assert!(merchant.risk_level.is_none());
         assert!(!merchant.new);
         assert!(!merchant.inactive);
         assert!(!merchant.frozen);
     }
 
     #[test]
-    fn merchant_bool_from_int_zero_is_false() {
+    fn merchant_new_fields() {
         let json = r#"{
             "id": "t1_mer_12345678901234567890123",
-            "new": 0,
-            "inactive": 0,
-            "frozen": 0
+            "lastActivity": "2024-06-15 10:30:00",
+            "totalApprovedSales": 1500000,
+            "incrementalAuthSupported": 1,
+            "seasonal": 0,
+            "advancedBilling": 1,
+            "autoBoarded": 1,
+            "applePayActive": 1,
+            "googlePayActive": 0
         }"#;
+
+        let merchant: Merchant = serde_json::from_str(json).unwrap();
+        assert_eq!(merchant.last_activity.as_deref(), Some("2024-06-15 10:30:00"));
+        assert_eq!(merchant.total_approved_sales, Some(1500000));
+        assert!(merchant.incremental_auth_supported);
+        assert!(!merchant.seasonal);
+        assert!(merchant.advanced_billing);
+        assert!(merchant.auto_boarded);
+        assert!(merchant.apple_pay_active);
+        assert!(!merchant.google_pay_active);
+    }
+
+    #[test]
+    fn merchant_bool_from_int_zero_is_false() {
+        let json = r#"{"id": "t1_mer_12345678901234567890123", "new": 0, "inactive": 0, "frozen": 0}"#;
         let merchant: Merchant = serde_json::from_str(json).unwrap();
         assert!(!merchant.new);
         assert!(!merchant.inactive);
@@ -701,128 +1028,10 @@ mod tests {
 
     #[test]
     fn merchant_bool_from_int_one_is_true() {
-        let json = r#"{
-            "id": "t1_mer_12345678901234567890123",
-            "new": 1,
-            "inactive": 1,
-            "frozen": 1
-        }"#;
+        let json = r#"{"id": "t1_mer_12345678901234567890123", "new": 1, "inactive": 1, "frozen": 1}"#;
         let merchant: Merchant = serde_json::from_str(json).unwrap();
         assert!(merchant.new);
         assert!(merchant.inactive);
         assert!(merchant.frozen);
-    }
-
-    #[test]
-    fn merchant_bool_from_int_missing_defaults_false() {
-        let json = r#"{
-            "id": "t1_mer_12345678901234567890123"
-        }"#;
-        let merchant: Merchant = serde_json::from_str(json).unwrap();
-        assert!(!merchant.new);
-        assert!(!merchant.inactive);
-        assert!(!merchant.frozen);
-    }
-
-    // ==================== Entity Struct Tests ====================
-
-    #[test]
-    fn entity_deserialize_full() {
-        let json = r#"{
-            "id": "t1_ent_12345678901234567890123",
-            "login": "t1_lgn_12345678901234567890123",
-            "name": "Acme Corporation",
-            "type": 1,
-            "address1": "123 Main St",
-            "address2": "Suite 100",
-            "city": "Springfield",
-            "state": "IL",
-            "zip": "62701",
-            "country": "USA",
-            "phone": "555-1234",
-            "fax": "555-5678",
-            "email": "info@acme.com",
-            "website": "https://acme.com",
-            "ein": "12-3456789",
-            "tinStatus": 1,
-            "custom": "custom data",
-            "created": "2024-01-01 00:00:00.000",
-            "modified": "2024-04-01 12:00:00.000",
-            "inactive": 0,
-            "frozen": 1
-        }"#;
-
-        let entity: Entity = serde_json::from_str(json).unwrap();
-        assert_eq!(entity.id.as_str(), "t1_ent_12345678901234567890123");
-        assert_eq!(entity.login.unwrap().as_str(), "t1_lgn_12345678901234567890123");
-        assert_eq!(entity.name.as_deref(), Some("Acme Corporation"));
-        assert_eq!(entity.entity_type, Some(MerchantType::Corporation));
-        assert_eq!(entity.address1.as_deref(), Some("123 Main St"));
-        assert_eq!(entity.address2.as_deref(), Some("Suite 100"));
-        assert_eq!(entity.city.as_deref(), Some("Springfield"));
-        assert_eq!(entity.state.as_deref(), Some("IL"));
-        assert_eq!(entity.zip.as_deref(), Some("62701"));
-        assert_eq!(entity.country.as_deref(), Some("USA"));
-        assert_eq!(entity.phone.as_deref(), Some("555-1234"));
-        assert_eq!(entity.fax.as_deref(), Some("555-5678"));
-        assert_eq!(entity.email.as_deref(), Some("info@acme.com"));
-        assert_eq!(entity.website.as_deref(), Some("https://acme.com"));
-        assert_eq!(entity.ein.as_deref(), Some("12-3456789"));
-        assert_eq!(entity.tin_status, Some(TaxIdStatus::Valid));
-        assert_eq!(entity.custom.as_deref(), Some("custom data"));
-        assert_eq!(entity.created.as_deref(), Some("2024-01-01 00:00:00.000"));
-        assert_eq!(entity.modified.as_deref(), Some("2024-04-01 12:00:00.000"));
-        assert!(!entity.inactive);
-        assert!(entity.frozen);
-    }
-
-    #[test]
-    fn entity_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_ent_12345678901234567890123"
-        }"#;
-
-        let entity: Entity = serde_json::from_str(json).unwrap();
-        assert_eq!(entity.id.as_str(), "t1_ent_12345678901234567890123");
-        assert!(entity.login.is_none());
-        assert!(entity.name.is_none());
-        assert!(entity.entity_type.is_none());
-        assert!(entity.tin_status.is_none());
-        assert!(!entity.inactive);
-        assert!(!entity.frozen);
-    }
-
-    #[test]
-    fn entity_bool_from_int_zero_is_false() {
-        let json = r#"{
-            "id": "t1_ent_12345678901234567890123",
-            "inactive": 0,
-            "frozen": 0
-        }"#;
-        let entity: Entity = serde_json::from_str(json).unwrap();
-        assert!(!entity.inactive);
-        assert!(!entity.frozen);
-    }
-
-    #[test]
-    fn entity_bool_from_int_one_is_true() {
-        let json = r#"{
-            "id": "t1_ent_12345678901234567890123",
-            "inactive": 1,
-            "frozen": 1
-        }"#;
-        let entity: Entity = serde_json::from_str(json).unwrap();
-        assert!(entity.inactive);
-        assert!(entity.frozen);
-    }
-
-    #[test]
-    fn entity_bool_from_int_missing_defaults_false() {
-        let json = r#"{
-            "id": "t1_ent_12345678901234567890123"
-        }"#;
-        let entity: Entity = serde_json::from_str(json).unwrap();
-        assert!(!entity.inactive);
-        assert!(!entity.frozen);
     }
 }

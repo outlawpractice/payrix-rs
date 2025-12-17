@@ -1,0 +1,15 @@
+{
+  "response": {
+    "data": [],
+    "details": {
+      "requestId": 1,
+      "totals": [],
+      "page": {
+        "current": 1,
+        "last": 1,
+        "hasMore": false
+      }
+    },
+    "errors": []
+  }
+}

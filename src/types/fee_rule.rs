@@ -1,172 +1,136 @@
 //! Fee rule types for the Payrix API.
 //!
-//! Fee rules define how and when fees are calculated and applied to transactions.
+//! Fee rules define conditions that determine whether a fee should be applied.
+//!
+//! **OpenAPI schema:** `feeRulesResponse`
 
 use serde::{Deserialize, Serialize};
 
-use super::{
-    bool_from_int_default_false, option_bool_from_int, FeeCollection, FeeRuleType, FeeUnit, PayrixId,
-};
+use super::{bool_from_int_default_false, FeeApplication, FeeRuleType, PayrixId};
+
+// =============================================================================
+// FEE RULE STRUCT
+// =============================================================================
 
 /// A Payrix fee rule.
 ///
-/// Fee rules configure automatic fee calculation for transactions.
-/// All monetary values are in **cents**.
+/// Fee rules define conditions for evaluating whether a fee should apply.
+///
+/// **OpenAPI schema:** `feeRulesResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct FeeRule {
-    /// Unique identifier (30 characters, e.g., "t1_fer_...")
+    /// The ID of this resource.
+    ///
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Entity ID that owns this rule
-    #[serde(default)]
-    pub entity: Option<PayrixId>,
-
-    /// Merchant ID (if merchant-specific)
-    #[serde(default)]
-    pub merchant: Option<PayrixId>,
-
-    /// Login ID that created this rule
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Fee rule type (different from Fee.type - uses string enum, not integer)
-    #[serde(default, rename = "type")]
-    pub fee_type: Option<FeeRuleType>,
-
-    /// Fee unit (percentage or fixed)
-    #[serde(default)]
-    pub unit: Option<FeeUnit>,
-
-    /// Fee collection scope
-    #[serde(default)]
-    pub collection: Option<FeeCollection>,
-
-    /// Fee amount (in cents if fixed, percentage if percent)
-    #[serde(default)]
-    pub amount: Option<i64>,
-
-    /// Minimum fee amount in cents
-    #[serde(default)]
-    pub min: Option<i64>,
-
-    /// Maximum fee amount in cents
-    #[serde(default)]
-    pub max: Option<i64>,
-
-    /// Currency code (e.g., "USD")
-    #[serde(default)]
-    pub currency: Option<String>,
-
-    /// Card brand filter (e.g., "visa", "mastercard")
-    #[serde(default)]
-    pub card_brand: Option<String>,
-
-    /// Card type filter (e.g., "credit", "debit")
-    #[serde(default)]
-    pub card_type: Option<String>,
-
-    /// Transaction type filter
-    #[serde(default)]
-    pub txn_type: Option<String>,
-
-    /// Fee rule name/label
-    #[serde(default)]
-    pub name: Option<String>,
-
-    /// Description/notes
-    #[serde(default)]
-    pub description: Option<String>,
-
-    /// Custom data field
-    #[serde(default)]
-    pub custom: Option<String>,
-
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive (false=active, true=inactive)
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
+
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+
+    /// The identifier of the Fee that this Fee Rule applies to.
+    ///
+    /// **OpenAPI type:** string (ref: feeRulesModelFee)
+    #[serde(default)]
+    pub fee: Option<PayrixId>,
+
+    /// The name of this Fee Rule.
+    ///
+    /// This field is stored as a text string (0-100 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub name: Option<String>,
+
+    /// The description of this Fee Rule.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub description: Option<String>,
+
+    /// The type of Fee Rule.
+    ///
+    /// See `FeeRuleType` for all 44 valid values (AVSRESULT, BIN, BUSINESS, etc.).
+    ///
+    /// **OpenAPI type:** string (ref: feeRuleType)
+    #[serde(default, rename = "type")]
+    pub rule_type: Option<FeeRuleType>,
+
+    /// Where the fee rule should apply.
+    ///
+    /// - `both` - Rule applies to fee and collection calculation
+    /// - `fee` - Rule applies only to the fee itself
+    /// - `collection` - Rule used only for collection calculation
+    ///
+    /// **OpenAPI type:** string (ref: feeApplication)
+    #[serde(default)]
+    pub application: Option<FeeApplication>,
+
+    /// The value to compare against when evaluating this Fee Rule.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub value: Option<String>,
+
+    /// A name for a group of rules to be applied in conjunction.
+    ///
+    /// When grouping is used, the Fee will be allowed to be processed
+    /// if at least one of the rules in the group is matched.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub grouping: Option<String>,
+
+    /// Whether this resource is marked as inactive.
+    ///
+    /// - `0` - Active
+    /// - `1` - Inactive
+    ///
+    /// **OpenAPI type:** integer (ref: Inactive)
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
-    /// Whether resource is frozen
+    /// Whether this resource is marked as frozen.
+    ///
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
+    ///
+    /// **OpenAPI type:** integer (ref: Frozen)
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }
 
-/// Request to create a new fee rule.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewFeeRule {
-    /// Entity ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub entity: Option<String>,
-
-    /// Merchant ID (if merchant-specific)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub merchant: Option<String>,
-
-    /// Fee rule type (different from Fee.type - uses string enum, not integer)
-    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-    pub fee_type: Option<FeeRuleType>,
-
-    /// Fee unit (percentage or fixed)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unit: Option<FeeUnit>,
-
-    /// Fee collection scope
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub collection: Option<FeeCollection>,
-
-    /// Fee amount (required)
-    pub amount: i64,
-
-    /// Minimum fee amount in cents
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub min: Option<i64>,
-
-    /// Maximum fee amount in cents
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max: Option<i64>,
-
-    /// Currency code (e.g., "USD")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub currency: Option<String>,
-
-    /// Card brand filter
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub card_brand: Option<String>,
-
-    /// Card type filter
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub card_type: Option<String>,
-
-    /// Transaction type filter
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub txn_type: Option<String>,
-
-    /// Fee rule name/label
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-
-    /// Description/notes
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-
-    /// Custom data field
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
-
-    /// Whether resource is inactive
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub inactive: Option<bool>,
-}
+// =============================================================================
+// TESTS
+// =============================================================================
 
 #[cfg(test)]
 mod tests {
@@ -176,81 +140,57 @@ mod tests {
 
     #[test]
     fn fee_rule_deserialize_full() {
-        // Per OpenAPI: type is string enum, unit/collection are integers
         let json = r#"{
             "id": "t1_fer_12345678901234567890123",
-            "entity": "t1_ent_12345678901234567890123",
-            "merchant": "t1_mer_12345678901234567890123",
-            "login": "t1_log_12345678901234567890123",
-            "type": "method",
-            "unit": 2,
-            "collection": 1,
-            "amount": 250,
-            "min": 50,
-            "max": 1000,
-            "currency": "USD",
-            "cardBrand": "visa",
-            "cardType": "credit",
-            "txnType": "sale",
-            "name": "Standard Fee Rule",
-            "description": "Standard processing fee",
-            "custom": "custom data",
-            "created": "2024-01-01 00:00:00.000",
-            "modified": "2024-04-01 12:00:00.000",
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 23:59:59.9999",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124",
+            "fee": "t1_fee_12345678901234567890123",
+            "name": "Visa Credit Rule",
+            "description": "Apply fee for Visa credit transactions",
+            "type": "METHOD",
+            "application": "both",
+            "value": "visa",
+            "grouping": "card_brand_group",
             "inactive": 0,
             "frozen": 1
         }"#;
 
         let fee_rule: FeeRule = serde_json::from_str(json).unwrap();
         assert_eq!(fee_rule.id.as_str(), "t1_fer_12345678901234567890123");
-        assert_eq!(fee_rule.entity.unwrap().as_str(), "t1_ent_12345678901234567890123");
-        assert_eq!(fee_rule.merchant.unwrap().as_str(), "t1_mer_12345678901234567890123");
-        assert_eq!(fee_rule.login.unwrap().as_str(), "t1_log_12345678901234567890123");
-        assert_eq!(fee_rule.fee_type, Some(FeeRuleType::Method));
-        assert_eq!(fee_rule.unit, Some(FeeUnit::Fixed));
-        assert_eq!(fee_rule.collection, Some(FeeCollection::Transaction));
-        assert_eq!(fee_rule.amount, Some(250));
-        assert_eq!(fee_rule.min, Some(50));
-        assert_eq!(fee_rule.max, Some(1000));
-        assert_eq!(fee_rule.currency, Some("USD".to_string()));
-        assert_eq!(fee_rule.card_brand, Some("visa".to_string()));
-        assert_eq!(fee_rule.card_type, Some("credit".to_string()));
-        assert_eq!(fee_rule.txn_type, Some("sale".to_string()));
-        assert_eq!(fee_rule.name, Some("Standard Fee Rule".to_string()));
-        assert_eq!(fee_rule.description, Some("Standard processing fee".to_string()));
-        assert_eq!(fee_rule.custom, Some("custom data".to_string()));
-        assert_eq!(fee_rule.created, Some("2024-01-01 00:00:00.000".to_string()));
-        assert_eq!(fee_rule.modified, Some("2024-04-01 12:00:00.000".to_string()));
+        assert_eq!(fee_rule.created, Some("2024-01-01 00:00:00.0000".to_string()));
+        assert_eq!(fee_rule.modified, Some("2024-01-02 23:59:59.9999".to_string()));
+        assert_eq!(fee_rule.creator.as_ref().map(|c| c.as_str()), Some("t1_lgn_12345678901234567890123"));
+        assert_eq!(fee_rule.modifier.as_ref().map(|m| m.as_str()), Some("t1_lgn_12345678901234567890124"));
+        assert_eq!(fee_rule.fee.as_ref().map(|f| f.as_str()), Some("t1_fee_12345678901234567890123"));
+        assert_eq!(fee_rule.name, Some("Visa Credit Rule".to_string()));
+        assert_eq!(fee_rule.description, Some("Apply fee for Visa credit transactions".to_string()));
+        assert_eq!(fee_rule.rule_type, Some(FeeRuleType::Method));
+        assert_eq!(fee_rule.application, Some(FeeApplication::Both));
+        assert_eq!(fee_rule.value, Some("visa".to_string()));
+        assert_eq!(fee_rule.grouping, Some("card_brand_group".to_string()));
         assert!(!fee_rule.inactive);
         assert!(fee_rule.frozen);
     }
 
     #[test]
     fn fee_rule_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_fer_12345678901234567890123"
-        }"#;
+        let json = r#"{"id": "t1_fer_12345678901234567890123"}"#;
 
         let fee_rule: FeeRule = serde_json::from_str(json).unwrap();
         assert_eq!(fee_rule.id.as_str(), "t1_fer_12345678901234567890123");
-        assert!(fee_rule.entity.is_none());
-        assert!(fee_rule.merchant.is_none());
-        assert!(fee_rule.login.is_none());
-        assert!(fee_rule.fee_type.is_none());
-        assert!(fee_rule.unit.is_none());
-        assert!(fee_rule.collection.is_none());
-        assert!(fee_rule.amount.is_none());
-        assert!(fee_rule.min.is_none());
-        assert!(fee_rule.max.is_none());
-        assert!(fee_rule.currency.is_none());
-        assert!(fee_rule.card_brand.is_none());
-        assert!(fee_rule.card_type.is_none());
-        assert!(fee_rule.txn_type.is_none());
-        assert!(fee_rule.name.is_none());
-        assert!(fee_rule.description.is_none());
-        assert!(fee_rule.custom.is_none());
         assert!(fee_rule.created.is_none());
         assert!(fee_rule.modified.is_none());
+        assert!(fee_rule.creator.is_none());
+        assert!(fee_rule.modifier.is_none());
+        assert!(fee_rule.fee.is_none());
+        assert!(fee_rule.name.is_none());
+        assert!(fee_rule.description.is_none());
+        assert!(fee_rule.rule_type.is_none());
+        assert!(fee_rule.application.is_none());
+        assert!(fee_rule.value.is_none());
+        assert!(fee_rule.grouping.is_none());
         assert!(!fee_rule.inactive);
         assert!(!fee_rule.frozen);
     }
@@ -280,270 +220,119 @@ mod tests {
     }
 
     #[test]
-    fn fee_rule_all_fee_type_variants() {
-        // Per OpenAPI: type is string enum (different from Fee.type)
-        let test_cases = vec![
-            ("method", FeeRuleType::Method),
-            ("bin", FeeRuleType::Bin),
-            ("avsresult", FeeRuleType::AvsResult),
-            ("business", FeeRuleType::Business),
+    fn fee_rule_type_common_variants() {
+        let test_cases = [
+            ("METHOD", FeeRuleType::Method),
+            ("BIN", FeeRuleType::Bin),
+            ("AVSRESULT", FeeRuleType::AvsResult),
+            ("BUSINESS", FeeRuleType::Business),
+            ("CVVRESULT", FeeRuleType::CvvResult),
+            ("EMV", FeeRuleType::Emv),
+            ("INTERCHANGE", FeeRuleType::Interchange),
+            ("INTERNATIONAL", FeeRuleType::International),
+            ("MCC", FeeRuleType::Mcc),
+            ("PLATFORM", FeeRuleType::Platform),
+            ("STATUS", FeeRuleType::Status),
+            ("SOFTPOS", FeeRuleType::SoftPos),
         ];
 
-        for (type_val, expected_type) in test_cases {
+        for (type_str, expected_type) in test_cases {
             let json = format!(
                 r#"{{"id": "t1_fer_12345678901234567890123", "type": "{}"}}"#,
-                type_val
+                type_str
             );
             let fee_rule: FeeRule = serde_json::from_str(&json).unwrap();
-            assert_eq!(fee_rule.fee_type, Some(expected_type));
+            assert_eq!(fee_rule.rule_type, Some(expected_type), "Failed for type: {}", type_str);
         }
     }
 
     #[test]
-    fn fee_rule_all_unit_variants() {
-        // Per OpenAPI: unit (feeUm) is integer enum [1, 2, 3]
-        let test_cases = vec![
-            (1, FeeUnit::Percent),
-            (2, FeeUnit::Fixed),
-            (3, FeeUnit::Surcharge),
+    fn fee_rule_type_comparison_variants() {
+        let test_cases = [
+            ("EQUAL", FeeRuleType::Equal),
+            ("NOTEQUAL", FeeRuleType::NotEqual),
+            ("GREATER", FeeRuleType::Greater),
+            ("LESS", FeeRuleType::Less),
         ];
 
-        for (unit_val, expected_unit) in test_cases {
+        for (type_str, expected_type) in test_cases {
             let json = format!(
-                r#"{{"id": "t1_fer_12345678901234567890123", "unit": {}}}"#,
-                unit_val
+                r#"{{"id": "t1_fer_12345678901234567890123", "type": "{}"}}"#,
+                type_str
             );
             let fee_rule: FeeRule = serde_json::from_str(&json).unwrap();
-            assert_eq!(fee_rule.unit, Some(expected_unit));
+            assert_eq!(fee_rule.rule_type, Some(expected_type));
         }
     }
 
     #[test]
-    fn fee_rule_all_collection_variants() {
-        // Per OpenAPI: collection is integer enum [1, 2, 3]
-        let test_cases = vec![
-            (1, FeeCollection::Transaction),
-            (2, FeeCollection::TransactionTaxId),
-            (3, FeeCollection::TransactionMerchant),
+    fn fee_rule_type_special_variants() {
+        let test_cases = [
+            ("3DSRESULT", FeeRuleType::ThreeDsResult),
+            ("IC_RETAIN_PASSTHRU_REFUND", FeeRuleType::IcRetainPassthruRefund),
+            ("TAXFORM1099K", FeeRuleType::TaxForm1099K),
         ];
 
-        for (collection_val, expected_collection) in test_cases {
+        for (type_str, expected_type) in test_cases {
             let json = format!(
-                r#"{{"id": "t1_fer_12345678901234567890123", "collection": {}}}"#,
-                collection_val
+                r#"{{"id": "t1_fer_12345678901234567890123", "type": "{}"}}"#,
+                type_str
             );
             let fee_rule: FeeRule = serde_json::from_str(&json).unwrap();
-            assert_eq!(fee_rule.collection, Some(expected_collection));
+            assert_eq!(fee_rule.rule_type, Some(expected_type));
         }
     }
 
     #[test]
-    fn fee_rule_min_max_constraints() {
+    fn fee_rule_application_variants() {
+        let test_cases = [
+            ("both", FeeApplication::Both),
+            ("fee", FeeApplication::Fee),
+            ("collection", FeeApplication::Collection),
+        ];
+
+        for (app_str, expected_app) in test_cases {
+            let json = format!(
+                r#"{{"id": "t1_fer_12345678901234567890123", "application": "{}"}}"#,
+                app_str
+            );
+            let fee_rule: FeeRule = serde_json::from_str(&json).unwrap();
+            assert_eq!(fee_rule.application, Some(expected_app));
+        }
+    }
+
+    #[test]
+    fn fee_rule_with_value_and_grouping() {
         let json = r#"{
             "id": "t1_fer_12345678901234567890123",
-            "min": 100,
-            "max": 500
+            "type": "BIN",
+            "value": "411111",
+            "grouping": "visa_bins"
         }"#;
 
         let fee_rule: FeeRule = serde_json::from_str(json).unwrap();
-        assert_eq!(fee_rule.min, Some(100));
-        assert_eq!(fee_rule.max, Some(500));
-    }
-
-    #[test]
-    fn fee_rule_card_filters() {
-        let json = r#"{
-            "id": "t1_fer_12345678901234567890123",
-            "cardBrand": "mastercard",
-            "cardType": "debit"
-        }"#;
-
-        let fee_rule: FeeRule = serde_json::from_str(json).unwrap();
-        assert_eq!(fee_rule.card_brand, Some("mastercard".to_string()));
-        assert_eq!(fee_rule.card_type, Some("debit".to_string()));
+        assert_eq!(fee_rule.rule_type, Some(FeeRuleType::Bin));
+        assert_eq!(fee_rule.value, Some("411111".to_string()));
+        assert_eq!(fee_rule.grouping, Some("visa_bins".to_string()));
     }
 
     #[test]
     fn fee_rule_serialize_roundtrip() {
-        let fee_rule = FeeRule {
-            id: "t1_fer_12345678901234567890123".parse().unwrap(),
-            entity: Some("t1_ent_12345678901234567890123".parse().unwrap()),
-            merchant: Some("t1_mer_12345678901234567890123".parse().unwrap()),
-            login: Some("t1_log_12345678901234567890123".parse().unwrap()),
-            fee_type: Some(FeeRuleType::Method),
-            unit: Some(FeeUnit::Fixed),
-            collection: Some(FeeCollection::Transaction),
-            amount: Some(100),
-            min: Some(50),
-            max: Some(500),
-            currency: Some("USD".to_string()),
-            card_brand: Some("visa".to_string()),
-            card_type: Some("credit".to_string()),
-            txn_type: Some("sale".to_string()),
-            name: Some("Test Fee Rule".to_string()),
-            description: Some("Test".to_string()),
-            custom: Some("custom".to_string()),
-            created: Some("2024-01-01 00:00:00.000".to_string()),
-            modified: Some("2024-01-02 00:00:00.000".to_string()),
-            inactive: false,
-            frozen: true,
-        };
+        let json = r#"{
+            "id": "t1_fer_12345678901234567890123",
+            "type": "METHOD",
+            "application": "both",
+            "value": "credit",
+            "inactive": 0,
+            "frozen": 0
+        }"#;
 
-        let json = serde_json::to_string(&fee_rule).unwrap();
-        let deserialized: FeeRule = serde_json::from_str(&json).unwrap();
-        assert_eq!(fee_rule, deserialized);
-    }
-
-    // ==================== NewFeeRule Tests ====================
-
-    #[test]
-    fn new_fee_rule_serialize_full() {
-        let new_fee_rule = NewFeeRule {
-            entity: Some("t1_ent_12345678901234567890123".to_string()),
-            merchant: Some("t1_mer_12345678901234567890123".to_string()),
-            fee_type: Some(FeeRuleType::Method),
-            unit: Some(FeeUnit::Fixed),
-            collection: Some(FeeCollection::Transaction),
-            amount: 250,
-            min: Some(50),
-            max: Some(1000),
-            currency: Some("USD".to_string()),
-            card_brand: Some("visa".to_string()),
-            card_type: Some("credit".to_string()),
-            txn_type: Some("sale".to_string()),
-            name: Some("Standard Fee Rule".to_string()),
-            description: Some("Standard processing fee".to_string()),
-            custom: Some("custom data".to_string()),
-            inactive: Some(false),
-        };
-
-        let json = serde_json::to_string(&new_fee_rule).unwrap();
-        assert!(json.contains("\"entity\":\"t1_ent_12345678901234567890123\""));
-        assert!(json.contains("\"merchant\":\"t1_mer_12345678901234567890123\""));
-        // Per OpenAPI: type is string, unit/collection are integers
-        assert!(json.contains("\"type\":\"method\""));
-        assert!(json.contains("\"unit\":2"));
-        assert!(json.contains("\"collection\":1"));
-        assert!(json.contains("\"amount\":250"));
-        assert!(json.contains("\"min\":50"));
-        assert!(json.contains("\"max\":1000"));
-        assert!(json.contains("\"currency\":\"USD\""));
-        assert!(json.contains("\"cardBrand\":\"visa\""));
-        assert!(json.contains("\"cardType\":\"credit\""));
-        assert!(json.contains("\"txnType\":\"sale\""));
-        assert!(json.contains("\"name\":\"Standard Fee Rule\""));
-        assert!(json.contains("\"description\":\"Standard processing fee\""));
-        assert!(json.contains("\"custom\":\"custom data\""));
-        assert!(json.contains("\"inactive\":0"));
-    }
-
-    #[test]
-    fn new_fee_rule_serialize_minimal() {
-        let new_fee_rule = NewFeeRule {
-            amount: 100,
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_fee_rule).unwrap();
-        assert!(json.contains("\"amount\":100"));
-        // Optional fields should be omitted
-        assert!(!json.contains("\"entity\""));
-        assert!(!json.contains("\"merchant\""));
-        assert!(!json.contains("\"type\""));
-        assert!(!json.contains("\"unit\""));
-        assert!(!json.contains("\"collection\""));
-        assert!(!json.contains("\"min\""));
-        assert!(!json.contains("\"max\""));
-        assert!(!json.contains("\"inactive\""));
-    }
-
-    #[test]
-    fn new_fee_rule_option_bool_to_int_true() {
-        let new_fee_rule = NewFeeRule {
-            amount: 100,
-            inactive: Some(true),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_fee_rule).unwrap();
-        assert!(json.contains("\"inactive\":1"));
-    }
-
-    #[test]
-    fn new_fee_rule_option_bool_to_int_false() {
-        let new_fee_rule = NewFeeRule {
-            amount: 100,
-            inactive: Some(false),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_fee_rule).unwrap();
-        assert!(json.contains("\"inactive\":0"));
-    }
-
-    #[test]
-    fn new_fee_rule_option_bool_none_omitted() {
-        let new_fee_rule = NewFeeRule {
-            amount: 100,
-            inactive: None,
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_fee_rule).unwrap();
-        assert!(!json.contains("\"inactive\""));
-    }
-
-    #[test]
-    fn new_fee_rule_with_all_enum_variants() {
-        let new_fee_rule = NewFeeRule {
-            amount: 500,
-            fee_type: Some(FeeRuleType::Bin),
-            unit: Some(FeeUnit::Percent),
-            collection: Some(FeeCollection::TransactionMerchant),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_fee_rule).unwrap();
-        // Per OpenAPI: type="bin" (string), unit=1 (Percent), collection=3 (TransactionMerchant)
-        assert!(json.contains("\"type\":\"bin\""));
-        assert!(json.contains("\"unit\":1"));
-        assert!(json.contains("\"collection\":3"));
-    }
-
-    #[test]
-    fn new_fee_rule_zero_amount() {
-        let new_fee_rule = NewFeeRule {
-            amount: 0,
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_fee_rule).unwrap();
-        assert!(json.contains("\"amount\":0"));
-    }
-
-    #[test]
-    fn new_fee_rule_large_amount() {
-        let new_fee_rule = NewFeeRule {
-            amount: 999999999,
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_fee_rule).unwrap();
-        assert!(json.contains("\"amount\":999999999"));
-    }
-
-    #[test]
-    fn new_fee_rule_with_constraints() {
-        let new_fee_rule = NewFeeRule {
-            amount: 300,
-            min: Some(100),
-            max: Some(500),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_fee_rule).unwrap();
-        assert!(json.contains("\"amount\":300"));
-        assert!(json.contains("\"min\":100"));
-        assert!(json.contains("\"max\":500"));
+        let fee_rule: FeeRule = serde_json::from_str(json).unwrap();
+        let serialized = serde_json::to_string(&fee_rule).unwrap();
+        let deserialized: FeeRule = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(fee_rule.id, deserialized.id);
+        assert_eq!(fee_rule.rule_type, deserialized.rule_type);
+        assert_eq!(fee_rule.application, deserialized.application);
+        assert_eq!(fee_rule.value, deserialized.value);
     }
 }

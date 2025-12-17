@@ -1,179 +1,111 @@
 //! Refund types for the Payrix API.
 //!
-//! Refunds represent the return of funds from a previously completed transaction
-//! back to the customer's payment method.
+//! Refunds represent the return of funds from a previously completed entry
+//! back to the customer.
+//!
+//! **OpenAPI schema:** `refundsResponse`
 
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use super::{bool_from_int_default_false, option_bool_from_int, PayrixId};
+use super::PayrixId;
 
-/// Refund status values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-pub enum RefundStatus {
-    /// Refund is pending
-    #[default]
-    Pending = 0,
-    /// Refund is approved
-    Approved = 1,
-    /// Refund is processing
-    Processing = 2,
-    /// Refund completed successfully
-    Completed = 3,
-    /// Refund failed
-    Failed = 4,
-    /// Refund was voided
-    Voided = 5,
-}
+// =============================================================================
+// REFUND STRUCT
+// =============================================================================
 
 /// A Payrix refund.
 ///
-/// Refunds return funds from a completed transaction back to the customer.
-/// All monetary values are in **cents**.
+/// Refunds return funds from an entry back to the customer.
+///
+/// **OpenAPI schema:** `refundsResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Refund {
-    /// Unique identifier (30 characters, e.g., "t1_ref_...")
+    /// The ID of this resource.
+    ///
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Entity ID
-    #[serde(default)]
-    pub entity: Option<PayrixId>,
-
-    /// Merchant ID that owns this refund
-    #[serde(default)]
-    pub merchant: Option<PayrixId>,
-
-    /// Original transaction ID being refunded
-    #[serde(default)]
-    pub txn: Option<PayrixId>,
-
-    /// Customer ID
-    #[serde(default)]
-    pub customer: Option<PayrixId>,
-
-    /// Login ID that created this refund
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Refund status
-    #[serde(default)]
-    pub status: Option<RefundStatus>,
-
-    /// Refund amount in cents
-    #[serde(default)]
-    pub amount: Option<i64>,
-
-    /// Currency code (e.g., "USD")
-    #[serde(default)]
-    pub currency: Option<String>,
-
-    /// Reason for refund
-    #[serde(default)]
-    pub reason: Option<String>,
-
-    /// Description/memo
-    #[serde(default)]
-    pub description: Option<String>,
-
-    /// Reference number
-    #[serde(default)]
-    pub reference: Option<String>,
-
-    /// Response code from processor
-    #[serde(default)]
-    pub response_code: Option<String>,
-
-    /// Response message from processor
-    #[serde(default)]
-    pub response_message: Option<String>,
-
-    /// Custom data field
-    #[serde(default)]
-    pub custom: Option<String>,
-
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive (false=active, true=inactive)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub inactive: bool,
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
 
-    /// Whether resource is frozen
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub frozen: bool,
-}
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
 
-/// Request to create a new refund.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewRefund {
-    /// Original transaction ID to refund (required)
-    pub txn: String,
+    /// The identifier of the Entry that is being refunded.
+    ///
+    /// **OpenAPI type:** string (ref: refundsModelEntry)
+    #[serde(default)]
+    pub entry: Option<PayrixId>,
 
-    /// Refund amount in cents (if not provided, full refund)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub amount: Option<i64>,
-
-    /// Reason for refund
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reason: Option<String>,
-
-    /// Description/memo
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// A description of this Refund.
+    ///
+    /// This field is stored as a text string (0-100 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
     pub description: Option<String>,
 
-    /// Custom data field
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
+    /// The amount of this Refund.
+    ///
+    /// This field is specified in cents (up to three decimal points).
+    /// If not set, the API uses the amount from the related Entry resource.
+    ///
+    /// **OpenAPI type:** number
+    #[serde(default)]
+    pub amount: Option<f64>,
 
-    /// Whether resource is inactive
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub inactive: Option<bool>,
+    // =========================================================================
+    // NESTED RELATIONS (expandable via API)
+    // =========================================================================
+
+    /// Entry associated with this refund.
+    ///
+    /// **OpenAPI type:** entriesResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub entries: Option<serde_json::Value>,
+
+    /// Pending entries associated with this refund.
+    ///
+    /// **OpenAPI type:** pendingEntriesResponse
+    #[cfg(not(feature = "sqlx"))]
+    #[serde(default)]
+    pub pending_entries: Option<serde_json::Value>,
 }
+
+// =============================================================================
+// TESTS
+// =============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // ==================== RefundStatus Tests ====================
-
-    #[test]
-    fn refund_status_serialize_all_variants() {
-        assert_eq!(serde_json::to_string(&RefundStatus::Pending).unwrap(), "0");
-        assert_eq!(serde_json::to_string(&RefundStatus::Approved).unwrap(), "1");
-        assert_eq!(serde_json::to_string(&RefundStatus::Processing).unwrap(), "2");
-        assert_eq!(serde_json::to_string(&RefundStatus::Completed).unwrap(), "3");
-        assert_eq!(serde_json::to_string(&RefundStatus::Failed).unwrap(), "4");
-        assert_eq!(serde_json::to_string(&RefundStatus::Voided).unwrap(), "5");
-    }
-
-    #[test]
-    fn refund_status_deserialize_all_variants() {
-        assert_eq!(serde_json::from_str::<RefundStatus>("0").unwrap(), RefundStatus::Pending);
-        assert_eq!(serde_json::from_str::<RefundStatus>("1").unwrap(), RefundStatus::Approved);
-        assert_eq!(serde_json::from_str::<RefundStatus>("2").unwrap(), RefundStatus::Processing);
-        assert_eq!(serde_json::from_str::<RefundStatus>("3").unwrap(), RefundStatus::Completed);
-        assert_eq!(serde_json::from_str::<RefundStatus>("4").unwrap(), RefundStatus::Failed);
-        assert_eq!(serde_json::from_str::<RefundStatus>("5").unwrap(), RefundStatus::Voided);
-    }
-
-    #[test]
-    fn refund_status_default() {
-        assert_eq!(RefundStatus::default(), RefundStatus::Pending);
-    }
-
-    #[test]
-    fn refund_status_invalid_value() {
-        assert!(serde_json::from_str::<RefundStatus>("99").is_err());
-    }
 
     // ==================== Refund Struct Tests ====================
 
@@ -181,82 +113,92 @@ mod tests {
     fn refund_deserialize_full() {
         let json = r#"{
             "id": "t1_ref_12345678901234567890123",
-            "entity": "t1_ent_12345678901234567890123",
-            "merchant": "t1_mer_12345678901234567890123",
-            "txn": "t1_txn_12345678901234567890123",
-            "customer": "t1_cus_12345678901234567890123",
-            "login": "t1_log_12345678901234567890123",
-            "status": 3,
-            "amount": 2500,
-            "currency": "USD",
-            "reason": "Customer request",
-            "description": "Partial refund",
-            "reference": "REF123",
-            "responseCode": "00",
-            "responseMessage": "Approved",
-            "custom": "custom data",
-            "created": "2024-01-01 00:00:00.000",
-            "modified": "2024-04-01 12:00:00.000",
-            "inactive": 0,
-            "frozen": 0
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 23:59:59.9999",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124",
+            "entry": "t1_ent_12345678901234567890123",
+            "description": "Customer refund request",
+            "amount": 2500.5
         }"#;
 
         let refund: Refund = serde_json::from_str(json).unwrap();
         assert_eq!(refund.id.as_str(), "t1_ref_12345678901234567890123");
-        assert_eq!(refund.txn.unwrap().as_str(), "t1_txn_12345678901234567890123");
-        assert_eq!(refund.status, Some(RefundStatus::Completed));
-        assert_eq!(refund.amount, Some(2500));
-        assert_eq!(refund.reason, Some("Customer request".to_string()));
-        assert!(!refund.inactive);
+        assert_eq!(refund.created, Some("2024-01-01 00:00:00.0000".to_string()));
+        assert_eq!(refund.modified, Some("2024-01-02 23:59:59.9999".to_string()));
+        assert_eq!(refund.creator.as_ref().map(|c| c.as_str()), Some("t1_lgn_12345678901234567890123"));
+        assert_eq!(refund.modifier.as_ref().map(|m| m.as_str()), Some("t1_lgn_12345678901234567890124"));
+        assert_eq!(refund.entry.as_ref().map(|e| e.as_str()), Some("t1_ent_12345678901234567890123"));
+        assert_eq!(refund.description, Some("Customer refund request".to_string()));
+        assert_eq!(refund.amount, Some(2500.5));
     }
 
     #[test]
     fn refund_deserialize_minimal() {
         let json = r#"{"id": "t1_ref_12345678901234567890123"}"#;
+
         let refund: Refund = serde_json::from_str(json).unwrap();
         assert_eq!(refund.id.as_str(), "t1_ref_12345678901234567890123");
-        assert!(refund.status.is_none());
+        assert!(refund.created.is_none());
+        assert!(refund.modified.is_none());
+        assert!(refund.creator.is_none());
+        assert!(refund.modifier.is_none());
+        assert!(refund.entry.is_none());
+        assert!(refund.description.is_none());
         assert!(refund.amount.is_none());
     }
 
     #[test]
-    fn refund_bool_from_int() {
-        let json = r#"{"id": "t1_ref_12345678901234567890123", "inactive": 1, "frozen": 1}"#;
+    fn refund_amount_decimal() {
+        let json = r#"{
+            "id": "t1_ref_12345678901234567890123",
+            "amount": 1234.567
+        }"#;
+
         let refund: Refund = serde_json::from_str(json).unwrap();
-        assert!(refund.inactive);
-        assert!(refund.frozen);
-    }
-
-    // ==================== NewRefund Tests ====================
-
-    #[test]
-    fn new_refund_serialize_full() {
-        let new_refund = NewRefund {
-            txn: "t1_txn_12345678901234567890123".to_string(),
-            amount: Some(2500),
-            reason: Some("Customer request".to_string()),
-            description: Some("Partial refund".to_string()),
-            custom: Some("custom".to_string()),
-            inactive: Some(false),
-        };
-
-        let json = serde_json::to_string(&new_refund).unwrap();
-        assert!(json.contains("\"txn\":\"t1_txn_12345678901234567890123\""));
-        assert!(json.contains("\"amount\":2500"));
-        assert!(json.contains("\"reason\":\"Customer request\""));
-        assert!(json.contains("\"inactive\":0"));
+        assert_eq!(refund.amount, Some(1234.567));
     }
 
     #[test]
-    fn new_refund_serialize_minimal() {
-        let new_refund = NewRefund {
-            txn: "t1_txn_12345678901234567890123".to_string(),
-            ..Default::default()
-        };
+    fn refund_amount_integer() {
+        let json = r#"{
+            "id": "t1_ref_12345678901234567890123",
+            "amount": 2500
+        }"#;
 
-        let json = serde_json::to_string(&new_refund).unwrap();
-        assert!(json.contains("\"txn\":\"t1_txn_12345678901234567890123\""));
-        assert!(!json.contains("\"amount\""));
-        assert!(!json.contains("\"reason\""));
+        let refund: Refund = serde_json::from_str(json).unwrap();
+        assert_eq!(refund.amount, Some(2500.0));
+    }
+
+    #[test]
+    #[cfg(not(feature = "sqlx"))]
+    fn refund_with_nested_relations() {
+        let json = r#"{
+            "id": "t1_ref_12345678901234567890123",
+            "entries": {"id": "t1_ent_12345678901234567890123"},
+            "pendingEntries": {"id": "t1_pen_12345678901234567890123"}
+        }"#;
+
+        let refund: Refund = serde_json::from_str(json).unwrap();
+        assert!(refund.entries.is_some());
+        assert!(refund.pending_entries.is_some());
+    }
+
+    #[test]
+    fn refund_serialize_roundtrip() {
+        let json = r#"{
+            "id": "t1_ref_12345678901234567890123",
+            "entry": "t1_ent_12345678901234567890123",
+            "description": "Test refund",
+            "amount": 1000.0
+        }"#;
+
+        let refund: Refund = serde_json::from_str(json).unwrap();
+        let serialized = serde_json::to_string(&refund).unwrap();
+        let deserialized: Refund = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(refund.id, deserialized.id);
+        assert_eq!(refund.entry, deserialized.entry);
+        assert_eq!(refund.description, deserialized.description);
+        assert_eq!(refund.amount, deserialized.amount);
     }
 }

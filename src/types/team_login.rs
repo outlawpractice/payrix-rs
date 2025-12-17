@@ -1,187 +1,209 @@
 //! Team login types for the Payrix API.
 //!
 //! Team logins represent permission assignments for logins within teams.
-//! Per OpenAPI spec, these define CRUD permissions for a login on a specific team.
+//!
+//! **OpenAPI schema:** `teamLoginResponse`
 
 use serde::{Deserialize, Serialize};
 
-use super::{bool_from_int_default_false, option_bool_from_int, PayrixId};
+use super::{bool_from_int_default_false, PayrixId};
+
+// =============================================================================
+// TEAM LOGIN STRUCT
+// =============================================================================
 
 /// A Payrix team login (permission assignment).
 ///
-/// Per OpenAPI spec: Team logins define the permissions a login has within a team.
-/// This represents CRUD and admin rights, not user account data.
+/// Represents the link between a Login and a Team as well as the Login's
+/// rights on the Team. The Login resource identified in its 'login' field
+/// is considered part of the Team.
+///
+/// **OpenAPI schema:** `teamLoginResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct TeamLogin {
-    /// Unique identifier (30 characters, e.g., "t1_tlg_...")
+    /// The ID of this resource.
+    ///
+    /// **OpenAPI type:** string
     pub id: PayrixId,
 
-    /// Login ID this permission applies to
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// Team ID this permission is for
-    #[serde(default)]
-    pub team: Option<PayrixId>,
-
-    /// Create permission (0/1)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub create: bool,
-
-    /// Read permission (0/1)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub read: bool,
-
-    /// Update permission (0/1)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub update: bool,
-
-    /// Delete permission (0/1)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub delete: bool,
-
-    /// Reference permission (0/1) - ability to reference this resource
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub reference: bool,
-
-    /// Team admin permission (0/1)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub team_admin: bool,
-
-    /// Custom data field
-    #[serde(default)]
-    pub custom: Option<String>,
-
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub created: Option<String>,
 
-    /// Timestamp in "YYYY-MM-DD HH:mm:ss.sss" format
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
     #[serde(default)]
     pub modified: Option<String>,
 
-    /// Whether resource is inactive (false=active, true=inactive)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub inactive: bool,
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
 
-    /// Whether resource is frozen
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+
+    /// The Login that owns this resource.
+    ///
+    /// **OpenAPI type:** string (ref: teamLoginModelLogin)
+    #[serde(default)]
+    pub login: Option<PayrixId>,
+
+    /// The identifier of the Team resource that the Login identified in the
+    /// 'login' field should be marked as part of.
+    ///
+    /// **OpenAPI type:** string (ref: teamLoginModelTeam)
+    #[serde(default)]
+    pub team: Option<PayrixId>,
+
+    /// Create rights for this Login on this Team.
+    ///
+    /// - `0` - None
+    /// - `1` - Allow
+    ///
+    /// **OpenAPI type:** integer (ref: Create)
     #[serde(default, with = "bool_from_int_default_false")]
-    pub frozen: bool,
+    pub create: bool,
+
+    /// Read rights for this Login on this Team.
+    ///
+    /// - `0` - None
+    /// - `1` - Allow
+    ///
+    /// **OpenAPI type:** integer (ref: teamLoginRead)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub read: bool,
+
+    /// Update rights for this Login on this Team.
+    ///
+    /// - `0` - None
+    /// - `1` - Allow
+    ///
+    /// **OpenAPI type:** integer (ref: Update)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub update: bool,
+
+    /// Delete rights for this Login on this Team.
+    ///
+    /// - `0` - None
+    /// - `1` - Allow
+    ///
+    /// **OpenAPI type:** integer (ref: Delete)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub delete: bool,
+
+    /// Reference use rights for this Login on this Team.
+    ///
+    /// - `0` - None
+    /// - `1` - Allow
+    ///
+    /// **OpenAPI type:** integer (ref: Reference)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub reference: bool,
+
+    /// Team administration rights for this Login on this Team.
+    ///
+    /// - `0` - None
+    /// - `1` - Allow
+    ///
+    /// **OpenAPI type:** integer (ref: TeamAdmin)
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub team_admin: bool,
 }
 
-/// Request to create a new team login (permission assignment).
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewTeamLogin {
-    /// Login ID (required)
-    pub login: String,
-
-    /// Team ID (required)
-    pub team: String,
-
-    /// Create permission
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub create: Option<bool>,
-
-    /// Read permission
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub read: Option<bool>,
-
-    /// Update permission
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub update: Option<bool>,
-
-    /// Delete permission
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub delete: Option<bool>,
-
-    /// Reference permission
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub reference: Option<bool>,
-
-    /// Team admin permission
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub team_admin: Option<bool>,
-
-    /// Custom data field
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
-
-    /// Whether resource is inactive
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub inactive: Option<bool>,
-}
+// =============================================================================
+// TESTS
+// =============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json;
 
-    // TeamLogin struct tests - per OpenAPI, this is a permissions assignment
+    // ==================== TeamLogin Struct Tests ====================
+
     #[test]
-    fn test_team_login_deserialize_full() {
+    fn team_login_deserialize_full() {
         let json = r#"{
             "id": "t1_tlg_12345678901234567890123",
-            "login": "t1_log_23456789012345678901234",
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 23:59:59.9999",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124",
+            "login": "t1_lgn_23456789012345678901234",
             "team": "t1_tea_34567890123456789012345",
             "create": 1,
             "read": 1,
             "update": 1,
             "delete": 0,
             "reference": 1,
-            "teamAdmin": 1,
-            "custom": "{\"key\":\"value\"}",
-            "created": "2024-01-01 12:00:00.000",
-            "modified": "2024-01-02 12:00:00.000",
-            "inactive": 0,
-            "frozen": 0
+            "teamAdmin": 1
         }"#;
 
-        let team_login: TeamLogin = serde_json::from_str(json).unwrap();
-        assert_eq!(team_login.id.as_str(), "t1_tlg_12345678901234567890123");
-        assert_eq!(team_login.login, Some(PayrixId::new("t1_log_23456789012345678901234").unwrap()));
-        assert_eq!(team_login.team, Some(PayrixId::new("t1_tea_34567890123456789012345").unwrap()));
-        assert!(team_login.create);
-        assert!(team_login.read);
-        assert!(team_login.update);
-        assert!(!team_login.delete);
-        assert!(team_login.reference);
-        assert!(team_login.team_admin);
-        assert_eq!(team_login.custom, Some("{\"key\":\"value\"}".to_string()));
-        assert_eq!(team_login.created, Some("2024-01-01 12:00:00.000".to_string()));
-        assert_eq!(team_login.modified, Some("2024-01-02 12:00:00.000".to_string()));
-        assert!(!team_login.inactive);
-        assert!(!team_login.frozen);
+        let tl: TeamLogin = serde_json::from_str(json).unwrap();
+        assert_eq!(tl.id.as_str(), "t1_tlg_12345678901234567890123");
+        assert_eq!(tl.created, Some("2024-01-01 00:00:00.0000".to_string()));
+        assert_eq!(tl.modified, Some("2024-01-02 23:59:59.9999".to_string()));
+        assert_eq!(
+            tl.creator.as_ref().map(|c| c.as_str()),
+            Some("t1_lgn_12345678901234567890123")
+        );
+        assert_eq!(
+            tl.modifier.as_ref().map(|m| m.as_str()),
+            Some("t1_lgn_12345678901234567890124")
+        );
+        assert_eq!(
+            tl.login.as_ref().map(|l| l.as_str()),
+            Some("t1_lgn_23456789012345678901234")
+        );
+        assert_eq!(
+            tl.team.as_ref().map(|t| t.as_str()),
+            Some("t1_tea_34567890123456789012345")
+        );
+        assert!(tl.create);
+        assert!(tl.read);
+        assert!(tl.update);
+        assert!(!tl.delete);
+        assert!(tl.reference);
+        assert!(tl.team_admin);
     }
 
     #[test]
-    fn test_team_login_deserialize_minimal() {
-        let json = r#"{
-            "id": "t1_tlg_12345678901234567890123"
-        }"#;
+    fn team_login_deserialize_minimal() {
+        let json = r#"{"id": "t1_tlg_12345678901234567890123"}"#;
 
-        let team_login: TeamLogin = serde_json::from_str(json).unwrap();
-        assert_eq!(team_login.id.as_str(), "t1_tlg_12345678901234567890123");
-        assert!(team_login.login.is_none());
-        assert!(team_login.team.is_none());
-        assert!(!team_login.create);
-        assert!(!team_login.read);
-        assert!(!team_login.update);
-        assert!(!team_login.delete);
-        assert!(!team_login.reference);
-        assert!(!team_login.team_admin);
-        assert!(team_login.custom.is_none());
-        assert!(team_login.created.is_none());
-        assert!(team_login.modified.is_none());
-        assert!(!team_login.inactive);
-        assert!(!team_login.frozen);
+        let tl: TeamLogin = serde_json::from_str(json).unwrap();
+        assert_eq!(tl.id.as_str(), "t1_tlg_12345678901234567890123");
+        assert!(tl.created.is_none());
+        assert!(tl.modified.is_none());
+        assert!(tl.creator.is_none());
+        assert!(tl.modifier.is_none());
+        assert!(tl.login.is_none());
+        assert!(tl.team.is_none());
+        assert!(!tl.create);
+        assert!(!tl.read);
+        assert!(!tl.update);
+        assert!(!tl.delete);
+        assert!(!tl.reference);
+        assert!(!tl.team_admin);
     }
 
     #[test]
-    fn test_team_login_bool_from_int() {
-        // Test all permission fields with int values
+    fn team_login_bool_from_int() {
         let json = r#"{
             "id": "t1_tlg_12345678901234567890123",
             "create": 1,
@@ -189,93 +211,31 @@ mod tests {
             "update": 1,
             "delete": 0,
             "reference": 1,
-            "teamAdmin": 0,
-            "inactive": 1,
-            "frozen": 0
+            "teamAdmin": 0
         }"#;
-        let team_login: TeamLogin = serde_json::from_str(json).unwrap();
-        assert!(team_login.create);
-        assert!(!team_login.read);
-        assert!(team_login.update);
-        assert!(!team_login.delete);
-        assert!(team_login.reference);
-        assert!(!team_login.team_admin);
-        assert!(team_login.inactive);
-        assert!(!team_login.frozen);
-    }
 
-    // NewTeamLogin struct tests
-    #[test]
-    fn test_new_team_login_serialize_full() {
-        let new_team_login = NewTeamLogin {
-            login: "t1_log_23456789012345678901234".to_string(),
-            team: "t1_tea_34567890123456789012345".to_string(),
-            create: Some(true),
-            read: Some(true),
-            update: Some(true),
-            delete: Some(false),
-            reference: Some(true),
-            team_admin: Some(true),
-            custom: Some("{\"key\":\"value\"}".to_string()),
-            inactive: Some(false),
-        };
-
-        let json = serde_json::to_string(&new_team_login).unwrap();
-        assert!(json.contains("\"login\":\"t1_log_23456789012345678901234\""));
-        assert!(json.contains("\"team\":\"t1_tea_34567890123456789012345\""));
-        assert!(json.contains("\"create\":1"));
-        assert!(json.contains("\"read\":1"));
-        assert!(json.contains("\"update\":1"));
-        assert!(json.contains("\"delete\":0"));
-        assert!(json.contains("\"reference\":1"));
-        assert!(json.contains("\"teamAdmin\":1"));
-        assert!(json.contains("\"custom\":\"{\\\"key\\\":\\\"value\\\"}\""));
-        assert!(json.contains("\"inactive\":0"));
+        let tl: TeamLogin = serde_json::from_str(json).unwrap();
+        assert!(tl.create);
+        assert!(!tl.read);
+        assert!(tl.update);
+        assert!(!tl.delete);
+        assert!(tl.reference);
+        assert!(!tl.team_admin);
     }
 
     #[test]
-    fn test_new_team_login_serialize_minimal() {
-        let new_team_login = NewTeamLogin {
-            login: "t1_log_23456789012345678901234".to_string(),
-            team: "t1_tea_34567890123456789012345".to_string(),
-            ..Default::default()
-        };
+    fn team_login_serialize_roundtrip() {
+        let json = r#"{
+            "id": "t1_tlg_12345678901234567890123",
+            "login": "t1_lgn_23456789012345678901234",
+            "team": "t1_tea_34567890123456789012345"
+        }"#;
 
-        let json = serde_json::to_string(&new_team_login).unwrap();
-        assert!(json.contains("\"login\":\"t1_log_23456789012345678901234\""));
-        assert!(json.contains("\"team\":\"t1_tea_34567890123456789012345\""));
-        // Optional fields should be omitted
-        assert!(!json.contains("create"));
-        assert!(!json.contains("read"));
-        assert!(!json.contains("update"));
-        assert!(!json.contains("delete"));
-        assert!(!json.contains("reference"));
-        assert!(!json.contains("teamAdmin"));
-        assert!(!json.contains("custom"));
-        assert!(!json.contains("inactive"));
-    }
-
-    #[test]
-    fn test_new_team_login_permissions() {
-        // Test with all permissions enabled
-        let new_team_login = NewTeamLogin {
-            login: "t1_log_23456789012345678901234".to_string(),
-            team: "t1_tea_34567890123456789012345".to_string(),
-            create: Some(true),
-            read: Some(true),
-            update: Some(true),
-            delete: Some(true),
-            reference: Some(true),
-            team_admin: Some(true),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_team_login).unwrap();
-        assert!(json.contains("\"create\":1"));
-        assert!(json.contains("\"read\":1"));
-        assert!(json.contains("\"update\":1"));
-        assert!(json.contains("\"delete\":1"));
-        assert!(json.contains("\"reference\":1"));
-        assert!(json.contains("\"teamAdmin\":1"));
+        let tl: TeamLogin = serde_json::from_str(json).unwrap();
+        let serialized = serde_json::to_string(&tl).unwrap();
+        let deserialized: TeamLogin = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(tl.id, deserialized.id);
+        assert_eq!(tl.login, deserialized.login);
+        assert_eq!(tl.team, deserialized.team);
     }
 }
