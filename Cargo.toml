@@ -54,6 +54,7 @@ required-features = ["webhook-cli"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 wiremock = "0.6"
 
 [package.metadata.docs.rs]

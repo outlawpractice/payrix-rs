@@ -25,6 +25,7 @@
 //!                           ┌─────▼─────┐              ┌─────────▼──┐    ┌─────▼─────┐
 //!                           │ Chargeback │              │Transaction │    │  Other    │
 //!                           │ Handler    │              │ Handler    │    │ Handlers  │
+//!                           │ (typestate)│              │            │    │           │
 //!                           └───────────┘              └────────────┘    └───────────┘
 //! ```
 //!
@@ -95,6 +96,57 @@
 //! let config = WebhookServerConfig::new()
 //!     .with_logger(logger);
 //! ```
+//!
+//! # Integration with Dispute Handling
+//!
+//! The webhook server integrates seamlessly with the
+//! [`dispute_handling`](crate::workflows::dispute_handling) workflow to provide
+//! automated chargeback response handling:
+//!
+//! ```no_run
+//! use payrix::webhooks::{WebhookServer, WebhookServerConfig, ChargebackEvent};
+//! use payrix::workflows::dispute_handling::{ChargebackDispute, ActiveDispute};
+//! use payrix::{PayrixClient, Environment};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let client = PayrixClient::new("api-key", Environment::Test)?;
+//!
+//! // Start webhook server
+//! let (server, mut events) = WebhookServer::new();
+//! tokio::spawn(server.run("0.0.0.0:13847".parse()?));
+//!
+//! // Handle chargeback events
+//! while let Some(event) = events.recv().await {
+//!     if let Some(cb_event) = event.as_chargeback_event() {
+//!         match cb_event {
+//!             ChargebackEvent::Created { data, .. } => {
+//!                 // Convert to typed dispute for compile-time state checking
+//!                 let dispute = ChargebackDispute::from_chargeback(data);
+//!
+//!                 match dispute {
+//!                     ChargebackDispute::Active(ActiveDispute::First(first)) => {
+//!                         // Can only call represent() or accept_liability() here
+//!                         println!("New chargeback: {}", first.id());
+//!                     }
+//!                     _ => {}
+//!                 }
+//!             }
+//!             ChargebackEvent::Won { chargeback_id, .. } => {
+//!                 println!("Won dispute: {}", chargeback_id);
+//!             }
+//!             ChargebackEvent::Lost { chargeback_id, .. } => {
+//!                 println!("Lost dispute: {}", chargeback_id);
+//!             }
+//!             _ => {}
+//!         }
+//!     }
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! See the `examples/webhook_dispute_handler.rs` example for a complete
+//! implementation with decision logic.
 
 pub mod events;
 pub mod logging;
