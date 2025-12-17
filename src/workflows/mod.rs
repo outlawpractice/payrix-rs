@@ -11,6 +11,7 @@
 //! # Available Workflows
 //!
 //! - [`merchant_onboarding`] - Onboard new merchants with business info, bank accounts, and owners
+//! - [`dispute_handling`] - Handle chargeback disputes with compile-time state enforcement
 //!
 //! # Example
 //!
@@ -30,6 +31,7 @@
 //! # }
 //! ```
 
+pub mod dispute_handling;
 pub mod merchant_onboarding;
 
 // Re-export key types for convenience
@@ -37,4 +39,13 @@ pub use merchant_onboarding::{
     check_boarding_status, onboard_merchant, Address, BankAccountInfo, BoardingStatus,
     BoardingStatusResult, BusinessInfo, MemberInfo, MerchantConfig, OnboardMerchantRequest,
     OnboardMerchantResult, TermsAcceptance,
+};
+
+// Re-export dispute handling types
+pub use dispute_handling::{
+    ActiveDispute, Arbitration, ChargebackDispute, ChargebackState, Evidence, EvidenceDocument,
+    First, PreArbitration, Representment, Retrieval, SecondChargeback, Terminal, TypedChargeback,
+    evidence_from_base64_url, evidence_from_bytes, evidence_from_path,
+    get_actionable_disputes, get_disputes_by_cycle, get_disputes_for_transaction,
+    MAX_DOCUMENTS, MAX_DOCUMENT_SIZE, MAX_TOTAL_SIZE,
 };

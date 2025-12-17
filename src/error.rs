@@ -82,6 +82,14 @@ pub enum Error {
     /// Invalid configuration
     #[error("Configuration error: {0}")]
     Config(String),
+
+    /// Validation error - invalid input parameters
+    #[error("Validation error: {0}")]
+    Validation(String),
+
+    /// IO error - file operations failed
+    #[error("IO error: {0}")]
+    Io(String),
 }
 
 fn format_api_errors(errors: &[PayrixApiError]) -> String {

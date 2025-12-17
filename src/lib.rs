@@ -134,3 +134,9 @@ pub use workflows::merchant_onboarding::{
     BoardingStatus, BoardingStatusResult, BusinessInfo, MemberInfo, MerchantConfig,
     OnboardMerchantRequest, OnboardMerchantResult, TermsAcceptance,
 };
+
+// Re-export dispute handling types for convenience
+pub use workflows::dispute_handling::{
+    ActiveDispute, ChargebackDispute, ChargebackState, Evidence, EvidenceDocument,
+    TypedChargeback, get_actionable_disputes,
+};
