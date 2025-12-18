@@ -352,140 +352,264 @@ fn test_customers_reference_valid_merchant() {
 #[test]
 fn test_deserialize_transactions_expanded() {
     if !fixture_exists("transactions_expanded") {
-        println!("SKIP: transactions_expanded.json not found");
-        println!("Run: cargo test --test collect_mock_data collect_transactions_expanded -- --ignored");
+        eprintln!("SKIP: transactions_expanded.json not found");
+        eprintln!("Run: cargo test --test collect_mock_data collect_transactions_expanded -- --ignored");
         return;
     }
 
     let transactions: Vec<TransactionExpanded> = load_fixture("transactions_expanded");
-
-    assert!(!transactions.is_empty(), "Should have loaded expanded transactions");
-    println!(
-        "Successfully deserialized {} expanded transactions",
-        transactions.len()
-    );
+    assert!(!transactions.is_empty(), "Fixture should contain transactions");
 
     for txn in &transactions {
+        // Validate ID format
         assert!(
             txn.id.as_str().starts_with("t1_txn_"),
-            "Transaction ID should have correct prefix: {}",
+            "Transaction ID should have t1_txn_ prefix: {}",
             txn.id
         );
 
-        // Test convenience methods work
-        let amount = txn.amount_dollars();
-        println!(
-            "  Transaction {}: ${:.2}, approved={}, payment={}",
-            txn.id,
-            amount,
-            txn.is_approved(),
-            txn.payment_display().unwrap_or_else(|| "N/A".to_string())
-        );
-
-        // Verify expanded payment field is an object (not just an ID)
+        // Verify payment expansion contains expected fields (not just presence)
         if let Some(ref payment) = txn.payment {
-            // Payment should have been expanded - check it has method field
+            assert!(payment.method.is_some(), "Payment should have method");
+            // Payment display should work when payment is present
             assert!(
-                payment.method.is_some(),
-                "Expanded payment should have method field"
+                txn.payment_display().is_some(),
+                "payment_display() should return Some when payment exists"
             );
         }
+
+        // Verify merchant is a PayrixId (not expanded object) - this was a bug we fixed
+        if let Some(ref merchant) = txn.merchant {
+            assert!(
+                merchant.as_str().starts_with("t1_mer_"),
+                "Merchant should be an ID with t1_mer_ prefix, got: {}",
+                merchant.as_str()
+            );
+        }
+
+        // Verify token expansion structure
+        if let Some(ref token) = txn.token {
+            assert!(
+                token.id.as_str().starts_with("t1_tok_"),
+                "Token ID should have t1_tok_ prefix"
+            );
+            // Customer in token should be ID, not expanded
+            if let Some(ref customer) = token.customer {
+                assert!(
+                    customer.as_str().starts_with("t1_cus_"),
+                    "Token's customer should be an ID, got: {}",
+                    customer.as_str()
+                );
+            }
+        }
+
+        // Verify amount is non-negative
+        assert!(
+            txn.amount_dollars() >= 0.0,
+            "Amount should not be negative"
+        );
     }
 }
 
 #[test]
 fn test_transaction_expanded_convenience_methods() {
     if !fixture_exists("transactions_expanded") {
-        println!("SKIP: transactions_expanded.json not found");
+        eprintln!("SKIP: transactions_expanded.json not found");
         return;
     }
 
-    let txn: TransactionExpanded = load_single_fixture("transactions_expanded");
+    let transactions: Vec<TransactionExpanded> = load_fixture("transactions_expanded");
+    assert!(!transactions.is_empty(), "Fixture should contain transactions");
 
-    // Test all convenience methods don't panic
-    let _ = txn.amount_dollars();
-    let _ = txn.approved_dollars();
-    let _ = txn.payment_display();
-    let _ = txn.customer_name();
-    let _ = txn.customer_id();
-    let _ = txn.is_approved();
+    for txn in &transactions {
+        // amount_dollars should match total / 100
+        if let Some(total) = txn.total {
+            let expected = total as f64 / 100.0;
+            let actual = txn.amount_dollars();
+            assert!(
+                (actual - expected).abs() < 0.001,
+                "amount_dollars() should be total/100: expected {}, got {}",
+                expected,
+                actual
+            );
+        }
 
-    println!("All TransactionExpanded convenience methods work");
+        // approved_dollars should match approved / 100
+        if let Some(approved) = txn.approved {
+            let expected = approved as f64 / 100.0;
+            let actual = txn.approved_dollars();
+            assert!(
+                (actual - expected).abs() < 0.001,
+                "approved_dollars() should be approved/100"
+            );
+        }
+
+        // is_approved should be consistent with status
+        match txn.status {
+            Some(payrix::TransactionStatus::Captured) => {
+                assert!(txn.is_approved(), "Captured status should mean is_approved()");
+            }
+            Some(payrix::TransactionStatus::Failed) => {
+                assert!(!txn.is_approved(), "Failed status should mean !is_approved()");
+            }
+            _ => {} // Other statuses - no assertion
+        }
+
+        // customer_name should return None if first/last are both empty
+        let has_name = txn.first.is_some() || txn.last.is_some();
+        if !has_name {
+            assert!(
+                txn.customer_name().is_none(),
+                "customer_name() should be None when no name fields"
+            );
+        }
+    }
 }
 
 #[test]
-fn test_deserialize_customers_expanded() {
-    if !fixture_exists("customers_expanded") {
-        println!("SKIP: customers_expanded.json not found");
-        println!("Run: cargo test --test collect_mock_data collect_customers_expanded -- --ignored");
-        return;
-    }
-
-    let customers: Vec<CustomerExpanded> = load_fixture("customers_expanded");
-
-    assert!(!customers.is_empty(), "Should have loaded expanded customers");
-    println!(
-        "Successfully deserialized {} expanded customers",
-        customers.len()
-    );
-
-    for customer in &customers {
-        assert!(
-            customer.id.as_str().starts_with("t1_cus_"),
-            "Customer ID should have correct prefix: {}",
-            customer.id
-        );
-
-        // Check if tokens were expanded
-        let token_count = customer.tokens.as_ref().map(|t| t.len()).unwrap_or(0);
-        println!(
-            "  Customer {}: {} {}, {} tokens",
-            customer.id,
-            customer.first.as_deref().unwrap_or("?"),
-            customer.last.as_deref().unwrap_or("?"),
-            token_count
-        );
-    }
-}
-
-#[test]
-fn test_expanded_transactions_have_nested_expansions() {
+fn test_transaction_expanded_date_fields() {
     if !fixture_exists("transactions_expanded") {
-        println!("SKIP: transactions_expanded.json not found");
+        eprintln!("SKIP: transactions_expanded.json not found");
         return;
     }
 
     let transactions: Vec<TransactionExpanded> = load_fixture("transactions_expanded");
 
-    let mut has_payment = false;
-    let mut has_token = false;
-    let mut has_customer = false;
+    let mut has_funded = false;
+    let mut has_settled = false;
 
     for txn in &transactions {
-        if txn.payment.is_some() {
-            has_payment = true;
+        // funded is Option<i32> - should be YYYYMMDD format if present
+        if let Some(funded) = txn.funded {
+            has_funded = true;
+            assert!(
+                funded >= 20000101 && funded <= 20991231,
+                "funded should be valid YYYYMMDD date: {}",
+                funded
+            );
         }
-        if txn.token.is_some() {
-            has_token = true;
-            // Check nested customer in token
-            if let Some(ref token) = txn.token {
-                if token.customer.is_some() {
-                    has_customer = true;
-                }
-            }
+
+        // settled is Option<String> via deserialize_string_or_int
+        if let Some(ref settled) = txn.settled {
+            has_settled = true;
+            // Should be parseable as a date (either YYYYMMDD or timestamp)
+            assert!(
+                !settled.is_empty(),
+                "settled should not be empty string"
+            );
         }
     }
 
-    println!(
-        "Expansion coverage: payment={}, token={}, nested_customer={}",
-        has_payment, has_token, has_customer
-    );
+    // Log coverage for debugging fixture quality
+    if !has_funded && !has_settled {
+        eprintln!("WARNING: No transactions have funded or settled dates");
+    }
+}
 
-    // At least payment should be expanded in most transactions
+#[test]
+fn test_deserialize_customers_expanded() {
+    if !fixture_exists("customers_expanded") {
+        eprintln!("SKIP: customers_expanded.json not found");
+        eprintln!("Run: cargo test --test collect_mock_data collect_customers_expanded -- --ignored");
+        return;
+    }
+
+    let customers: Vec<CustomerExpanded> = load_fixture("customers_expanded");
+    assert!(!customers.is_empty(), "Fixture should contain customers");
+
+    for customer in &customers {
+        // Validate ID format
+        assert!(
+            customer.id.as_str().starts_with("t1_cus_"),
+            "Customer ID should have t1_cus_ prefix: {}",
+            customer.id
+        );
+
+        // Validate expanded tokens if present
+        if let Some(ref tokens) = customer.tokens {
+            for token in tokens {
+                assert!(
+                    token.id.as_str().starts_with("t1_tok_"),
+                    "Token ID should have t1_tok_ prefix: {}",
+                    token.id
+                );
+
+                // Token's payment should be expanded if present
+                if let Some(ref payment) = token.payment {
+                    assert!(
+                        payment.method.is_some() || payment.bin.is_some(),
+                        "Expanded payment should have at least method or bin"
+                    );
+                }
+
+                // Token's customer should be an ID (not expanded)
+                if let Some(ref cust_id) = token.customer {
+                    assert!(
+                        cust_id.as_str().starts_with("t1_cus_"),
+                        "Token's customer should be ID with t1_cus_ prefix"
+                    );
+                }
+            }
+        }
+
+        // Verify merchant is an ID if present
+        if let Some(ref merchant) = customer.merchant {
+            assert!(
+                merchant.as_str().starts_with("t1_mer_"),
+                "Customer's merchant should be ID with t1_mer_ prefix"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_expanded_transactions_have_expected_expansions() {
+    if !fixture_exists("transactions_expanded") {
+        eprintln!("SKIP: transactions_expanded.json not found");
+        return;
+    }
+
+    let transactions: Vec<TransactionExpanded> = load_fixture("transactions_expanded");
+    assert!(!transactions.is_empty(), "Fixture should contain transactions");
+
+    let mut payment_count = 0;
+    let mut token_count = 0;
+    let mut customer_in_token_count = 0;
+    let mut merchant_count = 0;
+
+    for txn in &transactions {
+        if txn.payment.is_some() {
+            payment_count += 1;
+        }
+        if let Some(ref token) = txn.token {
+            token_count += 1;
+            if token.customer.is_some() {
+                customer_in_token_count += 1;
+            }
+        }
+        if txn.merchant.is_some() {
+            merchant_count += 1;
+        }
+    }
+
+    let total = transactions.len();
+
+    // Payment should be expanded in most/all transactions
     assert!(
-        has_payment,
+        payment_count > 0,
         "At least one transaction should have expanded payment"
     );
+
+    // Log expansion coverage for fixture quality assessment
+    eprintln!(
+        "Expansion coverage ({} transactions): payment={}, token={}, customer_in_token={}, merchant={}",
+        total, payment_count, token_count, customer_in_token_count, merchant_count
+    );
+
+    // Warn if coverage is low (but don't fail - depends on test data)
+    if payment_count < total / 2 {
+        eprintln!("WARNING: Less than 50% of transactions have payment expansion");
+    }
 }
 
 // =============================================================================
