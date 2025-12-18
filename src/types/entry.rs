@@ -4,6 +4,7 @@
 //!
 //! **OpenAPI schema:** `entriesResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -246,13 +247,15 @@ pub enum EventType {
 /// **OpenAPI schema:** `entriesResponse`
 ///
 /// See API_INCONSISTENCIES.md for known deviations from this spec.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PayrixEntity)]
+#[payrix(update = UpdateEntry)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Entry {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -260,6 +263,7 @@ pub struct Entry {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -268,18 +272,21 @@ pub struct Entry {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: creator)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
@@ -407,6 +414,7 @@ pub struct Entry {
     /// A description of this Entry.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub description: Option<String>,
 

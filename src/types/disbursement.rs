@@ -211,38 +211,50 @@ pub struct Disbursement {
     /// The last negative Entry processed included in the disbursement.
     ///
     /// **OpenAPI type:** string (ref: disbursementsModelLastNegativeEntry)
+    ///
+    /// NOTE: API returns "0" or "1" (boolean) when no entry exists, not a proper ID.
     #[serde(default)]
-    pub last_negative_entry: Option<PayrixId>,
+    pub last_negative_entry: Option<String>,
 
     /// The last negative PendingEntry processed included in the disbursement.
     ///
     /// **OpenAPI type:** string (ref: disbursementsModelLastNegativePendingEntry)
+    ///
+    /// NOTE: API returns "0" or "1" (boolean) when no entry exists, not a proper ID.
     #[serde(default)]
-    pub last_negative_pending_entry: Option<PayrixId>,
+    pub last_negative_pending_entry: Option<String>,
 
     /// The last positive ReserveEntry processed included in the disbursement.
     ///
     /// **OpenAPI type:** string (ref: disbursementsModelLastPositiveReserveEntry)
+    ///
+    /// NOTE: API returns "0" or "1" (boolean) when no entry exists, not a proper ID.
     #[serde(default)]
-    pub last_positive_reserve_entry: Option<PayrixId>,
+    pub last_positive_reserve_entry: Option<String>,
 
     /// The last positive Entry processed included in the disbursement.
     ///
     /// **OpenAPI type:** string (ref: disbursementsModelLastPositiveEntry)
+    ///
+    /// NOTE: API returns "0" or "1" (boolean) when no entry exists, not a proper ID.
     #[serde(default)]
-    pub last_positive_entry: Option<PayrixId>,
+    pub last_positive_entry: Option<String>,
 
     /// The last positive PendingEntry processed included in the disbursement.
     ///
     /// **OpenAPI type:** string (ref: disbursementsModelLastPositivePendingEntry)
+    ///
+    /// NOTE: API returns "0" or "1" (boolean) when no entry exists, not a proper ID.
     #[serde(default)]
-    pub last_positive_pending_entry: Option<PayrixId>,
+    pub last_positive_pending_entry: Option<String>,
 
     /// The last negative ReserveEntry processed included in the disbursement.
     ///
     /// **OpenAPI type:** string (ref: disbursementsModelLastNegativeReserveEntry)
+    ///
+    /// NOTE: API returns "0" or "1" (boolean) when no entry exists, not a proper ID.
     #[serde(default)]
-    pub last_negative_reserve_entry: Option<PayrixId>,
+    pub last_negative_reserve_entry: Option<String>,
 
     /// The currency of this Disbursement.
     ///

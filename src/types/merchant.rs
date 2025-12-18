@@ -4,6 +4,7 @@
 //!
 //! **OpenAPI schema:** `merchantsResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -245,7 +246,8 @@ pub enum ExpressBatchCloseMethod {
 /// **OpenAPI schema:** `merchantsResponse`
 ///
 /// See `API_INCONSISTENCIES.md` for known deviations from this spec.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateMerchant, update = UpdateMerchant)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Merchant {
@@ -256,6 +258,7 @@ pub struct Merchant {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -263,6 +266,7 @@ pub struct Merchant {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -271,18 +275,21 @@ pub struct Merchant {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: `creator`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
@@ -303,12 +310,14 @@ pub struct Merchant {
     /// The Entity associated with this Merchant.
     ///
     /// **OpenAPI type:** string (ref: `merchantsModelEntity`)
+    #[payrix(create_only)]
     #[serde(default)]
     pub entity: Option<PayrixId>,
 
     /// Login ID associated with this merchant.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only)]
     #[serde(default)]
     pub login: Option<PayrixId>,
 
@@ -321,6 +330,7 @@ pub struct Merchant {
     /// This field is stored as a text string and must be between 0 and 50 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub dba: Option<String>,
 
@@ -480,6 +490,7 @@ pub struct Merchant {
     /// The environment which the Merchant is in, if applicable.
     ///
     /// **OpenAPI type:** string (ref: `merchantEnvironment`)
+    #[payrix(mutable)]
     #[serde(default)]
     pub environment: Option<MerchantEnvironment>,
 
@@ -646,6 +657,7 @@ pub struct Merchant {
     /// Notification Email for chargebacks.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub chargeback_notification_email: Option<String>,
 
@@ -758,6 +770,7 @@ pub struct Merchant {
     /// Valid values:
     /// - `0` - Active
     /// - `1` - Inactive
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
@@ -768,6 +781,7 @@ pub struct Merchant {
     /// Valid values:
     /// - `0` - Not Frozen
     /// - `1` - Frozen
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }

@@ -4,6 +4,7 @@
 //!
 //! **OpenAPI schema:** `feesResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 
 use super::{bool_from_int_default_false, FeeCollection, FeeSchedule, FeeType, FeeUnit, PayrixId};
@@ -19,13 +20,15 @@ use super::{bool_from_int_default_false, FeeCollection, FeeSchedule, FeeType, Fe
 /// **OpenAPI schema:** `feesResponse`
 ///
 /// See API_INCONSISTENCIES.md for known deviations from this spec.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateFee, update = UpdateFee)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Fee {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -33,6 +36,7 @@ pub struct Fee {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -41,24 +45,28 @@ pub struct Fee {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: creator)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
     /// The identifier of the Entity that will charge this Fee.
     ///
     /// **OpenAPI type:** string (ref: feesModelEntity)
+    #[payrix(create_only)]
     #[serde(default)]
     pub entity: Option<PayrixId>,
 
@@ -100,6 +108,7 @@ pub struct Fee {
     /// This field is stored as a text string (0-100 characters).
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub name: Option<String>,
 
@@ -108,6 +117,7 @@ pub struct Fee {
     /// This field is stored as a text string (0-100 characters).
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub description: Option<String>,
 
@@ -229,6 +239,7 @@ pub struct Fee {
     /// - `1` - Inactive
     ///
     /// **OpenAPI type:** integer (ref: Inactive)
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
@@ -238,6 +249,7 @@ pub struct Fee {
     /// - `1` - Frozen
     ///
     /// **OpenAPI type:** integer (ref: Frozen)
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 

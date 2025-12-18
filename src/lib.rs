@@ -14,7 +14,7 @@
 //! ## Quick Start
 //!
 //! ```no_run
-//! use payrix::{PayrixClient, Environment, EntityType, Customer, NewCustomer};
+//! use payrix::{PayrixClient, Environment, EntityType, Customer, CreateCustomer};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), payrix::Error> {
@@ -30,8 +30,8 @@
 //!     // Create a new customer
 //!     let new_customer: Customer = client.create(
 //!         EntityType::Customers,
-//!         &NewCustomer {
-//!             merchant: "t1_mer_12345678901234567890123".to_string(),
+//!         &CreateCustomer {
+//!             merchant: Some("t1_mer_12345678901234567890123".parse().unwrap()),
 //!             first: Some("John".to_string()),
 //!             last: Some("Doe".to_string()),
 //!             ..Default::default()
@@ -134,7 +134,8 @@ pub use types::*;
 
 // Re-export for convenience
 pub use types::{
-    Customer, Entity, Merchant, NewCustomer, NewToken, NewTransaction, Token, Transaction,
+    CreateCustomer, CreateToken, CreateTransaction, Customer, Entity, Merchant, Token, Transaction,
+    UpdateCustomer,
 };
 
 // Re-export workflow types for convenience

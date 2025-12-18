@@ -5,9 +5,10 @@
 //!
 //! **OpenAPI schema:** `customersResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 
-use super::{bool_from_int_default_false, option_bool_from_int, PayrixId, Token};
+use super::{bool_from_int_default_false, PayrixId, Token};
 
 // =============================================================================
 // Customer (Response)
@@ -21,17 +22,19 @@ use super::{bool_from_int_default_false, option_bool_from_int, PayrixId, Token};
 /// **OpenAPI schema:** `customersResponse`
 ///
 /// See `API_INCONSISTENCIES.md` for known deviations from this spec.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateCustomer, update = UpdateCustomer)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Customer {
     // -------------------------------------------------------------------------
-    // Core Identifiers
+    // Core Identifiers (readonly)
     // -------------------------------------------------------------------------
 
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -39,6 +42,7 @@ pub struct Customer {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -47,24 +51,28 @@ pub struct Customer {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: `creator`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
     /// The ID of the Login that owns this resource.
     ///
     /// **OpenAPI type:** string (ref: `customersModelLogin`)
+    #[payrix(create_only)]
     #[serde(default)]
     pub login: Option<PayrixId>,
 
@@ -73,50 +81,57 @@ pub struct Customer {
     /// **OpenAPI type:** string (ref: `customersModelMerchant`)
     ///
     /// Note: API may return null for some customers.
+    #[payrix(create_only)]
     #[serde(default)]
     pub merchant: Option<PayrixId>,
 
     /// The ID of the Entity that owns this resource.
     ///
     /// **OpenAPI type:** string (ref: `customersModelEntity`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub entity: Option<PayrixId>,
 
     // -------------------------------------------------------------------------
-    // Customer Name & Company
+    // Customer Name & Company (mutable)
     // -------------------------------------------------------------------------
 
     /// The first name associated with this Customer.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub first: Option<String>,
 
     /// The middle name associated with this Customer.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub middle: Option<String>,
 
     /// The last name associated with this Customer.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub last: Option<String>,
 
     /// The name of the company associated with this Customer.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub company: Option<String>,
 
     // -------------------------------------------------------------------------
-    // Contact Information
+    // Contact Information (mutable)
     // -------------------------------------------------------------------------
 
     /// The email address of this Customer.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub email: Option<String>,
 
@@ -125,6 +140,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 10 and 15 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub phone: Option<String>,
 
@@ -133,11 +149,12 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 10 and 15 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub fax: Option<String>,
 
     // -------------------------------------------------------------------------
-    // Billing Address
+    // Billing Address (mutable)
     // -------------------------------------------------------------------------
 
     /// The first line of the address associated with this Customer.
@@ -145,6 +162,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 1 and 500 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub address1: Option<String>,
 
@@ -153,6 +171,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 1 and 500 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub address2: Option<String>,
 
@@ -161,6 +180,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 1 and 500 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub city: Option<String>,
 
@@ -173,6 +193,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 2 and 100 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub state: Option<String>,
 
@@ -181,6 +202,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 1 and 20 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub zip: Option<String>,
 
@@ -190,34 +212,39 @@ pub struct Customer {
     /// (e.g., `USA`, `CAN`).
     ///
     /// **OpenAPI type:** string (ref: `Country`)
+    #[payrix(mutable)]
     #[serde(default)]
     pub country: Option<String>,
 
     // -------------------------------------------------------------------------
-    // Shipping Address
+    // Shipping Address (mutable)
     // -------------------------------------------------------------------------
 
     /// The first name associated with this Customer's shipping information.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_first: Option<String>,
 
     /// The middle name associated with this Customer's shipping information.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_middle: Option<String>,
 
     /// The last name associated with this Customer's shipping information.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_last: Option<String>,
 
     /// The name of the company associated with this Customer's shipping information.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_company: Option<String>,
 
@@ -226,6 +253,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 1 and 500 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_address1: Option<String>,
 
@@ -234,6 +262,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 1 and 500 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_address2: Option<String>,
 
@@ -242,6 +271,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 1 and 500 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_city: Option<String>,
 
@@ -254,6 +284,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 2 and 100 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_state: Option<String>,
 
@@ -262,6 +293,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 1 and 20 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_zip: Option<String>,
 
@@ -271,6 +303,7 @@ pub struct Customer {
     /// (e.g., `USA`, `CAN`).
     ///
     /// **OpenAPI type:** string (ref: `ShippingCountry`)
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_country: Option<String>,
 
@@ -279,6 +312,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 10 and 15 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_phone: Option<String>,
 
@@ -287,6 +321,7 @@ pub struct Customer {
     /// This field is stored as a text string and must be between 10 and 15 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub shipping_fax: Option<String>,
 
@@ -300,17 +335,19 @@ pub struct Customer {
     /// Use this to store your application's ID for this contact.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub custom: Option<String>,
 
     /// The customer reference from the authToken used for user authentication, if available.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub auth_token_customer: Option<String>,
 
     // -------------------------------------------------------------------------
-    // Status Flags
+    // Status Flags (mutable)
     // -------------------------------------------------------------------------
 
     /// Whether this resource is marked as frozen.
@@ -320,6 +357,7 @@ pub struct Customer {
     /// Valid values:
     /// - `0` - Not Frozen
     /// - `1` - Frozen
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 
@@ -330,6 +368,7 @@ pub struct Customer {
     /// Valid values:
     /// - `0` - Active
     /// - `1` - Inactive
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
@@ -356,233 +395,55 @@ pub struct Customer {
     pub tokens: Option<Vec<Token>>,
 }
 
-// =============================================================================
-// NewCustomer (Request)
-// =============================================================================
+// Helper methods for CreateCustomer
+impl CreateCustomer {
+    /// Create a new customer for a merchant with minimal info.
+    pub fn new(merchant: impl Into<PayrixId>) -> Self {
+        Self {
+            merchant: Some(merchant.into()),
+            ..Default::default()
+        }
+    }
 
-/// Request to create a new customer.
-///
-/// **OpenAPI schema:** `customersRequest` (POST /customers)
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewCustomer {
-    /// The ID of the Merchant associated with this Customer.
-    ///
-    /// **Required.**
-    ///
-    /// **OpenAPI type:** string
-    pub merchant: String,
+    /// Set the customer's name.
+    pub fn with_name(mut self, first: impl Into<String>, last: impl Into<String>) -> Self {
+        self.first = Some(first.into());
+        self.last = Some(last.into());
+        self
+    }
 
-    /// The ID of the Login that owns this resource.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub login: Option<String>,
+    /// Set the customer's email.
+    pub fn with_email(mut self, email: impl Into<String>) -> Self {
+        self.email = Some(email.into());
+        self
+    }
 
-    /// The first name associated with this Customer.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub first: Option<String>,
+    /// Set the customer's phone number.
+    pub fn with_phone(mut self, phone: impl Into<String>) -> Self {
+        self.phone = Some(phone.into());
+        self
+    }
 
-    /// The middle name associated with this Customer.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub middle: Option<String>,
+    /// Set the billing address.
+    pub fn with_address(
+        mut self,
+        address1: impl Into<String>,
+        city: impl Into<String>,
+        state: impl Into<String>,
+        zip: impl Into<String>,
+    ) -> Self {
+        self.address1 = Some(address1.into());
+        self.city = Some(city.into());
+        self.state = Some(state.into());
+        self.zip = Some(zip.into());
+        self
+    }
 
-    /// The last name associated with this Customer.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last: Option<String>,
-
-    /// The name of the company associated with this Customer.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub company: Option<String>,
-
-    /// The email address of this Customer.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub email: Option<String>,
-
-    /// The phone number associated with this Customer.
-    ///
-    /// This field must be between 10 and 15 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub phone: Option<String>,
-
-    /// The fax number associated with this Customer.
-    ///
-    /// This field must be between 10 and 15 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fax: Option<String>,
-
-    /// The first line of the address associated with this Customer.
-    ///
-    /// This field must be between 1 and 500 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub address1: Option<String>,
-
-    /// The second line of the address associated with this Customer.
-    ///
-    /// This field must be between 1 and 500 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub address2: Option<String>,
-
-    /// The name of the city in the address associated with this Customer.
-    ///
-    /// This field must be between 1 and 500 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub city: Option<String>,
-
-    /// The U.S. state or Canadian province relevant to the address.
-    ///
-    /// Use 2-character postal abbreviation for U.S./Canada, or full state name otherwise.
-    /// This field must be between 2 and 100 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub state: Option<String>,
-
-    /// The ZIP code in the address associated with this Customer.
-    ///
-    /// This field must be between 1 and 20 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub zip: Option<String>,
-
-    /// The country associated with this Customer.
-    ///
-    /// Use the 3-letter ISO code (e.g., `USA`, `CAN`).
-    ///
-    /// **OpenAPI type:** string (ref: `Country`)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub country: Option<String>,
-
-    /// The first name associated with this Customer's shipping information.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_first: Option<String>,
-
-    /// The middle name associated with this Customer's shipping information.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_middle: Option<String>,
-
-    /// The last name associated with this Customer's shipping information.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_last: Option<String>,
-
-    /// The name of the company associated with this Customer's shipping information.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_company: Option<String>,
-
-    /// The first line of the address associated with this Customer's shipping information.
-    ///
-    /// This field must be between 1 and 500 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_address1: Option<String>,
-
-    /// The second line of the address associated with this Customer's shipping information.
-    ///
-    /// This field must be between 1 and 500 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_address2: Option<String>,
-
-    /// The name of the city associated with this Customer's shipping information.
-    ///
-    /// This field must be between 1 and 500 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_city: Option<String>,
-
-    /// The U.S. state or Canadian province relevant to the shipping address.
-    ///
-    /// Use 2-character postal abbreviation for U.S./Canada, or full state name otherwise.
-    /// This field must be between 2 and 100 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_state: Option<String>,
-
-    /// The ZIP code associated with this Customer's shipping information.
-    ///
-    /// This field must be between 1 and 20 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_zip: Option<String>,
-
-    /// The country associated with this Customer's shipping information.
-    ///
-    /// Use the 3-letter ISO code (e.g., `USA`, `CAN`).
-    ///
-    /// **OpenAPI type:** string (ref: `ShippingCountry`)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_country: Option<String>,
-
-    /// The phone number associated with this Customer's shipping information.
-    ///
-    /// This field must be between 10 and 15 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_phone: Option<String>,
-
-    /// The fax number associated with this Customer's shipping information.
-    ///
-    /// This field must be between 10 and 15 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shipping_fax: Option<String>,
-
-    /// Custom, free-form field for client-supplied text.
-    ///
-    /// Must be between 0 and 1,000 characters long.
-    /// Use this to store your application's ID for this contact.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
-
-    /// Whether this resource is marked as inactive.
-    ///
-    /// **OpenAPI type:** integer (`0` = Active, `1` = Inactive)
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub inactive: Option<bool>,
-
-    /// Whether this resource is marked as frozen.
-    ///
-    /// **OpenAPI type:** integer (`0` = Not Frozen, `1` = Frozen)
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub frozen: Option<bool>,
+    /// Set a custom identifier for your application.
+    pub fn with_custom(mut self, custom: impl Into<String>) -> Self {
+        self.custom = Some(custom.into());
+        self
+    }
 }
 
 // =============================================================================
@@ -815,124 +676,39 @@ mod tests {
     }
 
     // =========================================================================
-    // NewCustomer Tests
+    // CreateCustomer Tests
     // =========================================================================
 
     #[test]
-    fn new_customer_serialize_full() {
-        let new_customer = NewCustomer {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            login: Some("t1_lgn_12345678901234567890123".to_string()),
-            first: Some("John".to_string()),
-            middle: Some("Q".to_string()),
-            last: Some("Doe".to_string()),
-            company: Some("Acme Corp".to_string()),
-            email: Some("john.doe@example.com".to_string()),
-            phone: Some("5551234567".to_string()),
-            fax: Some("5559876543".to_string()),
-            address1: Some("123 Main St".to_string()),
-            address2: Some("Suite 100".to_string()),
-            city: Some("Springfield".to_string()),
-            state: Some("IL".to_string()),
-            zip: Some("62701".to_string()),
-            country: Some("USA".to_string()),
-            shipping_first: Some("Jane".to_string()),
-            shipping_middle: Some("R".to_string()),
-            shipping_last: Some("Smith".to_string()),
-            shipping_company: Some("Shipping Co".to_string()),
-            shipping_address1: Some("456 Oak Ave".to_string()),
-            shipping_address2: Some("Apt 5".to_string()),
-            shipping_city: Some("Chicago".to_string()),
-            shipping_state: Some("IL".to_string()),
-            shipping_zip: Some("60601".to_string()),
-            shipping_country: Some("USA".to_string()),
-            shipping_phone: Some("5551111111".to_string()),
-            shipping_fax: Some("5552222222".to_string()),
-            custom: Some("my-app-customer-id".to_string()),
-            inactive: Some(false),
-            frozen: Some(true),
-        };
+    fn create_customer_serialize_with_builder() {
+        let merchant_id: PayrixId = "t1_mer_12345678901234567890123".parse().unwrap();
+        let create = CreateCustomer::new(merchant_id)
+            .with_name("John", "Doe")
+            .with_email("john.doe@example.com")
+            .with_address("123 Main St", "Springfield", "IL", "62701");
 
-        let json = serde_json::to_string(&new_customer).unwrap();
+        let json = serde_json::to_string(&create).unwrap();
 
-        assert!(json.contains("\"merchant\":\"t1_mer_12345678901234567890123\""));
-        assert!(json.contains("\"first\":\"John\""));
-        assert!(json.contains("\"last\":\"Doe\""));
-        assert!(json.contains("\"email\":\"john.doe@example.com\""));
-        assert!(json.contains("\"shippingFirst\":\"Jane\""));
-        assert!(json.contains("\"shippingCity\":\"Chicago\""));
-        assert!(json.contains("\"custom\":\"my-app-customer-id\""));
-        assert!(json.contains("\"inactive\":0"));
-        assert!(json.contains("\"frozen\":1"));
+        assert!(json.contains("\"merchant\""));
+        assert!(json.contains("\"first\""));
+        assert!(json.contains("\"last\""));
+        assert!(json.contains("\"email\""));
+        assert!(json.contains("\"address1\""));
+        assert!(json.contains("\"city\""));
+        assert!(json.contains("\"state\""));
+        assert!(json.contains("\"zip\""));
     }
 
     #[test]
-    fn new_customer_serialize_minimal() {
-        let new_customer = NewCustomer {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            ..Default::default()
-        };
+    fn create_customer_serialize_minimal() {
+        let merchant_id: PayrixId = "t1_mer_12345678901234567890123".parse().unwrap();
+        let create = CreateCustomer::new(merchant_id);
 
-        let json = serde_json::to_string(&new_customer).unwrap();
+        let json = serde_json::to_string(&create).unwrap();
 
-        assert!(json.contains("\"merchant\":\"t1_mer_12345678901234567890123\""));
-        // Optional fields should be omitted
+        assert!(json.contains("\"merchant\""));
+        // Optional fields should be omitted when None
         assert!(!json.contains("\"first\""));
         assert!(!json.contains("\"email\""));
-        assert!(!json.contains("\"inactive\""));
-        assert!(!json.contains("\"frozen\""));
-        assert!(!json.contains("\"shippingFirst\""));
-    }
-
-    #[test]
-    fn new_customer_option_bool_to_int_true() {
-        let new_customer = NewCustomer {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            inactive: Some(true),
-            frozen: Some(true),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_customer).unwrap();
-        assert!(json.contains("\"inactive\":1"));
-        assert!(json.contains("\"frozen\":1"));
-    }
-
-    #[test]
-    fn new_customer_option_bool_to_int_false() {
-        let new_customer = NewCustomer {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            inactive: Some(false),
-            frozen: Some(false),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_customer).unwrap();
-        assert!(json.contains("\"inactive\":0"));
-        assert!(json.contains("\"frozen\":0"));
-    }
-
-    #[test]
-    fn new_customer_with_shipping_fields() {
-        let new_customer = NewCustomer {
-            merchant: "t1_mer_12345678901234567890123".to_string(),
-            shipping_first: Some("Jane".to_string()),
-            shipping_last: Some("Doe".to_string()),
-            shipping_address1: Some("789 Elm St".to_string()),
-            shipping_city: Some("New York".to_string()),
-            shipping_state: Some("NY".to_string()),
-            shipping_zip: Some("10001".to_string()),
-            shipping_country: Some("USA".to_string()),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_customer).unwrap();
-        assert!(json.contains("\"shippingFirst\":\"Jane\""));
-        assert!(json.contains("\"shippingLast\":\"Doe\""));
-        assert!(json.contains("\"shippingAddress1\":\"789 Elm St\""));
-        assert!(json.contains("\"shippingCity\":\"New York\""));
-        assert!(json.contains("\"shippingState\":\"NY\""));
-        assert!(json.contains("\"shippingZip\":\"10001\""));
-        assert!(json.contains("\"shippingCountry\":\"USA\""));
     }
 }

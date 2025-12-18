@@ -160,11 +160,14 @@ pub struct Member {
 
     /// The date of birth of this Member.
     ///
-    /// Format: YYYYMMDD (e.g., `20160120` for January 20, 2016).
+    /// Format: YYYYMMDD (e.g., `"20160120"` for January 20, 2016), or
+    /// sometimes just a year (e.g., `"1980"`).
     ///
     /// **OpenAPI type:** integer (int32)
+    ///
+    /// NOTE: API actually returns this as a string, not an integer.
     #[serde(default)]
-    pub dob: Option<i32>,
+    pub dob: Option<String>,
 
     /// The gender of this Member.
     ///
@@ -523,7 +526,7 @@ mod tests {
             "last": "Smith",
             "ssn": "123456789",
             "citizenship": "USA",
-            "dob": 19800115,
+            "dob": "19800115",
             "gender": "male",
             "dl": "D1234567",
             "dlstate": "IL",
@@ -567,7 +570,7 @@ mod tests {
         assert_eq!(member.last, Some("Smith".to_string()));
         assert_eq!(member.ssn, Some("123456789".to_string()));
         assert_eq!(member.citizenship, Some("USA".to_string()));
-        assert_eq!(member.dob, Some(19800115));
+        assert_eq!(member.dob, Some("19800115".to_string()));
         assert_eq!(member.gender, Some(Gender::Male));
         assert_eq!(member.dl, Some("D1234567".to_string()));
         assert_eq!(member.dlstate, Some("IL".to_string()));

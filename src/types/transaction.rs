@@ -8,10 +8,11 @@
 //!
 //! See API_INCONSISTENCIES.md for known deviations from this spec.
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use super::{bool_from_int_default_false, deserialize_optional_amount, deserialize_optional_i32, DateMmyy, PayrixId};
+use super::{bool_from_int_default_false, deserialize_optional_amount, deserialize_optional_i32, deserialize_string_or_int, DateMmyy, PayrixId};
 
 /// A Payrix transaction.
 ///
@@ -22,7 +23,8 @@ use super::{bool_from_int_default_false, deserialize_optional_amount, deserializ
 /// `refunded`, etc.) are in **cents**.
 ///
 /// See API_INCONSISTENCIES.md for known deviations from this spec.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateTransaction, update = UpdateTransaction)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Transaction {
@@ -31,6 +33,7 @@ pub struct Transaction {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -38,6 +41,7 @@ pub struct Transaction {
     /// Format: YYYY-MM-DD HH:MM:SS.SSSS
     ///
     /// **OpenAPI type:** string (pattern: ^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -46,30 +50,35 @@ pub struct Transaction {
     /// Format: YYYY-MM-DD HH:MM:SS.SSSS
     ///
     /// **OpenAPI type:** string (pattern: ^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: creator)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
     /// The incoming IP address from which this Transaction was created.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub ip_created: Option<String>,
 
     /// The incoming IP address from which this Transaction was last modified.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub ip_modified: Option<String>,
 
@@ -78,12 +87,14 @@ pub struct Transaction {
     /// The identifier of the Merchant associated with this Transaction.
     ///
     /// **OpenAPI type:** string (ref: txnsModelMerchant)
+    #[payrix(create_only, create_required, create_type = "String")]
     #[serde(default)]
     pub merchant: Option<PayrixId>,
 
     /// The token of the Tokens resource this Transaction is associated with.
     ///
     /// **OpenAPI type:** string (ref: txnsModelToken)
+    #[payrix(create_only)]
     #[serde(default)]
     pub token: Option<String>,
 
@@ -99,6 +110,7 @@ pub struct Transaction {
     /// identifier of the original sale Transaction.
     ///
     /// **OpenAPI type:** string (ref: txnsModelFortxn)
+    #[payrix(create_only, create_type = "String")]
     #[serde(default)]
     pub fortxn: Option<PayrixId>,
 
@@ -146,6 +158,7 @@ pub struct Transaction {
     /// - `14` - Incremental Authorization
     ///
     /// **OpenAPI type:** integer enum (txnType)
+    #[payrix(create_only, create_required)]
     #[serde(rename = "type")]
     pub txn_type: TransactionType,
 
@@ -163,6 +176,7 @@ pub struct Transaction {
     ///
     /// **API Inconsistency:** POST returns string `"1"`, GET returns integer `1`.
     /// Uses flexible deserializer to handle both.
+    #[payrix(readonly)]
     #[serde(default)]
     pub status: Option<TransactionStatus>,
 
@@ -181,6 +195,7 @@ pub struct Transaction {
     /// - `9` - In writing
     ///
     /// **OpenAPI type:** integer enum (txnOrigin)
+    #[payrix(create_only)]
     #[serde(default)]
     pub origin: Option<TransactionOrigin>,
 
@@ -206,6 +221,7 @@ pub struct Transaction {
     /// The total amount of this Transaction in **cents**.
     ///
     /// **OpenAPI type:** integer (int64)
+    #[payrix(create_only, create_required, create_type = "i64")]
     #[serde(default, deserialize_with = "deserialize_optional_amount")]
     pub total: Option<i64>,
 
@@ -288,6 +304,14 @@ pub struct Transaction {
     #[serde(default)]
     pub fee: Option<f64>,
 
+    /// Fee ID to apply to this transaction (used when creating).
+    ///
+    /// This is the ID of a Fees resource to apply to this transaction.
+    /// Only used in create requests; not returned in responses.
+    #[payrix(create_only)]
+    #[serde(rename = "fee", skip_deserializing)]
+    pub fee_id: Option<String>,
+
     /// Tip amount in **cents**.
     ///
     /// **OpenAPI type:** integer (int64)
@@ -310,7 +334,9 @@ pub struct Transaction {
     /// Format: YYYY-MM-DD HH:MM:SS. Set automatically.
     ///
     /// **OpenAPI type:** string (pattern: ^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})
-    #[serde(default)]
+    ///
+    /// NOTE: API sometimes returns this as an integer (YYYYMMDD format).
+    #[serde(default, deserialize_with = "deserialize_string_or_int")]
     pub captured: Option<String>,
 
     /// A date indicating when this Transaction was settled.
@@ -318,7 +344,9 @@ pub struct Transaction {
     /// Format: YYYY-MM-DD HH:MM:SS. Set automatically.
     ///
     /// **OpenAPI type:** string (pattern: ^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})
-    #[serde(default)]
+    ///
+    /// NOTE: API sometimes returns this as an integer (YYYYMMDD format).
+    #[serde(default, deserialize_with = "deserialize_string_or_int")]
     pub settled: Option<String>,
 
     /// A date indicating when this Transaction was funded.
@@ -332,7 +360,9 @@ pub struct Transaction {
     /// The transaction has been returned by the receiver.
     ///
     /// **OpenAPI type:** string
-    #[serde(default)]
+    ///
+    /// NOTE: API sometimes returns this as an integer (YYYYMMDD format).
+    #[serde(default, deserialize_with = "deserialize_string_or_int")]
     pub returned: Option<String>,
 
     // ==================== Currency ====================
@@ -561,6 +591,7 @@ pub struct Transaction {
     /// - `installment` - Installment Transaction
     ///
     /// **OpenAPI type:** string enum (CofType)
+    #[payrix(create_only)]
     #[serde(default)]
     pub cof_type: Option<CardOnFileType>,
 
@@ -580,6 +611,7 @@ pub struct Transaction {
     /// Often contains JSON with custom data.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub description: Option<String>,
 
@@ -605,12 +637,14 @@ pub struct Transaction {
     /// For eCheck transactions, either first or last is required.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only)]
     #[serde(default)]
     pub first: Option<String>,
 
     /// Middle name associated with this Transaction.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only)]
     #[serde(default)]
     pub middle: Option<String>,
 
@@ -619,6 +653,7 @@ pub struct Transaction {
     /// For eCheck transactions, either first or last is required.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only)]
     #[serde(default)]
     pub last: Option<String>,
 
@@ -697,6 +732,7 @@ pub struct Transaction {
     /// Valid values are any IPv4 or IPv6 address.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only)]
     #[serde(default)]
     pub client_ip: Option<String>,
 
@@ -720,6 +756,7 @@ pub struct Transaction {
     /// - `1` - Partial allowed
     ///
     /// **OpenAPI type:** integer enum (AllowPartial)
+    #[payrix(create_only)]
     #[serde(default, deserialize_with = "deserialize_optional_i32")]
     pub allow_partial: Option<i32>,
 
@@ -873,6 +910,7 @@ pub struct Transaction {
     /// - `1` - Inactive
     ///
     /// **OpenAPI type:** integer enum (Inactive)
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
@@ -882,6 +920,7 @@ pub struct Transaction {
     /// - `1` - Frozen
     ///
     /// **OpenAPI type:** integer enum (Frozen)
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }
@@ -1393,66 +1432,8 @@ pub enum TxnResultCode {
 
 // ==================== Request Types ====================
 
-/// Request to create a new transaction.
-///
-/// All monetary values are in **cents**.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewTransaction {
-    /// Merchant ID (required)
-    pub merchant: String,
-
-    /// Token ID for payment method (required for tokenized payments)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub token: Option<String>,
-
-    /// Transaction type (required)
-    #[serde(rename = "type")]
-    pub txn_type: TransactionType,
-
-    /// Transaction origin
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub origin: Option<TransactionOrigin>,
-
-    /// Card-on-file type for tokenized transactions
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cof_type: Option<CardOnFileType>,
-
-    /// Total amount in **cents** (required)
-    pub total: i64,
-
-    /// Description/memo (JSON string recommended)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-
-    /// Related transaction ID (for refunds)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fortxn: Option<String>,
-
-    /// Fee ID to apply
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee: Option<String>,
-
-    /// Allow partial payment (0 or 1)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub allow_partial: Option<i32>,
-
-    /// Client IP address
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub client_ip: Option<String>,
-
-    /// Customer's first name (for eCheck refunds)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub first: Option<String>,
-
-    /// Customer's middle name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub middle: Option<String>,
-
-    /// Customer's last name (for eCheck refunds)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last: Option<String>,
-}
+// CreateTransaction is generated by the PayrixEntity derive macro.
+// See the Transaction struct for field documentation.
 
 /// Custom data stored in transaction description field.
 ///
@@ -1854,11 +1835,11 @@ mod tests {
         assert!(!txn.frozen);
     }
 
-    // ==================== NewTransaction Tests ====================
+    // ==================== CreateTransaction Tests (generated by macro) ====================
 
     #[test]
-    fn new_transaction_serialize_full() {
-        let new_txn = NewTransaction {
+    fn create_transaction_serialize_full() {
+        let new_txn = CreateTransaction {
             merchant: "t1_mer_12345678901234567890123".to_string(),
             token: Some("t1_tok_12345678901234567890123".to_string()),
             txn_type: TransactionType::CreditCardSale,
@@ -1867,12 +1848,14 @@ mod tests {
             total: 10000,
             description: Some("Test transaction".to_string()),
             fortxn: Some("t1_txn_98765432109876543210987".to_string()),
-            fee: Some("t1_fee_12345678901234567890123".to_string()),
+            fee_id: Some("t1_fee_12345678901234567890123".to_string()),
             allow_partial: Some(1),
             client_ip: Some("192.168.1.1".to_string()),
             first: Some("John".to_string()),
             middle: Some("Q".to_string()),
             last: Some("Doe".to_string()),
+            inactive: Some(false),
+            frozen: Some(false),
         };
 
         let json = serde_json::to_string(&new_txn).unwrap();
@@ -1881,15 +1864,29 @@ mod tests {
         assert!(json.contains("\"total\":10000"));
         assert!(json.contains("\"origin\":2"));
         assert!(json.contains("\"cofType\":\"scheduled\""));
+        // fee_id serializes as "fee"
+        assert!(json.contains("\"fee\":\"t1_fee_12345678901234567890123\""));
     }
 
     #[test]
-    fn new_transaction_serialize_minimal() {
-        let new_txn = NewTransaction {
+    fn create_transaction_serialize_minimal() {
+        let new_txn = CreateTransaction {
             merchant: "t1_mer_12345678901234567890123".to_string(),
             txn_type: TransactionType::CreditCardSale,
             total: 10000,
-            ..Default::default()
+            token: None,
+            origin: None,
+            cof_type: None,
+            description: None,
+            fortxn: None,
+            fee_id: None,
+            allow_partial: None,
+            client_ip: None,
+            first: None,
+            middle: None,
+            last: None,
+            inactive: None,
+            frozen: None,
         };
 
         let json = serde_json::to_string(&new_txn).unwrap();

@@ -4,6 +4,7 @@
 //!
 //! **OpenAPI schema:** `accountsResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -164,13 +165,15 @@ pub enum UpdateMethod {
 /// **OpenAPI schema:** `accountsResponse`
 ///
 /// See API_INCONSISTENCIES.md for known deviations from this spec.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateAccount, update = UpdateAccount)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -178,6 +181,7 @@ pub struct Account {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -186,24 +190,28 @@ pub struct Account {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: creator)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
     /// The identifier of the Entity associated with this Account.
     ///
     /// **OpenAPI type:** string (ref: accountsModelEntity)
+    #[payrix(create_only)]
     #[serde(default)]
     pub entity: Option<PayrixId>,
 
@@ -224,6 +232,7 @@ pub struct Account {
     /// This field is stored as a string (0-100 characters).
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub name: Option<String>,
 
@@ -232,6 +241,7 @@ pub struct Account {
     /// This field is stored as a string (0-100 characters).
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub description: Option<String>,
 
@@ -316,6 +326,7 @@ pub struct Account {
     /// - `1` - Inactive
     ///
     /// **OpenAPI type:** integer (ref: Inactive)
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
@@ -325,6 +336,7 @@ pub struct Account {
     /// - `1` - Frozen
     ///
     /// **OpenAPI type:** integer (ref: Frozen)
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 

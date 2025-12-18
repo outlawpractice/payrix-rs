@@ -5,10 +5,11 @@
 //!
 //! **OpenAPI schema:** `tokensResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
 
-use super::{bool_from_int_default_false, option_bool_from_int, DateMmyy, PaymentMethod, PayrixId, Transaction};
+use super::{bool_from_int_default_false, DateMmyy, PaymentMethod, PayrixId, Transaction};
 
 // =============================================================================
 // Custom Deserializers
@@ -131,17 +132,19 @@ pub enum TokenStatus {
 /// **OpenAPI schema:** `tokensResponse`
 ///
 /// See `API_INCONSISTENCIES.md` for known deviations from this spec.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateToken, update = UpdateToken)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Token {
     // -------------------------------------------------------------------------
-    // Core Identifiers
+    // Core Identifiers (readonly)
     // -------------------------------------------------------------------------
 
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -149,6 +152,7 @@ pub struct Token {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -157,26 +161,41 @@ pub struct Token {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: `creator`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
     /// The Customer that this Token is associated with.
     ///
+    /// Required when creating a token.
+    ///
     /// **OpenAPI type:** string (ref: `tokensModelCustomer`)
+    #[payrix(create_only, create_required)]
     #[serde(default)]
     pub customer: Option<PayrixId>,
+
+    /// The Login that owns this token.
+    ///
+    /// Optional when creating a token.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(create_only)]
+    #[serde(default)]
+    pub login: Option<PayrixId>,
 
     // -------------------------------------------------------------------------
     // Payment Information
@@ -184,9 +203,11 @@ pub struct Token {
 
     /// The payment method that is associated with this Token.
     ///
-    /// The Payrix API may return this as either an integer or an object.
+    /// When creating a token, provide full payment details via `PaymentInfo`.
+    /// The response returns only the payment method type.
     ///
     /// **OpenAPI type:** anyOf (string | `paymentResponse` object)
+    #[payrix(create_only, create_required, create_type = "PaymentInfo")]
     #[serde(default, deserialize_with = "deserialize_payment_method")]
     pub payment: Option<PaymentMethod>,
 
@@ -199,6 +220,7 @@ pub struct Token {
     /// Valid values:
     /// - `pending` - The payment data is not yet available, Token is not ready for use.
     /// - `ready` - The payment data is available, Token is ready for use.
+    #[payrix(readonly)]
     #[serde(default)]
     pub status: Option<TokenStatus>,
 
@@ -207,18 +229,21 @@ pub struct Token {
     /// Use this value (not `id`) when processing payments.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub token: Option<String>,
 
     /// The magnetic stripe track data for the payment record for use in a transaction.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub track: Option<String>,
 
     /// The CVV (Card Verification Value) for the payment record for use in a transaction.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub cvv: Option<String>,
 
@@ -231,6 +256,7 @@ pub struct Token {
     /// The value must reflect a future date.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub expiration: Option<DateMmyy>,
 
@@ -239,6 +265,7 @@ pub struct Token {
     /// This field is stored as a text string and must be between 0 and 100 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub name: Option<String>,
 
@@ -247,6 +274,7 @@ pub struct Token {
     /// This field is stored as a text string and must be between 0 and 100 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub description: Option<String>,
 
@@ -255,24 +283,28 @@ pub struct Token {
     /// Must be between 0 and 1000 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub custom: Option<String>,
 
     /// The customer reference from the authToken used for user authentication.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub auth_token_customer: Option<String>,
 
     /// The origin of the token.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub origin: Option<String>,
 
     /// Entry mode set to the token.
     ///
     /// **OpenAPI type:** integer (int32)
+    #[payrix(readonly)]
     #[serde(default)]
     pub entry_mode: Option<i32>,
 
@@ -281,11 +313,12 @@ pub struct Token {
     /// If this field has a value, the whole record is treated as an omnitoken.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub omnitoken: Option<String>,
 
     // -------------------------------------------------------------------------
-    // Status Flags
+    // Status Flags (mutable)
     // -------------------------------------------------------------------------
 
     /// Whether this resource is marked as inactive.
@@ -295,6 +328,7 @@ pub struct Token {
     /// Valid values:
     /// - `0` - Active
     /// - `1` - Inactive
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
@@ -305,6 +339,7 @@ pub struct Token {
     /// Valid values:
     /// - `0` - Not Frozen
     /// - `1` - Frozen
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 
@@ -403,66 +438,8 @@ pub struct TokenCustom {
 // NewToken (Request)
 // =============================================================================
 
-/// Request to create a new payment token.
-///
-/// **OpenAPI schema:** `tokensPostRequest` (POST /tokens)
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewToken {
-    /// Customer ID (required).
-    ///
-    /// The Customer that this Token will be associated with.
-    ///
-    /// **OpenAPI type:** string
-    pub customer: String,
-
-    /// The ID of the Login that owns this resource.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub login: Option<String>,
-
-    /// Payment information.
-    ///
-    /// **OpenAPI type:** object (ref: `paymentPostRequest`)
-    pub payment: PaymentInfo,
-
-    /// The name of this Token (e.g., "Primary Card").
-    ///
-    /// This field must be between 0 and 100 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-
-    /// A description of this Token. Store your contact ID here.
-    ///
-    /// This field must be between 0 and 100 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-
-    /// Custom data (JSON string).
-    ///
-    /// Must be between 0 and 1000 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
-
-    /// Whether this resource is marked as inactive.
-    ///
-    /// **OpenAPI type:** integer (`0` = Active, `1` = Inactive)
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub inactive: Option<bool>,
-
-    /// Whether this resource is marked as frozen.
-    ///
-    /// **OpenAPI type:** integer (`0` = Not Frozen, `1` = Frozen)
-    #[serde(skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
-    pub frozen: Option<bool>,
-}
+// CreateToken is generated by the PayrixEntity derive macro.
+// See the Token struct for field documentation.
 
 // =============================================================================
 // Tests
@@ -666,14 +643,14 @@ mod tests {
     }
 
     // =========================================================================
-    // NewToken Tests
+    // CreateToken Tests (generated by PayrixEntity macro)
     // =========================================================================
 
     #[test]
-    fn new_token_serialize_full() {
-        let new_token = NewToken {
-            customer: "t1_cus_12345678901234567890123".to_string(),
-            login: Some("t1_log_12345678901234567890123".to_string()),
+    fn create_token_serialize_full() {
+        let create_token = CreateToken {
+            customer: "t1_cus_12345678901234567890123".parse().unwrap(),
+            login: Some("t1_log_12345678901234567890123".parse().unwrap()),
             payment: PaymentInfo {
                 method: PaymentMethod::Visa,
                 number: Some("4242424242424242".to_string()),
@@ -681,6 +658,7 @@ mod tests {
                 expiration: Some("1225".to_string()),
                 cvv: Some("123".to_string()),
             },
+            expiration: Some("1225".parse().unwrap()),
             name: Some("Primary Card".to_string()),
             description: Some("Contact ID: 12345".to_string()),
             custom: Some("{\"firmId\":\"firm123\"}".to_string()),
@@ -688,26 +666,33 @@ mod tests {
             frozen: Some(true),
         };
 
-        let json = serde_json::to_string(&new_token).unwrap();
+        let json = serde_json::to_string(&create_token).unwrap();
         assert!(json.contains("\"customer\":\"t1_cus_12345678901234567890123\""));
         assert!(json.contains("\"method\":2"));
         assert!(json.contains("\"name\":\"Primary Card\""));
-        assert!(json.contains("\"inactive\":0"));
-        assert!(json.contains("\"frozen\":1"));
+        // Option<bool> serializes as true/false
+        assert!(json.contains("\"inactive\":false"));
+        assert!(json.contains("\"frozen\":true"));
     }
 
     #[test]
-    fn new_token_serialize_minimal() {
-        let new_token = NewToken {
-            customer: "t1_cus_12345678901234567890123".to_string(),
+    fn create_token_serialize_minimal() {
+        let create_token = CreateToken {
+            customer: "t1_cus_12345678901234567890123".parse().unwrap(),
             payment: PaymentInfo {
                 method: PaymentMethod::Visa,
                 ..Default::default()
             },
-            ..Default::default()
+            login: None,
+            expiration: None,
+            name: None,
+            description: None,
+            custom: None,
+            inactive: None,
+            frozen: None,
         };
 
-        let json = serde_json::to_string(&new_token).unwrap();
+        let json = serde_json::to_string(&create_token).unwrap();
         assert!(json.contains("\"customer\":\"t1_cus_12345678901234567890123\""));
         assert!(json.contains("\"method\":2"));
         // Optional fields should be omitted
@@ -718,39 +703,26 @@ mod tests {
     }
 
     #[test]
-    fn new_token_option_bool_to_int_true() {
-        let new_token = NewToken {
-            customer: "t1_cus_12345678901234567890123".to_string(),
+    fn create_token_option_bool_serialization() {
+        let create_token = CreateToken {
+            customer: "t1_cus_12345678901234567890123".parse().unwrap(),
             payment: PaymentInfo {
                 method: PaymentMethod::Visa,
                 ..Default::default()
             },
+            login: None,
+            expiration: None,
+            name: None,
+            description: None,
+            custom: None,
             inactive: Some(true),
-            frozen: Some(true),
-            ..Default::default()
-        };
-
-        let json = serde_json::to_string(&new_token).unwrap();
-        assert!(json.contains("\"inactive\":1"));
-        assert!(json.contains("\"frozen\":1"));
-    }
-
-    #[test]
-    fn new_token_option_bool_to_int_false() {
-        let new_token = NewToken {
-            customer: "t1_cus_12345678901234567890123".to_string(),
-            payment: PaymentInfo {
-                method: PaymentMethod::Visa,
-                ..Default::default()
-            },
-            inactive: Some(false),
             frozen: Some(false),
-            ..Default::default()
         };
 
-        let json = serde_json::to_string(&new_token).unwrap();
-        assert!(json.contains("\"inactive\":0"));
-        assert!(json.contains("\"frozen\":0"));
+        let json = serde_json::to_string(&create_token).unwrap();
+        // Option<bool> serializes as true/false, not 0/1
+        assert!(json.contains("\"inactive\":true"));
+        assert!(json.contains("\"frozen\":false"));
     }
 
     #[test]

@@ -301,15 +301,15 @@ impl PayrixClient {
     /// # Example
     ///
     /// ```no_run
-    /// use payrix::{PayrixClient, Environment, EntityType, NewCustomer};
+    /// use payrix::{PayrixClient, Environment, EntityType, CreateCustomer};
     ///
     /// # async fn example() -> payrix::Result<()> {
     /// let client = PayrixClient::new("api-key", Environment::Test)?;
     ///
     /// let customer = client.create::<_, payrix::Customer>(
     ///     EntityType::Customers,
-    ///     &NewCustomer {
-    ///         merchant: "merchant_id".to_string(),
+    ///     &CreateCustomer {
+    ///         merchant: Some("t1_mer_12345678901234567890123".parse().unwrap()),
     ///         first: Some("John".to_string()),
     ///         last: Some("Doe".to_string()),
     ///         ..Default::default()

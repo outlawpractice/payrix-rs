@@ -5,6 +5,7 @@
 //!
 //! **OpenAPI schema:** `subscriptionsResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -61,13 +62,15 @@ pub enum SubscriptionOrigin {
 /// **OpenAPI schema:** `subscriptionsResponse`
 ///
 /// See API_INCONSISTENCIES.md for known deviations from this spec.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateSubscription, update = UpdateSubscription)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Subscription {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -75,6 +78,7 @@ pub struct Subscription {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -83,18 +87,21 @@ pub struct Subscription {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: creator)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
@@ -103,6 +110,7 @@ pub struct Subscription {
     /// The Plan determines the frequency and amount of each payment.
     ///
     /// **OpenAPI type:** string (ref: subscriptionsModelPlan)
+    #[payrix(create_only)]
     #[serde(default)]
     pub plan: Option<PayrixId>,
 
@@ -211,6 +219,7 @@ pub struct Subscription {
     /// - `1` - Inactive
     ///
     /// **OpenAPI type:** integer (ref: Inactive)
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
@@ -220,6 +229,7 @@ pub struct Subscription {
     /// - `1` - Frozen
     ///
     /// **OpenAPI type:** integer (ref: Frozen)
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 

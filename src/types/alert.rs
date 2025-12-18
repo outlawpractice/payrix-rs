@@ -4,6 +4,7 @@
 //!
 //! **OpenAPI schema:** `alertsResponse`, `alertActionsResponse`, `alertTriggersResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 
 use super::{bool_from_int_default_false, PayrixId};
@@ -35,381 +36,6 @@ pub enum AlertActionType {
     Sms,
 }
 
-// =============================================================================
-// ALERT STRUCT
-// =============================================================================
-
-/// A Payrix alert configuration.
-///
-/// Alerts define notification rules for various events.
-///
-/// **OpenAPI schema:** `alertsResponse`
-///
-/// See API_INCONSISTENCIES.md for known deviations from this spec.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
-#[serde(rename_all = "camelCase")]
-pub struct Alert {
-    /// The ID of this resource.
-    ///
-    /// **OpenAPI type:** string
-    pub id: PayrixId,
-
-    /// The date and time at which this resource was created.
-    ///
-    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
-    ///
-    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
-    #[serde(default)]
-    pub created: Option<String>,
-
-    /// The date and time at which this resource was modified.
-    ///
-    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
-    ///
-    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
-    #[serde(default)]
-    pub modified: Option<String>,
-
-    /// The identifier of the Login that created this resource.
-    ///
-    /// **OpenAPI type:** string (ref: creator)
-    #[serde(default)]
-    pub creator: Option<PayrixId>,
-
-    /// The identifier of the Login that last modified this resource.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub modifier: Option<PayrixId>,
-
-    /// The identifier of the Login that created this resource.
-    ///
-    /// **OpenAPI type:** string (ref: alertsModelLogin)
-    #[serde(default)]
-    pub login: Option<PayrixId>,
-
-    /// The identifier of the Login that this Alert applies to.
-    ///
-    /// **OpenAPI type:** string (ref: alertsModelForlogin)
-    #[serde(default)]
-    pub forlogin: Option<PayrixId>,
-
-    /// The identifier (ID) of the team that this Alert relates to.
-    ///
-    /// The Alert is triggered based on the activity of this Team.
-    ///
-    /// **OpenAPI type:** string (ref: alertsModelTeam)
-    #[serde(default)]
-    pub team: Option<PayrixId>,
-
-    /// The identifier of the Division that this Alert applies to.
-    ///
-    /// **OpenAPI type:** string (ref: alertsModelDivision)
-    #[serde(default)]
-    pub division: Option<PayrixId>,
-
-    /// The partition for which this Alert applies.
-    ///
-    /// **OpenAPI type:** string (ref: alertsModelPartition)
-    #[serde(default)]
-    pub partition: Option<PayrixId>,
-
-    /// The name of this Alert.
-    ///
-    /// This field is stored as a text string and must be between 1 and 100 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub name: Option<String>,
-
-    /// Description of Alerts.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub description: Option<String>,
-
-    /// Alert actions associated with this alert.
-    ///
-    /// **OpenAPI type:** array of alertActionsResponse
-    #[cfg(not(feature = "sqlx"))]
-    #[serde(default)]
-    pub alert_actions: Option<Vec<AlertAction>>,
-
-    /// Alert triggers associated with this alert.
-    ///
-    /// **OpenAPI type:** array of alertTriggersResponse
-    #[cfg(not(feature = "sqlx"))]
-    #[serde(default)]
-    pub alert_triggers: Option<Vec<AlertTrigger>>,
-
-    /// Whether this resource is marked as inactive.
-    ///
-    /// - `0` - Active
-    /// - `1` - Inactive
-    ///
-    /// **OpenAPI type:** integer (ref: Inactive)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub inactive: bool,
-
-    /// Whether this resource is marked as frozen.
-    ///
-    /// - `0` - Not Frozen
-    /// - `1` - Frozen
-    ///
-    /// **OpenAPI type:** integer (ref: Frozen)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub frozen: bool,
-}
-
-// =============================================================================
-// ALERT ACTION STRUCT
-// =============================================================================
-
-/// A Payrix alert action.
-///
-/// Alert actions define what happens when an alert is triggered.
-///
-/// **OpenAPI schema:** `alertActionsResponse`
-///
-/// See API_INCONSISTENCIES.md for known deviations from this spec.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
-#[serde(rename_all = "camelCase")]
-pub struct AlertAction {
-    /// The ID of this resource.
-    ///
-    /// **OpenAPI type:** string
-    pub id: PayrixId,
-
-    /// The date and time at which this resource was created.
-    ///
-    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
-    ///
-    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
-    #[serde(default)]
-    pub created: Option<String>,
-
-    /// The date and time at which this resource was modified.
-    ///
-    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
-    ///
-    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
-    #[serde(default)]
-    pub modified: Option<String>,
-
-    /// The identifier of the Login that created this resource.
-    ///
-    /// **OpenAPI type:** string (ref: creator)
-    #[serde(default)]
-    pub creator: Option<PayrixId>,
-
-    /// The identifier of the Login that last modified this resource.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub modifier: Option<PayrixId>,
-
-    /// The medium to use to deliver this Alert.
-    ///
-    /// - `email` - Deliver the Alert to an email address
-    /// - `web` - Deliver the Alert through a web site notification
-    /// - `app` - Deliver the Alert through a mobile application notification
-    /// - `sms` - Deliver the Alert through an SMS message to a mobile device
-    ///
-    /// **OpenAPI type:** string (ref: alertActionType)
-    #[serde(default, rename = "type")]
-    pub action_type: Option<AlertActionType>,
-
-    /// When the 'type' field of this resource is set to 'web', this field
-    /// determines the format that the Alert data should be sent in.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub options: Option<String>,
-
-    /// A value used to deliver the alert.
-    ///
-    /// The field should be set to an email address if the type is email,
-    /// an endpoint if the type is web, etc.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub value: Option<String>,
-
-    /// The request header name for authentication to the endpoint.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub header_name: Option<String>,
-
-    /// The request header value for authentication to the endpoint.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub header_value: Option<String>,
-
-    /// The number of times an alert should be resent in case of a failure.
-    ///
-    /// This field can only be set for web type alertActions.
-    ///
-    /// **OpenAPI type:** integer (int32)
-    #[serde(default)]
-    pub retries: Option<i32>,
-
-    /// Whether it was temporarily disabled for reaching the maximum number
-    /// of failed attempts.
-    ///
-    /// - `0` - Not Temporarily Disabled
-    /// - `1` - Temporarily Disabled
-    ///
-    /// **OpenAPI type:** integer (ref: MaxAttemptsTempDisabled)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub max_attempts_temp_disabled: bool,
-
-    /// The identifier of the Alert resource that defines this alertAction.
-    ///
-    /// **OpenAPI type:** string (ref: alertActionsModelAlert)
-    #[serde(default)]
-    pub alert: Option<PayrixId>,
-
-    /// Whether this resource is marked as inactive.
-    ///
-    /// - `0` - Active
-    /// - `1` - Inactive
-    ///
-    /// **OpenAPI type:** integer (ref: Inactive)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub inactive: bool,
-
-    /// Whether this resource is marked as frozen.
-    ///
-    /// - `0` - Not Frozen
-    /// - `1` - Frozen
-    ///
-    /// **OpenAPI type:** integer (ref: Frozen)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub frozen: bool,
-}
-
-// =============================================================================
-// ALERT TRIGGER STRUCT
-// =============================================================================
-
-/// A Payrix alert trigger.
-///
-/// Alert triggers define conditions that cause an alert to fire.
-///
-/// **OpenAPI schema:** `alertTriggersResponse`
-///
-/// See API_INCONSISTENCIES.md for known deviations from this spec.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
-#[serde(rename_all = "camelCase")]
-pub struct AlertTrigger {
-    /// The ID of this resource.
-    ///
-    /// **OpenAPI type:** string
-    pub id: PayrixId,
-
-    /// The date and time at which this resource was created.
-    ///
-    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
-    ///
-    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
-    #[serde(default)]
-    pub created: Option<String>,
-
-    /// The date and time at which this resource was modified.
-    ///
-    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
-    ///
-    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
-    #[serde(default)]
-    pub modified: Option<String>,
-
-    /// The identifier of the Login that created this resource.
-    ///
-    /// **OpenAPI type:** string (ref: creator)
-    #[serde(default)]
-    pub creator: Option<PayrixId>,
-
-    /// The identifier of the Login that last modified this resource.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub modifier: Option<PayrixId>,
-
-    /// The identifier of the Alert resource that you want to invoke with this trigger.
-    ///
-    /// **OpenAPI type:** string (ref: alertTriggersModelAlert)
-    #[serde(default)]
-    pub alert: Option<PayrixId>,
-
-    /// The event type that triggers the associated Alert.
-    ///
-    /// **OpenAPI type:** string (ref: alertTriggerEvent)
-    ///
-    /// Valid values include: `create`, `update`, `delete`, `ownership`, `batch`,
-    /// `account`, `account.created`, `account.updated`, `payout`, `fee`,
-    /// `chargeback`, `chargeback.opened`, `chargeback.closed`, `chargeback.created`,
-    /// `chargeback.lost`, `chargeback.won`, `txn.created`, `txn.approved`,
-    /// `txn.failed`, `txn.captured`, `txn.settled`, `txn.returned`,
-    /// `merchant.created`, `merchant.boarding`, `merchant.boarded`,
-    /// `merchant.closed`, `merchant.failed`, `merchant.held`,
-    /// `disbursement.requested`, `disbursement.processing`, `disbursement.processed`,
-    /// `disbursement.failed`, `disbursement.denied`, `disbursement.returned`,
-    /// and many more.
-    #[serde(default)]
-    pub event: Option<String>,
-
-    /// The resource type that this trigger applies to.
-    ///
-    /// **OpenAPI type:** integer (ref: Resource)
-    ///
-    /// Valid values include: 1 (apiKeys), 2 (contacts), 3 (customers),
-    /// 4 (alertTriggers), 7 (alerts), 8 (logins), 9 (merchants), 10 (orgs),
-    /// 13 (plans), 14 (subscriptions), 15 (tokens), 16 (txns), and many more.
-    #[serde(default)]
-    pub resource: Option<i32>,
-
-    /// The name of this alertTrigger.
-    ///
-    /// This field is stored as a text string and must be between 0 and 100 characters long.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub name: Option<String>,
-
-    /// Description of Alert Triggers.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(default)]
-    pub description: Option<String>,
-
-    /// Whether this resource is marked as inactive.
-    ///
-    /// - `0` - Active
-    /// - `1` - Inactive
-    ///
-    /// **OpenAPI type:** integer (ref: Inactive)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub inactive: bool,
-
-    /// Whether this resource is marked as frozen.
-    ///
-    /// - `0` - Not Frozen
-    /// - `1` - Frozen
-    ///
-    /// **OpenAPI type:** integer (ref: Frozen)
-    #[serde(default, with = "bool_from_int_default_false")]
-    pub frozen: bool,
-}
-
-// =============================================================================
-// NEW ALERT TYPES (for creation)
-// =============================================================================
-
 /// Options for the web alert action format.
 ///
 /// Determines how the alert data is sent to the endpoint.
@@ -427,63 +53,161 @@ pub enum AlertActionOptions {
     Form,
 }
 
-/// Request body for creating a new Alert.
+// =============================================================================
+// ALERT STRUCT
+// =============================================================================
+
+/// A Payrix alert configuration.
 ///
-/// At least one of `forlogin`, `team`, `division`, or `partition` must be set.
+/// Alerts define notification rules for various events.
 ///
-/// **OpenAPI schema:** `alertsRequest` (POST /alerts)
-#[derive(Debug, Clone, Default, Serialize)]
+/// **OpenAPI schema:** `alertsResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
+#[derive(Debug, Clone, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateAlert, update = UpdateAlert)]
 #[serde(rename_all = "camelCase")]
-pub struct NewAlert {
+pub struct Alert {
+    /// The ID of this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(readonly)]
+    pub id: PayrixId,
+
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub created: Option<String>,
+
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub modified: Option<String>,
+
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
+
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: alertsModelLogin)
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub login: Option<PayrixId>,
+
     /// The identifier of the Login that this Alert applies to.
     ///
-    /// At least one of `forlogin`, `team`, `division`, or `partition` must be set.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub forlogin: Option<String>,
+    /// **OpenAPI type:** string (ref: alertsModelForlogin)
+    #[payrix(create_only)]
+    #[serde(default)]
+    pub forlogin: Option<PayrixId>,
 
-    /// The identifier of the Team that this Alert applies to.
+    /// The identifier (ID) of the team that this Alert relates to.
     ///
-    /// At least one of `forlogin`, `team`, `division`, or `partition` must be set.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub team: Option<String>,
+    /// The Alert is triggered based on the activity of this Team.
+    ///
+    /// **OpenAPI type:** string (ref: alertsModelTeam)
+    #[payrix(create_only)]
+    #[serde(default)]
+    pub team: Option<PayrixId>,
 
     /// The identifier of the Division that this Alert applies to.
     ///
-    /// At least one of `forlogin`, `team`, `division`, or `partition` must be set.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub division: Option<String>,
+    /// **OpenAPI type:** string (ref: alertsModelDivision)
+    #[payrix(create_only)]
+    #[serde(default)]
+    pub division: Option<PayrixId>,
 
-    /// The identifier of the Partition that this Alert applies to.
+    /// The partition for which this Alert applies.
     ///
-    /// At least one of `forlogin`, `team`, `division`, or `partition` must be set.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub partition: Option<String>,
+    /// **OpenAPI type:** string (ref: alertsModelPartition)
+    #[payrix(create_only)]
+    #[serde(default)]
+    pub partition: Option<PayrixId>,
 
-    /// The name of this Alert (1-100 characters).
+    /// The name of this Alert.
     ///
-    /// **Required.**
-    pub name: String,
+    /// This field is stored as a text string (0-100 characters).
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(mutable)]
+    #[serde(default)]
+    pub name: Option<String>,
 
-    /// Description of the Alert.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// A description of this Alert.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(mutable)]
+    #[serde(default)]
     pub description: Option<String>,
+
+    /// Alert actions associated with this alert.
+    ///
+    /// **OpenAPI type:** array of alertActionsResponse
+    #[serde(default)]
+    pub alert_actions: Option<Vec<AlertAction>>,
+
+    /// Alert triggers associated with this alert.
+    ///
+    /// **OpenAPI type:** array of alertTriggersResponse
+    #[serde(default)]
+    pub alert_triggers: Option<Vec<AlertTrigger>>,
+
+    /// Whether this resource is marked as inactive.
+    ///
+    /// - `0` - Active
+    /// - `1` - Inactive
+    ///
+    /// **OpenAPI type:** integer (ref: Inactive)
+    #[payrix(mutable)]
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub inactive: bool,
+
+    /// Whether this resource is marked as frozen.
+    ///
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
+    ///
+    /// **OpenAPI type:** integer (ref: Frozen)
+    #[payrix(mutable)]
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub frozen: bool,
 }
 
-impl NewAlert {
+// Helper methods for CreateAlert
+impl CreateAlert {
     /// Create a new alert for a specific login.
-    pub fn for_login(login_id: impl Into<String>, name: impl Into<String>) -> Self {
+    pub fn for_login(login_id: impl Into<PayrixId>, name: impl Into<String>) -> Self {
         Self {
             forlogin: Some(login_id.into()),
-            name: name.into(),
+            name: Some(name.into()),
             ..Default::default()
         }
     }
 
     /// Create a new alert for a specific team.
-    pub fn for_team(team_id: impl Into<String>, name: impl Into<String>) -> Self {
+    pub fn for_team(team_id: impl Into<PayrixId>, name: impl Into<String>) -> Self {
         Self {
             team: Some(team_id.into()),
-            name: name.into(),
+            name: Some(name.into()),
             ..Default::default()
         }
     }
@@ -495,84 +219,183 @@ impl NewAlert {
     }
 }
 
-/// Request body for creating a new AlertAction.
+// =============================================================================
+// ALERT ACTION STRUCT
+// =============================================================================
+
+/// A Payrix alert action.
 ///
-/// **OpenAPI schema:** `alertActionsRequest` (POST /alertActions)
-#[derive(Debug, Clone, Serialize)]
+/// Alert actions define what happens when an alert is triggered.
+///
+/// **OpenAPI schema:** `alertActionsResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
+#[derive(Debug, Clone, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateAlertAction, update = UpdateAlertAction)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
-pub struct NewAlertAction {
-    /// The identifier of the Alert this action belongs to.
+pub struct AlertAction {
+    /// The ID of this resource.
     ///
-    /// **Required.**
-    pub alert: String,
+    /// **OpenAPI type:** string
+    #[payrix(readonly)]
+    pub id: PayrixId,
 
-    /// The type of delivery mechanism.
+    /// The date and time at which this resource was created.
     ///
-    /// **Required.**
-    #[serde(rename = "type")]
-    pub action_type: AlertActionType,
-
-    /// The destination value (email address, URL, phone number, etc.).
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
-    /// **Required.**
-    pub value: String,
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub created: Option<String>,
 
-    /// Format for web-type actions (JSON, XML, SOAP, FORM).
+    /// The date and time at which this resource was modified.
     ///
-    /// Only applicable when `action_type` is `Web`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub options: Option<AlertActionOptions>,
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    ///
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub modified: Option<String>,
 
-    /// Custom header name for authentication.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
+
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+
+    /// The identifier of the Alert resource that defines this alertAction.
+    ///
+    /// **OpenAPI type:** string (ref: alertActionsModelAlert)
+    #[payrix(create_only)]
+    #[serde(default)]
+    pub alert: Option<PayrixId>,
+
+    /// The medium to use to deliver this Alert.
+    ///
+    /// - `email` - Deliver the Alert to an email address
+    /// - `web` - Deliver the Alert through a web site notification
+    /// - `app` - Deliver the Alert through a mobile application notification
+    /// - `sms` - Deliver the Alert through an SMS message to a mobile device
+    ///
+    /// **OpenAPI type:** string (ref: alertActionType)
+    #[payrix(mutable)]
+    #[serde(default, rename = "type")]
+    pub action_type: Option<AlertActionType>,
+
+    /// When the 'type' field of this resource is set to 'web', this field
+    /// determines the format that the Alert data should be sent in.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(mutable)]
+    #[serde(default)]
+    pub options: Option<String>,
+
+    /// A value used to deliver the alert.
+    ///
+    /// The field should be set to an email address if the type is email,
+    /// an endpoint if the type is web, etc.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(mutable)]
+    #[serde(default)]
+    pub value: Option<String>,
+
+    /// The request header name for authentication to the endpoint.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(mutable)]
+    #[serde(default)]
     pub header_name: Option<String>,
 
-    /// Custom header value for authentication.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The request header value for authentication to the endpoint.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(mutable)]
+    #[serde(default)]
     pub header_value: Option<String>,
 
-    /// Number of retry attempts on failure (web-type only).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The number of times an alert should be resent in case of a failure.
+    ///
+    /// This field can only be set for web type alertActions.
+    ///
+    /// **OpenAPI type:** integer (int32)
+    #[payrix(mutable)]
+    #[serde(default)]
     pub retries: Option<i32>,
+
+    /// Whether it was temporarily disabled for reaching the maximum number
+    /// of failed attempts.
+    ///
+    /// - `0` - Not Temporarily Disabled
+    /// - `1` - Temporarily Disabled
+    ///
+    /// **OpenAPI type:** integer (ref: MaxAttemptsTempDisabled)
+    #[payrix(readonly)]
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub max_attempts_temp_disabled: bool,
+
+    /// Whether this resource is marked as inactive.
+    ///
+    /// - `0` - Active
+    /// - `1` - Inactive
+    ///
+    /// **OpenAPI type:** integer (ref: Inactive)
+    #[payrix(mutable)]
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub inactive: bool,
+
+    /// Whether this resource is marked as frozen.
+    ///
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
+    ///
+    /// **OpenAPI type:** integer (ref: Frozen)
+    #[payrix(mutable)]
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub frozen: bool,
 }
 
-impl NewAlertAction {
+// Helper methods for CreateAlertAction
+impl CreateAlertAction {
     /// Create a new email alert action.
-    pub fn email(alert_id: impl Into<String>, email: impl Into<String>) -> Self {
+    pub fn email(alert_id: impl Into<PayrixId>, email: impl Into<String>) -> Self {
         Self {
-            alert: alert_id.into(),
-            action_type: AlertActionType::Email,
-            value: email.into(),
-            options: None,
-            header_name: None,
-            header_value: None,
-            retries: None,
+            alert: Some(alert_id.into()),
+            action_type: Some(AlertActionType::Email),
+            value: Some(email.into()),
+            ..Default::default()
         }
     }
 
     /// Create a new webhook alert action.
-    pub fn webhook(alert_id: impl Into<String>, url: impl Into<String>) -> Self {
+    pub fn webhook(alert_id: impl Into<PayrixId>, url: impl Into<String>) -> Self {
         Self {
-            alert: alert_id.into(),
-            action_type: AlertActionType::Web,
-            value: url.into(),
-            options: Some(AlertActionOptions::Json),
-            header_name: None,
-            header_value: None,
+            alert: Some(alert_id.into()),
+            action_type: Some(AlertActionType::Web),
+            value: Some(url.into()),
+            options: Some("JSON".to_string()),
             retries: Some(3),
+            ..Default::default()
         }
     }
 
     /// Create a new SMS alert action.
-    pub fn sms(alert_id: impl Into<String>, phone: impl Into<String>) -> Self {
+    pub fn sms(alert_id: impl Into<PayrixId>, phone: impl Into<String>) -> Self {
         Self {
-            alert: alert_id.into(),
-            action_type: AlertActionType::Sms,
-            value: phone.into(),
-            options: None,
-            header_name: None,
-            header_value: None,
-            retries: None,
+            alert: Some(alert_id.into()),
+            action_type: Some(AlertActionType::Sms),
+            value: Some(phone.into()),
+            ..Default::default()
         }
     }
 
@@ -584,8 +407,8 @@ impl NewAlertAction {
     }
 
     /// Set the response format for webhook.
-    pub fn with_options(mut self, options: AlertActionOptions) -> Self {
-        self.options = Some(options);
+    pub fn with_options(mut self, options: impl Into<String>) -> Self {
+        self.options = Some(options.into());
         self
     }
 
@@ -596,56 +419,149 @@ impl NewAlertAction {
     }
 }
 
-/// Request body for creating a new AlertTrigger.
+// =============================================================================
+// ALERT TRIGGER STRUCT
+// =============================================================================
+
+/// A Payrix alert trigger.
 ///
-/// **OpenAPI schema:** `alertTriggersRequest` (POST /alertTriggers)
-#[derive(Debug, Clone, Serialize)]
+/// Alert triggers define conditions that cause an alert to fire.
+///
+/// **OpenAPI schema:** `alertTriggersResponse`
+///
+/// See API_INCONSISTENCIES.md for known deviations from this spec.
+#[derive(Debug, Clone, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateAlertTrigger, update = UpdateAlertTrigger)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
-pub struct NewAlertTrigger {
-    /// The identifier of the Alert this trigger belongs to.
+pub struct AlertTrigger {
+    /// The ID of this resource.
     ///
-    /// **Required.**
-    pub alert: String,
+    /// **OpenAPI type:** string
+    #[payrix(readonly)]
+    pub id: PayrixId,
 
-    /// The event that triggers the alert.
+    /// The date and time at which this resource was created.
     ///
-    /// Examples: `txn.created`, `chargeback.opened`, `merchant.boarded`
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
-    /// **Required.**
-    pub event: String,
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub created: Option<String>,
 
-    /// The resource type (integer code).
+    /// The date and time at which this resource was modified.
     ///
-    /// Common values: 16 (txns), 9 (merchants), 3 (customers)
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
-    /// **Required.**
-    pub resource: i32,
+    /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub modified: Option<String>,
 
-    /// The name of this trigger (0-100 characters).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The identifier of the Login that created this resource.
+    ///
+    /// **OpenAPI type:** string (ref: creator)
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
+
+    /// The identifier of the Login that last modified this resource.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(readonly)]
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+
+    /// The identifier of the Alert resource that you want to invoke with this trigger.
+    ///
+    /// **OpenAPI type:** string (ref: alertTriggersModelAlert)
+    #[payrix(create_only)]
+    #[serde(default)]
+    pub alert: Option<PayrixId>,
+
+    /// The event type that triggers the associated Alert.
+    ///
+    /// **OpenAPI type:** string (ref: alertTriggerEvent)
+    ///
+    /// Valid values include: `create`, `update`, `delete`, `ownership`, `batch`,
+    /// `account`, `account.created`, `account.updated`, `payout`, `fee`,
+    /// `chargeback`, `chargeback.opened`, `chargeback.closed`, `chargeback.created`,
+    /// `chargeback.lost`, `chargeback.won`, `txn.created`, `txn.approved`,
+    /// `txn.failed`, `txn.captured`, `txn.settled`, `txn.returned`,
+    /// `merchant.created`, `merchant.boarding`, `merchant.boarded`,
+    /// `merchant.closed`, `merchant.failed`, `merchant.held`,
+    /// `disbursement.requested`, `disbursement.processing`, `disbursement.processed`,
+    /// `disbursement.failed`, `disbursement.denied`, `disbursement.returned`,
+    /// and many more.
+    #[payrix(mutable)]
+    #[serde(default)]
+    pub event: Option<String>,
+
+    /// The resource type that this trigger applies to.
+    ///
+    /// **OpenAPI type:** integer (ref: Resource)
+    ///
+    /// Valid values include: 1 (apiKeys), 2 (contacts), 3 (customers),
+    /// 4 (alertTriggers), 7 (alerts), 8 (logins), 9 (merchants), 10 (orgs),
+    /// 13 (plans), 14 (subscriptions), 15 (tokens), 16 (txns), and many more.
+    #[payrix(mutable)]
+    #[serde(default)]
+    pub resource: Option<i32>,
+
+    /// The name of this alertTrigger.
+    ///
+    /// This field is stored as a text string and must be between 0 and 100 characters long.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(mutable)]
+    #[serde(default)]
     pub name: Option<String>,
 
-    /// Description of the trigger.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Description of Alert Triggers.
+    ///
+    /// **OpenAPI type:** string
+    #[payrix(mutable)]
+    #[serde(default)]
     pub description: Option<String>,
+
+    /// Whether this resource is marked as inactive.
+    ///
+    /// - `0` - Active
+    /// - `1` - Inactive
+    ///
+    /// **OpenAPI type:** integer (ref: Inactive)
+    #[payrix(mutable)]
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub inactive: bool,
+
+    /// Whether this resource is marked as frozen.
+    ///
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
+    ///
+    /// **OpenAPI type:** integer (ref: Frozen)
+    #[payrix(mutable)]
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub frozen: bool,
 }
 
-impl NewAlertTrigger {
+// Helper methods for CreateAlertTrigger
+impl CreateAlertTrigger {
     /// Create a new alert trigger.
-    pub fn new(alert_id: impl Into<String>, event: impl Into<String>, resource: i32) -> Self {
+    pub fn new(alert_id: impl Into<PayrixId>, event: impl Into<String>, resource: i32) -> Self {
         Self {
-            alert: alert_id.into(),
-            event: event.into(),
-            resource,
-            name: None,
-            description: None,
+            alert: Some(alert_id.into()),
+            event: Some(event.into()),
+            resource: Some(resource),
+            ..Default::default()
         }
     }
 
     /// Create a transaction event trigger.
     ///
     /// Common events: `txn.created`, `txn.approved`, `txn.failed`, `txn.settled`
-    pub fn transaction(alert_id: impl Into<String>, event: impl Into<String>) -> Self {
+    pub fn transaction(alert_id: impl Into<PayrixId>, event: impl Into<String>) -> Self {
         Self::new(alert_id, event, 16) // 16 = txns resource
     }
 
@@ -653,14 +569,14 @@ impl NewAlertTrigger {
     ///
     /// Common events: `chargeback.created`, `chargeback.opened`, `chargeback.closed`,
     /// `chargeback.won`, `chargeback.lost`
-    pub fn chargeback(alert_id: impl Into<String>, event: impl Into<String>) -> Self {
+    pub fn chargeback(alert_id: impl Into<PayrixId>, event: impl Into<String>) -> Self {
         Self::new(alert_id, event, 73) // 73 = chargebacks resource
     }
 
     /// Create a merchant event trigger.
     ///
     /// Common events: `merchant.created`, `merchant.boarded`, `merchant.held`
-    pub fn merchant(alert_id: impl Into<String>, event: impl Into<String>) -> Self {
+    pub fn merchant(alert_id: impl Into<PayrixId>, event: impl Into<String>) -> Self {
         Self::new(alert_id, event, 9) // 9 = merchants resource
     }
 
@@ -1041,5 +957,46 @@ mod tests {
         assert_eq!(trigger.alert, deserialized.alert);
         assert_eq!(trigger.event, deserialized.event);
         assert_eq!(trigger.resource, deserialized.resource);
+    }
+
+    // ==================== Create/Update Type Tests ====================
+
+    #[test]
+    fn create_alert_serializes_correctly() {
+        let login_id: PayrixId = "t1_lgn_12345678901234567890123".parse().unwrap();
+        let create = CreateAlert::for_login(login_id, "Test Alert")
+            .with_description("A test alert");
+
+        let json = serde_json::to_string(&create).unwrap();
+        assert!(json.contains("\"forlogin\""));
+        assert!(json.contains("\"name\""));
+        assert!(json.contains("\"description\""));
+    }
+
+    #[test]
+    fn create_alert_action_serializes_correctly() {
+        let alert_id: PayrixId = "t1_alt_12345678901234567890123".parse().unwrap();
+        let create = CreateAlertAction::webhook(alert_id, "https://example.com")
+            .with_auth("Authorization", "Bearer token");
+
+        let json = serde_json::to_string(&create).unwrap();
+        assert!(json.contains("\"alert\""));
+        assert!(json.contains("\"type\""));
+        assert!(json.contains("\"value\""));
+        assert!(json.contains("\"headerName\""));
+        assert!(json.contains("\"headerValue\""));
+    }
+
+    #[test]
+    fn create_alert_trigger_serializes_correctly() {
+        let alert_id: PayrixId = "t1_alt_12345678901234567890123".parse().unwrap();
+        let create = CreateAlertTrigger::transaction(alert_id, "txn.created")
+            .with_name("Transaction Trigger");
+
+        let json = serde_json::to_string(&create).unwrap();
+        assert!(json.contains("\"alert\""));
+        assert!(json.contains("\"event\""));
+        assert!(json.contains("\"resource\""));
+        assert!(json.contains("\"name\""));
     }
 }

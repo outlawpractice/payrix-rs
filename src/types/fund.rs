@@ -495,7 +495,7 @@ pub enum FeeRuleType {
 
     /// Payment method rule.
     #[default]
-    #[serde(rename = "METHOD")]
+    #[serde(rename = "METHOD", alias = "method")]
     Method,
 
     /// Payment method type rule.
@@ -1112,6 +1112,11 @@ pub enum BatchStatus {
     /// Batch is open and can accept more transactions.
     #[default]
     Open,
+
+    /// Batch has been processed.
+    ///
+    /// NOTE: This value is not documented in OpenAPI but observed in actual API responses.
+    Processed,
 
     /// Batch is closed to new transactions and ready to be sent to processor.
     Closed,

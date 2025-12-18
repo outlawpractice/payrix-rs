@@ -102,7 +102,7 @@ use crate::entity::EntityType;
 use crate::error::{Error, Result};
 use crate::types::{
     Chargeback, ChargebackCycle, ChargebackDocument, ChargebackDocumentType, ChargebackMessage,
-    ChargebackMessageType, ChargebackStatusValue, NewChargebackDocument, NewChargebackMessage,
+    ChargebackMessageType, ChargebackStatusValue, CreateChargebackDocument, CreateChargebackMessage,
     PayrixId,
 };
 
@@ -650,7 +650,7 @@ impl TypedChargeback<First> {
         }
 
         // Create the chargeback message
-        let message = NewChargebackMessage {
+        let message = CreateChargebackMessage {
             chargeback: self.inner.id.to_string(),
             message_type: Some(ChargebackMessageType::Represent),
             subject: Some("Representment".to_string()),
@@ -666,7 +666,7 @@ impl TypedChargeback<First> {
             let document_type = mime_type_to_document_type(&doc.mime_type);
             let encoded_content = base64::engine::general_purpose::STANDARD.encode(&doc.content);
 
-            let new_doc = NewChargebackDocument {
+            let new_doc = CreateChargebackDocument {
                 chargeback: self.inner.id.to_string(),
                 chargeback_message: Some(response.id.to_string()),
                 name: Some(doc.name),
@@ -709,7 +709,7 @@ impl TypedChargeback<First> {
             ));
         }
 
-        let message = NewChargebackMessage {
+        let message = CreateChargebackMessage {
             chargeback: self.inner.id.to_string(),
             message_type: Some(ChargebackMessageType::AcceptLiability),
             subject: Some("Accept Liability".to_string()),
@@ -753,7 +753,7 @@ impl TypedChargeback<PreArbitration> {
             ));
         }
 
-        let message = NewChargebackMessage {
+        let message = CreateChargebackMessage {
             chargeback: self.inner.id.to_string(),
             message_type: Some(ChargebackMessageType::RequestArbitration),
             subject: Some("Request Arbitration".to_string()),
@@ -789,7 +789,7 @@ impl TypedChargeback<PreArbitration> {
             ));
         }
 
-        let message = NewChargebackMessage {
+        let message = CreateChargebackMessage {
             chargeback: self.inner.id.to_string(),
             message_type: Some(ChargebackMessageType::Represent),
             subject: Some("Pre-Arbitration Response".to_string()),
@@ -805,7 +805,7 @@ impl TypedChargeback<PreArbitration> {
             let document_type = mime_type_to_document_type(&doc.mime_type);
             let encoded_content = base64::engine::general_purpose::STANDARD.encode(&doc.content);
 
-            let new_doc = NewChargebackDocument {
+            let new_doc = CreateChargebackDocument {
                 chargeback: self.inner.id.to_string(),
                 chargeback_message: Some(response.id.to_string()),
                 name: Some(doc.name),
@@ -836,7 +836,7 @@ impl TypedChargeback<PreArbitration> {
             ));
         }
 
-        let message = NewChargebackMessage {
+        let message = CreateChargebackMessage {
             chargeback: self.inner.id.to_string(),
             message_type: Some(ChargebackMessageType::AcceptLiability),
             subject: Some("Accept Liability".to_string()),
@@ -871,7 +871,7 @@ impl TypedChargeback<SecondChargeback> {
             ));
         }
 
-        let message = NewChargebackMessage {
+        let message = CreateChargebackMessage {
             chargeback: self.inner.id.to_string(),
             message_type: Some(ChargebackMessageType::Represent),
             subject: Some("Second Chargeback Representment".to_string()),
@@ -887,7 +887,7 @@ impl TypedChargeback<SecondChargeback> {
             let document_type = mime_type_to_document_type(&doc.mime_type);
             let encoded_content = base64::engine::general_purpose::STANDARD.encode(&doc.content);
 
-            let new_doc = NewChargebackDocument {
+            let new_doc = CreateChargebackDocument {
                 chargeback: self.inner.id.to_string(),
                 chargeback_message: Some(response.id.to_string()),
                 name: Some(doc.name),
@@ -918,7 +918,7 @@ impl TypedChargeback<SecondChargeback> {
             ));
         }
 
-        let message = NewChargebackMessage {
+        let message = CreateChargebackMessage {
             chargeback: self.inner.id.to_string(),
             message_type: Some(ChargebackMessageType::AcceptLiability),
             subject: Some("Accept Liability".to_string()),

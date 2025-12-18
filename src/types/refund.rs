@@ -5,6 +5,7 @@
 //!
 //! **OpenAPI schema:** `refundsResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 
 use super::PayrixId;
@@ -20,13 +21,15 @@ use super::PayrixId;
 /// **OpenAPI schema:** `refundsResponse`
 ///
 /// See API_INCONSISTENCIES.md for known deviations from this spec.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateRefund, update = UpdateRefund)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Refund {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -34,6 +37,7 @@ pub struct Refund {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -42,24 +46,28 @@ pub struct Refund {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: creator)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
     /// The identifier of the Entry that is being refunded.
     ///
     /// **OpenAPI type:** string (ref: refundsModelEntry)
+    #[payrix(create_only)]
     #[serde(default)]
     pub entry: Option<PayrixId>,
 
@@ -68,6 +76,7 @@ pub struct Refund {
     /// This field is stored as a text string (0-100 characters).
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub description: Option<String>,
 

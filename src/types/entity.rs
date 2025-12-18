@@ -5,10 +5,11 @@
 //!
 //! **OpenAPI schema:** `entitiesResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use super::{bool_from_int_default_false, MerchantType, PayrixId, TaxIdStatus};
+use super::{bool_from_int_default_false, deserialize_string_or_int, MerchantType, PayrixId, TaxIdStatus};
 
 // =============================================================================
 // ENUMS
@@ -244,7 +245,8 @@ pub enum EntityPublic {
 /// **OpenAPI schema:** `entitiesResponse`
 ///
 /// See API_INCONSISTENCIES.md for known deviations from this spec.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateEntity, update = UpdateEntity)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Entity {
@@ -255,6 +257,7 @@ pub struct Entity {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -262,6 +265,7 @@ pub struct Entity {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -270,30 +274,35 @@ pub struct Entity {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: creator)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
     /// The incoming IP address from which this Entity was created.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub ip_created: Option<String>,
 
     /// The incoming IP address from which this Entity was last modified.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub ip_modified: Option<String>,
 
@@ -330,6 +339,7 @@ pub struct Entity {
     /// The type of Entity (business structure).
     ///
     /// **OpenAPI type:** integer (ref: entityType)
+    #[payrix(mutable)]
     #[serde(default, rename = "type")]
     pub entity_type: Option<MerchantType>,
 
@@ -338,6 +348,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 1 and 100 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub name: Option<String>,
 
@@ -346,6 +357,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 1 and 1,000 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub display_name: Option<String>,
 
@@ -358,6 +370,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 1 and 500 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub address1: Option<String>,
 
@@ -366,6 +379,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 1 and 500 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub address2: Option<String>,
 
@@ -374,6 +388,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 1 and 500 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub city: Option<String>,
 
@@ -384,6 +399,7 @@ pub struct Entity {
     /// provide the full state name.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub state: Option<String>,
 
@@ -392,6 +408,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 1 and 20 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub zip: Option<String>,
 
@@ -400,6 +417,7 @@ pub struct Entity {
     /// Currently accepts values including `USA` and `CAN`.
     ///
     /// **OpenAPI type:** string (ref: entityCountry)
+    #[payrix(mutable)]
     #[serde(default)]
     pub country: Option<String>,
 
@@ -408,6 +426,7 @@ pub struct Entity {
     /// Valid values: est, pst, cst, mst, akst, hst, sst, chst, ast, pwt, mht, chut, nst
     ///
     /// **OpenAPI type:** string (ref: Timezone)
+    #[payrix(mutable)]
     #[serde(default)]
     pub timezone: Option<String>,
 
@@ -416,6 +435,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 0 and 500 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub website: Option<String>,
 
@@ -428,6 +448,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 5 and 15 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub phone: Option<String>,
 
@@ -437,6 +458,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 5 and 15 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub customer_phone: Option<String>,
 
@@ -445,6 +467,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 5 and 15 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub fax: Option<String>,
 
@@ -453,6 +476,7 @@ pub struct Entity {
     /// This field is stored as a text string and must be between 1 and 100 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub email: Option<String>,
 
@@ -564,7 +588,9 @@ pub struct Entity {
     /// for example, `201601201528` for January 20, 2016, at 15:28 (3:28 PM).
     ///
     /// **OpenAPI type:** string
-    #[serde(default)]
+    ///
+    /// NOTE: API sometimes returns this as an integer instead of a string.
+    #[serde(default, deserialize_with = "deserialize_string_or_int")]
     pub tc_accept_date: Option<String>,
 
     /// IP address from which this Entity accepted the Terms and Conditions.
@@ -610,6 +636,7 @@ pub struct Entity {
     /// Must be between 0 and 1,000 characters long.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub custom: Option<String>,
 
@@ -623,6 +650,7 @@ pub struct Entity {
     /// - `1` - Inactive
     ///
     /// **OpenAPI type:** integer (ref: Inactive)
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
@@ -632,6 +660,7 @@ pub struct Entity {
     /// - `1` - Frozen
     ///
     /// **OpenAPI type:** integer (ref: Frozen)
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }

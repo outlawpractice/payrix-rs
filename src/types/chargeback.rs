@@ -4,6 +4,7 @@
 //!
 //! **OpenAPI schema:** `chargebacksResponse`
 
+use payrix_macros::PayrixEntity;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -312,7 +313,8 @@ pub enum MessageDirection {
 /// **OpenAPI schema:** `chargebacksResponse`
 ///
 /// See `API_INCONSISTENCIES.md` for known deviations from this spec.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PayrixEntity)]
+#[payrix(update = UpdateChargeback)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct Chargeback {
@@ -323,6 +325,7 @@ pub struct Chargeback {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
@@ -330,6 +333,7 @@ pub struct Chargeback {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
@@ -338,18 +342,21 @@ pub struct Chargeback {
     /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
     ///
     /// **OpenAPI type:** string (pattern: `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{4}$`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string (ref: `creator`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
@@ -378,6 +385,7 @@ pub struct Chargeback {
     /// Description of the chargeback.
     ///
     /// **OpenAPI type:** string
+    #[payrix(mutable)]
     #[serde(default)]
     pub description: Option<String>,
 
@@ -528,6 +536,7 @@ pub struct Chargeback {
     /// Valid values:
     /// - `0` - Active
     /// - `1` - Inactive
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
@@ -538,6 +547,7 @@ pub struct Chargeback {
     /// Valid values:
     /// - `0` - Not Frozen
     /// - `1` - Frozen
+    #[payrix(mutable)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }
@@ -551,134 +561,124 @@ pub struct Chargeback {
 /// Messages are communications related to a chargeback case.
 ///
 /// **OpenAPI schema:** `chargebackMessagesResponse`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateChargebackMessage)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct ChargebackMessage {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
     /// The date and time at which this resource was modified.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
     /// Chargeback ID this message belongs to.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only, create_required, create_type = "String")]
     pub chargeback: PayrixId,
 
     /// Login ID that created this message.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub login: Option<PayrixId>,
 
     /// Message type.
     ///
     /// **OpenAPI type:** string (ref: `chargebackMessageType`)
+    #[payrix(create_only)]
     #[serde(default, rename = "type")]
     pub message_type: Option<ChargebackMessageType>,
 
     /// Message status.
     ///
     /// **OpenAPI type:** string (ref: `chargebackMessageStatus`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub status: Option<ChargebackMessageStatus>,
 
     /// Message subject.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only)]
     #[serde(default)]
     pub subject: Option<String>,
 
     /// Message body.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only)]
     #[serde(default)]
     pub message: Option<String>,
 
     /// Sender information.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub sender: Option<String>,
 
     /// Direction (inbound/outbound).
     ///
     /// **OpenAPI type:** integer (ref: `messageDirection`)
+    #[payrix(readonly)]
     #[serde(default)]
     pub direction: Option<MessageDirection>,
 
     /// Read status.
     ///
     /// **OpenAPI type:** integer
+    #[payrix(readonly)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub read: bool,
 
     /// Whether this resource is marked as inactive.
     ///
     /// **OpenAPI type:** integer (ref: `Inactive`)
+    #[payrix(readonly)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
     /// Whether this resource is marked as frozen.
     ///
     /// **OpenAPI type:** integer (ref: `Frozen`)
+    #[payrix(readonly)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }
 
-/// Request to create a new chargeback message.
-///
-/// **OpenAPI schema:** `chargebackMessagesRequest`
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewChargebackMessage {
-    /// Chargeback ID (required).
-    ///
-    /// **OpenAPI type:** string
-    pub chargeback: String,
-
-    /// Message type.
-    ///
-    /// **OpenAPI type:** string (ref: `chargebackMessageType`)
-    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-    pub message_type: Option<ChargebackMessageType>,
-
-    /// Message subject.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subject: Option<String>,
-
-    /// Message body.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-}
+// CreateChargebackMessage is generated by the PayrixEntity derive macro.
+// See the ChargebackMessage struct for field documentation.
 
 // =============================================================================
 // ChargebackDocument (Response)
@@ -689,156 +689,131 @@ pub struct NewChargebackMessage {
 /// Documents are evidence files attached to chargeback cases.
 ///
 /// **OpenAPI schema:** `chargebackDocumentsResponse`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PayrixEntity)]
+#[payrix(create = CreateChargebackDocument)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[serde(rename_all = "camelCase")]
 pub struct ChargebackDocument {
     /// The ID of this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     pub id: PayrixId,
 
     /// The date and time at which this resource was created.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub created: Option<String>,
 
     /// The date and time at which this resource was modified.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modified: Option<String>,
 
     /// The identifier of the Login that created this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub creator: Option<PayrixId>,
 
     /// The identifier of the Login that last modified this resource.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub modifier: Option<PayrixId>,
 
     /// Chargeback ID this document belongs to.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only, create_required, create_type = "String")]
     pub chargeback: PayrixId,
 
     /// Chargeback message ID (if attached to a message).
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only, create_type = "String")]
     #[serde(default)]
     pub chargeback_message: Option<PayrixId>,
 
     /// Login ID that uploaded this document.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub login: Option<PayrixId>,
 
     /// Document name/filename.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only)]
     #[serde(default)]
     pub name: Option<String>,
 
     /// Document type/category.
     ///
     /// **OpenAPI type:** string (ref: `chargebackDocumentType`)
+    #[payrix(create_only)]
     #[serde(default, rename = "type")]
     pub document_type: Option<ChargebackDocumentType>,
 
     /// MIME type.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only)]
     #[serde(default)]
     pub mime_type: Option<String>,
 
     /// File size in bytes.
     ///
     /// **OpenAPI type:** integer (int64)
+    #[payrix(readonly)]
     #[serde(default)]
     pub size: Option<i64>,
 
     /// Document URL or path.
     ///
     /// **OpenAPI type:** string
+    #[payrix(readonly)]
     #[serde(default)]
     pub url: Option<String>,
 
     /// Document description.
     ///
     /// **OpenAPI type:** string
+    #[payrix(create_only)]
     #[serde(default)]
     pub description: Option<String>,
+
+    /// Base64-encoded document content (used for creating documents).
+    ///
+    /// Only used when creating a document. Not returned in responses.
+    #[payrix(create_only)]
+    #[serde(default, skip_deserializing)]
+    pub data: Option<String>,
 
     /// Whether this resource is marked as inactive.
     ///
     /// **OpenAPI type:** integer (ref: `Inactive`)
+    #[payrix(readonly)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub inactive: bool,
 
     /// Whether this resource is marked as frozen.
     ///
     /// **OpenAPI type:** integer (ref: `Frozen`)
+    #[payrix(readonly)]
     #[serde(default, with = "bool_from_int_default_false")]
     pub frozen: bool,
 }
 
-/// Request to create a new chargeback document.
-///
-/// **OpenAPI schema:** `chargebackDocumentsRequest`
-///
-/// Note: Document content can be provided via the `data` field as base64-encoded
-/// binary data. Verify with Payrix documentation for the exact format requirements.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewChargebackDocument {
-    /// Chargeback ID (required).
-    ///
-    /// **OpenAPI type:** string
-    pub chargeback: String,
-
-    /// Chargeback message ID (if attaching to a message).
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub chargeback_message: Option<String>,
-
-    /// Document name/filename.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-
-    /// Document type/category.
-    ///
-    /// **OpenAPI type:** string (ref: `chargebackDocumentType`)
-    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-    pub document_type: Option<ChargebackDocumentType>,
-
-    /// MIME type.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub mime_type: Option<String>,
-
-    /// Document description.
-    ///
-    /// **OpenAPI type:** string
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-
-    /// Base64-encoded document content.
-    ///
-    /// Some payment APIs accept document content as base64-encoded data.
-    /// Verify the exact format with Payrix API documentation.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<String>,
-}
+// CreateChargebackDocument is generated by the PayrixEntity derive macro.
+// See the ChargebackDocument struct for field documentation.
 
 // =============================================================================
 // ChargebackMessageResult (Response)
@@ -1230,8 +1205,8 @@ mod tests {
     }
 
     #[test]
-    fn new_chargeback_message_serialize() {
-        let msg = NewChargebackMessage {
+    fn create_chargeback_message_serialize() {
+        let msg = CreateChargebackMessage {
             chargeback: "t1_chb_12345678901234567890123".to_string(),
             message_type: Some(ChargebackMessageType::Represent),
             subject: Some("Response".to_string()),
@@ -1259,8 +1234,8 @@ mod tests {
     }
 
     #[test]
-    fn new_chargeback_document_serialize() {
-        let doc = NewChargebackDocument {
+    fn create_chargeback_document_serialize() {
+        let doc = CreateChargebackDocument {
             chargeback: "t1_chb_12345678901234567890123".to_string(),
             chargeback_message: Some("t1_cbm_12345678901234567890123".to_string()),
             name: Some("evidence.pdf".to_string()),

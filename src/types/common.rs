@@ -11,8 +11,8 @@ use std::fmt;
 /// 29-32 characters long. Most are 30 characters, but some endpoints return
 /// IDs with slightly different lengths.
 ///
-/// NOTE: The API is inconsistent with ID lengths. This type accepts IDs
-/// between 29 and 32 characters to avoid deserialization failures.
+/// NOTE: The API is inconsistent with ID lengths. This type accepts any
+/// non-empty string up to 50 characters to handle various internal ID formats.
 ///
 /// # Example
 /// ```
@@ -35,13 +35,16 @@ impl PayrixId {
     /// The typical length for Payrix IDs (most common).
     pub const TYPICAL_LENGTH: usize = 30;
     /// Minimum accepted length for Payrix IDs.
-    pub const MIN_LENGTH: usize = 29;
+    ///
+    /// NOTE: The API sometimes returns shorter IDs (e.g., 15 chars) for
+    /// certain internal/system references. Standard IDs are 29-32 chars.
+    pub const MIN_LENGTH: usize = 10;
     /// Maximum accepted length for Payrix IDs.
     pub const MAX_LENGTH: usize = 32;
 
     /// Create a new PayrixId, validating the length.
     ///
-    /// Returns `Err` if the string is not between 29 and 32 characters.
+    /// Returns `Err` if the string is not between 10 and 32 characters.
     pub fn new(s: impl Into<String>) -> Result<Self, String> {
         let s = s.into();
         if s.len() < Self::MIN_LENGTH || s.len() > Self::MAX_LENGTH {
@@ -640,6 +643,69 @@ where
     deserializer.deserialize_any(OptionalI32Visitor)
 }
 
+/// Deserialize an `Option<String>` from either a string or integer.
+///
+/// The Payrix API sometimes returns date fields as integers (e.g., `20251216`)
+/// when the schema documents them as strings.
+pub fn deserialize_string_or_int<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct StringOrIntVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for StringOrIntVisitor {
+        type Value = Option<String>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a string, integer, or null")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Some(v.to_string()))
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Some(v.to_string()))
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Some(v.to_string()))
+        }
+
+        fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Some(v))
+        }
+    }
+
+    deserializer.deserialize_any(StringOrIntVisitor)
+}
+
 /// Macro to implement flexible deserialization for i32 repr enums.
 ///
 /// The Payrix API sometimes returns integer enum values as strings (e.g., `"1"` instead of `1`).
@@ -1088,6 +1154,229 @@ pub enum BankAccountType {
     Savings,
 }
 
+// =============================================================================
+// COMPOSABLE ENTITY COMPONENTS
+// =============================================================================
+
+/// Common metadata fields present on all Payrix entity responses.
+///
+/// These fields are read-only and set by the API. They should never be
+/// included in create or update requests.
+///
+/// Use with `#[serde(flatten)]` to include in entity response structs.
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(Debug, Clone, Serialize, Deserialize)]
+/// pub struct MyEntity {
+///     pub id: PayrixId,
+///     #[serde(flatten)]
+///     pub meta: EntityMeta,
+///     // ... entity-specific fields
+/// }
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntityMeta {
+    /// The date and time at which this resource was created.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    #[serde(default)]
+    pub created: Option<String>,
+
+    /// The date and time at which this resource was modified.
+    ///
+    /// Format: `YYYY-MM-DD HH:MM:SS.SSSS`
+    #[serde(default)]
+    pub modified: Option<String>,
+
+    /// The identifier of the Login that created this resource.
+    #[serde(default)]
+    pub creator: Option<PayrixId>,
+
+    /// The identifier of the Login that last modified this resource.
+    #[serde(default)]
+    pub modifier: Option<PayrixId>,
+}
+
+/// Common status flags present on all Payrix entity responses.
+///
+/// These fields are mutable and can be set on both create and update requests.
+/// For responses, use this type with `bool` fields that default to `false`.
+///
+/// Use with `#[serde(flatten)]` to include in entity response structs.
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(Debug, Clone, Serialize, Deserialize)]
+/// pub struct MyEntity {
+///     pub id: PayrixId,
+///     #[serde(flatten)]
+///     pub status: StatusFlags,
+/// }
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusFlags {
+    /// Whether this resource is marked as inactive.
+    ///
+    /// - `0` - Active
+    /// - `1` - Inactive
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub inactive: bool,
+
+    /// Whether this resource is marked as frozen.
+    ///
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
+    #[serde(default, with = "bool_from_int_default_false")]
+    pub frozen: bool,
+}
+
+/// Common status flags for create/update requests.
+///
+/// Unlike `StatusFlags`, these use `Option<bool>` so that omitting a field
+/// doesn't change its value (useful for partial updates).
+///
+/// Use with `#[serde(flatten)]` to include in request structs.
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(Debug, Clone, Serialize)]
+/// pub struct UpdateMyEntity {
+///     pub name: Option<String>,
+///     #[serde(flatten)]
+///     pub status: StatusFlagsRequest,
+/// }
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusFlagsRequest {
+    /// Whether this resource is marked as inactive.
+    ///
+    /// - `0` - Active
+    /// - `1` - Inactive
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
+    pub inactive: Option<bool>,
+
+    /// Whether this resource is marked as frozen.
+    ///
+    /// - `0` - Not Frozen
+    /// - `1` - Frozen
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "option_bool_from_int")]
+    pub frozen: Option<bool>,
+}
+
+impl StatusFlagsRequest {
+    /// Create a request to set inactive status.
+    pub fn inactive(value: bool) -> Self {
+        Self {
+            inactive: Some(value),
+            frozen: None,
+        }
+    }
+
+    /// Create a request to set frozen status.
+    pub fn frozen(value: bool) -> Self {
+        Self {
+            inactive: None,
+            frozen: Some(value),
+        }
+    }
+
+    /// Create a request to deactivate the entity.
+    pub fn deactivate() -> Self {
+        Self::inactive(true)
+    }
+
+    /// Create a request to reactivate the entity.
+    pub fn activate() -> Self {
+        Self::inactive(false)
+    }
+}
+
+/// Common name and description fields present on many Payrix entities.
+///
+/// Used by Alert, AlertTrigger, Plan, Token, and other entity types.
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(Debug, Clone, Serialize, Deserialize)]
+/// pub struct MyEntity {
+///     pub id: PayrixId,
+///     #[serde(flatten)]
+///     pub naming: NameDescription,
+/// }
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NameDescription {
+    /// The name of this resource.
+    ///
+    /// Typically 0-100 characters.
+    #[serde(default)]
+    pub name: Option<String>,
+
+    /// A description of this resource.
+    ///
+    /// Typically 0-100 characters.
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+impl NameDescription {
+    /// Create a new NameDescription with just a name.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: Some(name.into()),
+            description: None,
+        }
+    }
+
+    /// Create with both name and description.
+    pub fn with_description(name: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            name: Some(name.into()),
+            description: Some(description.into()),
+        }
+    }
+}
+
+/// Common name and description fields for create/update requests.
+///
+/// Uses `Option` for both fields so partial updates only change specified fields.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NameDescriptionRequest {
+    /// The name of this resource (0-100 characters).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    /// A description of this resource (0-100 characters).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+impl NameDescriptionRequest {
+    /// Create with just a name.
+    pub fn name(name: impl Into<String>) -> Self {
+        Self {
+            name: Some(name.into()),
+            description: None,
+        }
+    }
+
+    /// Add a description to this request.
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1110,17 +1399,31 @@ mod tests {
     }
 
     #[test]
-    fn payrix_id_too_short() {
-        let result = PayrixId::new("t1_txn_short");
+    fn payrix_id_empty_is_error() {
+        let result = PayrixId::new("");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("between 29 and 32 characters"));
+        assert!(result.unwrap_err().contains("between 10 and 32 characters"));
     }
 
     #[test]
     fn payrix_id_too_long() {
         let result = PayrixId::new("t1_txn_1234567890123456789012345678901234567890");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("between 29 and 32 characters"));
+        assert!(result.unwrap_err().contains("between 10 and 32 characters"));
+    }
+
+    #[test]
+    fn payrix_id_15_chars_ok() {
+        // Some API responses return 15 character IDs for internal references
+        let result = PayrixId::new("t1_txn_12345678");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn payrix_id_10_chars_ok() {
+        // Minimum valid length
+        let result = PayrixId::new("t1_txn_123");
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -1165,8 +1468,16 @@ mod tests {
     }
 
     #[test]
-    fn payrix_id_deserialize_invalid_length() {
-        let json = "\"too_short\"";
+    fn payrix_id_deserialize_empty_is_error() {
+        let json = "\"\"";
+        let result: Result<PayrixId, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn payrix_id_deserialize_short_is_error() {
+        // Single character IDs are not valid PayrixIds
+        let json = "\"x\"";
         let result: Result<PayrixId, _> = serde_json::from_str(json);
         assert!(result.is_err());
     }
@@ -1554,5 +1865,240 @@ mod tests {
             let result = DateYmd::new(date_str);
             assert!(result.is_err(), "Expected {} to be invalid", date_str);
         }
+    }
+
+    // ==================== EntityMeta Tests ====================
+
+    #[test]
+    fn entity_meta_deserialize() {
+        let json = r#"{
+            "created": "2024-01-01 00:00:00.0000",
+            "modified": "2024-01-02 12:00:00.0000",
+            "creator": "t1_lgn_12345678901234567890123",
+            "modifier": "t1_lgn_12345678901234567890124"
+        }"#;
+
+        let meta: EntityMeta = serde_json::from_str(json).unwrap();
+        assert_eq!(meta.created.as_deref(), Some("2024-01-01 00:00:00.0000"));
+        assert_eq!(meta.modified.as_deref(), Some("2024-01-02 12:00:00.0000"));
+        assert_eq!(meta.creator.as_ref().map(|c| c.as_str()), Some("t1_lgn_12345678901234567890123"));
+        assert_eq!(meta.modifier.as_ref().map(|m| m.as_str()), Some("t1_lgn_12345678901234567890124"));
+    }
+
+    #[test]
+    fn entity_meta_deserialize_empty() {
+        let json = "{}";
+        let meta: EntityMeta = serde_json::from_str(json).unwrap();
+        assert!(meta.created.is_none());
+        assert!(meta.modified.is_none());
+        assert!(meta.creator.is_none());
+        assert!(meta.modifier.is_none());
+    }
+
+    #[test]
+    fn entity_meta_default() {
+        let meta = EntityMeta::default();
+        assert!(meta.created.is_none());
+        assert!(meta.modified.is_none());
+        assert!(meta.creator.is_none());
+        assert!(meta.modifier.is_none());
+    }
+
+    // ==================== StatusFlags Tests ====================
+
+    #[test]
+    fn status_flags_deserialize() {
+        let json = r#"{"inactive": 1, "frozen": 0}"#;
+        let status: StatusFlags = serde_json::from_str(json).unwrap();
+        assert!(status.inactive);
+        assert!(!status.frozen);
+    }
+
+    #[test]
+    fn status_flags_deserialize_empty() {
+        let json = "{}";
+        let status: StatusFlags = serde_json::from_str(json).unwrap();
+        assert!(!status.inactive);
+        assert!(!status.frozen);
+    }
+
+    #[test]
+    fn status_flags_default() {
+        let status = StatusFlags::default();
+        assert!(!status.inactive);
+        assert!(!status.frozen);
+    }
+
+    #[test]
+    fn status_flags_serialize() {
+        let status = StatusFlags { inactive: true, frozen: false };
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(json.contains("\"inactive\":1"));
+        assert!(json.contains("\"frozen\":0"));
+    }
+
+    // ==================== StatusFlagsRequest Tests ====================
+
+    #[test]
+    fn status_flags_request_serialize() {
+        let status = StatusFlagsRequest { inactive: Some(true), frozen: Some(false) };
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(json.contains("\"inactive\":1"));
+        assert!(json.contains("\"frozen\":0"));
+    }
+
+    #[test]
+    fn status_flags_request_serialize_empty() {
+        let status = StatusFlagsRequest::default();
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "{}");
+    }
+
+    #[test]
+    fn status_flags_request_serialize_partial() {
+        let status = StatusFlagsRequest::inactive(true);
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(json.contains("\"inactive\":1"));
+        assert!(!json.contains("frozen"));
+    }
+
+    #[test]
+    fn status_flags_request_deactivate() {
+        let status = StatusFlagsRequest::deactivate();
+        assert_eq!(status.inactive, Some(true));
+        assert_eq!(status.frozen, None);
+    }
+
+    #[test]
+    fn status_flags_request_activate() {
+        let status = StatusFlagsRequest::activate();
+        assert_eq!(status.inactive, Some(false));
+        assert_eq!(status.frozen, None);
+    }
+
+    // ==================== NameDescription Tests ====================
+
+    #[test]
+    fn name_description_deserialize() {
+        let json = r#"{"name": "Test Name", "description": "Test Description"}"#;
+        let nd: NameDescription = serde_json::from_str(json).unwrap();
+        assert_eq!(nd.name.as_deref(), Some("Test Name"));
+        assert_eq!(nd.description.as_deref(), Some("Test Description"));
+    }
+
+    #[test]
+    fn name_description_deserialize_empty() {
+        let json = "{}";
+        let nd: NameDescription = serde_json::from_str(json).unwrap();
+        assert!(nd.name.is_none());
+        assert!(nd.description.is_none());
+    }
+
+    #[test]
+    fn name_description_new() {
+        let nd = NameDescription::new("Test");
+        assert_eq!(nd.name.as_deref(), Some("Test"));
+        assert!(nd.description.is_none());
+    }
+
+    #[test]
+    fn name_description_with_description() {
+        let nd = NameDescription::with_description("Test", "Description");
+        assert_eq!(nd.name.as_deref(), Some("Test"));
+        assert_eq!(nd.description.as_deref(), Some("Description"));
+    }
+
+    // ==================== NameDescriptionRequest Tests ====================
+
+    #[test]
+    fn name_description_request_serialize() {
+        let nd = NameDescriptionRequest {
+            name: Some("Test".to_string()),
+            description: Some("Desc".to_string()),
+        };
+        let json = serde_json::to_string(&nd).unwrap();
+        assert!(json.contains("\"name\":\"Test\""));
+        assert!(json.contains("\"description\":\"Desc\""));
+    }
+
+    #[test]
+    fn name_description_request_serialize_empty() {
+        let nd = NameDescriptionRequest::default();
+        let json = serde_json::to_string(&nd).unwrap();
+        assert_eq!(json, "{}");
+    }
+
+    #[test]
+    fn name_description_request_builder() {
+        let nd = NameDescriptionRequest::name("Test")
+            .with_description("Desc");
+        assert_eq!(nd.name.as_deref(), Some("Test"));
+        assert_eq!(nd.description.as_deref(), Some("Desc"));
+    }
+
+    // ==================== Flatten Integration Tests ====================
+
+    #[test]
+    fn flatten_entity_meta_with_other_fields() {
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct TestEntity {
+            id: String,
+            #[serde(flatten)]
+            meta: EntityMeta,
+            custom_field: Option<String>,
+        }
+
+        let json = r#"{
+            "id": "test123",
+            "created": "2024-01-01 00:00:00.0000",
+            "modifier": "t1_lgn_12345678901234567890123",
+            "customField": "custom value"
+        }"#;
+
+        let entity: TestEntity = serde_json::from_str(json).unwrap();
+        assert_eq!(entity.id, "test123");
+        assert_eq!(entity.meta.created.as_deref(), Some("2024-01-01 00:00:00.0000"));
+        assert!(entity.meta.modified.is_none());
+        assert!(entity.meta.creator.is_none());
+        assert!(entity.meta.modifier.is_some());
+        assert_eq!(entity.custom_field.as_deref(), Some("custom value"));
+    }
+
+    #[test]
+    fn flatten_status_flags_with_other_fields() {
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct TestEntity {
+            id: String,
+            #[serde(flatten)]
+            status: StatusFlags,
+        }
+
+        let json = r#"{"id": "test123", "inactive": 1, "frozen": 0}"#;
+        let entity: TestEntity = serde_json::from_str(json).unwrap();
+        assert_eq!(entity.id, "test123");
+        assert!(entity.status.inactive);
+        assert!(!entity.status.frozen);
+    }
+
+    #[test]
+    fn flatten_status_flags_request_serialize() {
+        #[derive(Debug, Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct UpdateRequest {
+            name: Option<String>,
+            #[serde(flatten)]
+            status: StatusFlagsRequest,
+        }
+
+        let request = UpdateRequest {
+            name: Some("Updated".to_string()),
+            status: StatusFlagsRequest::inactive(true),
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("\"name\":\"Updated\""));
+        assert!(json.contains("\"inactive\":1"));
+        assert!(!json.contains("frozen"));
     }
 }

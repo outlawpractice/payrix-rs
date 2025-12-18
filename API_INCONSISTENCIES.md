@@ -154,6 +154,16 @@ Less critical but notable:
 
 **Library solution:** Integer-based enum created from observed behavior.
 
+### FeeRuleType (Case Sensitivity)
+
+**OpenAPI suggests:** UPPERCASE string values
+- `"METHOD"`, `"BIN"`, `"AVSRESULT"`, etc.
+
+**Actual API returns:** Sometimes lowercase
+- `"method"` instead of `"METHOD"` (observed December 2025)
+
+**Library solution:** Added lowercase aliases via `#[serde(alias = "method")]` for case-insensitive deserialization.
+
 ### SubscriptionSchedule / PlanSchedule
 
 **OpenAPI suggests:** Integer enum (4 values)
@@ -187,9 +197,11 @@ Less critical but notable:
 **Actual API returns:** Variable-length IDs
 - Most IDs: 30 characters
 - Some endpoints (Disbursements, Payouts): 32 characters
-- Observed range: 29-32 characters
+- Some internal/system IDs: 15 characters (observed December 2025)
+- Some reference fields contain single-character values like `"1"` (observed December 2025)
+- Observed range: 1-50 characters
 
-**Library solution:** Changed validation from exactly 30 characters to accept 29-32 characters.
+**Library solution:** Changed validation to accept any non-empty string up to 50 characters to handle all observed ID formats.
 
 ### DateYmd (YYYYMMDD dates)
 
@@ -201,6 +213,34 @@ Less critical but notable:
 - Other lengths observed in various contexts
 
 **Library solution:** Relaxed validation to accept any numeric string. Only validates full 8-character dates for correctness; shorter strings are accepted as-is.
+
+### Member.dob (Date of Birth)
+
+**OpenAPI suggests:** `integer (int32)` in YYYYMMDD format (e.g., `19800115`)
+
+**Actual API returns:** String in various formats
+- Full date as string: `"19800115"`
+- Year only: `"1980"` (observed December 2025)
+
+**Library solution:** Changed `dob` field from `Option<i32>` to `Option<String>` to handle string responses.
+
+### Transaction Date Fields (captured, settled, returned)
+
+**OpenAPI suggests:** String in datetime format (`YYYY-MM-DD HH:MM:SS`)
+
+**Actual API returns:** Sometimes integer in YYYYMMDD format
+- Example: `20251216` instead of `"2025-12-16 00:00:00"` (observed December 2025)
+
+**Library solution:** Added flexible deserializer that accepts both string and integer formats.
+
+### Entity.tc_accept_date
+
+**OpenAPI suggests:** String in YYYYMMDDHHII format (e.g., `"201601201528"`)
+
+**Actual API returns:** Sometimes integer
+- Example: `202309192157` instead of `"202309192157"` (observed December 2025)
+
+**Library solution:** Added flexible deserializer that accepts both string and integer formats.
 
 ### Disbursement Date Fields
 
@@ -494,34 +534,43 @@ These are cases where field names match but have different meanings.
 
 ---
 
-## Test Results Summary (Strict OpenAPI Types)
+## Test Results Summary (December 2025)
 
-**Current Approach:** Types strictly follow OpenAPI specification. Failing tests document real API inconsistencies.
+**Current Approach:** Types use flexible deserializers to handle API inconsistencies while maintaining type safety.
 
-**Passing tests (51/55):**
-- All CRUD and read tests pass for most entity types
+**Passing tests (67/68):**
+- All CRUD and read tests pass for all entity types
 - Customer, token, transaction creation tests pass
-- Most GET tests pass
+- All GET tests pass except TeamLogins
 
-**Failing tests that document API inconsistencies (4/55):**
+**Failing test (1/68):**
 
 | Test | Error | API Inconsistency |
 |------|-------|-------------------|
-| `test_get_disbursement_entries` | `invalid type: floating point 1855189.609, expected i64` | **Amount fields return floats instead of integers** |
-| `test_get_funds` | `invalid type: floating point 3524255.258, expected i64` | **Balance fields return floats instead of integers** |
-| `test_get_disbursements` | `DateYmd must contain only digits, got '2025-10-09 10:47:48'` | **Date fields return datetime instead of YYYYMMDD** |
-| `test_get_team_logins` | `EOF while parsing a value` | Empty response body (access issue) |
+| `test_get_team_logins` | `EOF while parsing a value` | Empty response body (access/permission issue with test account) |
 
-**Key Inconsistencies Proven by Tests:**
+**Key Inconsistencies Fixed (December 2025):**
 
 1. **Transaction Status (RESOLVED):** POST responses return `status` as string (`"1"`), GET responses return integer (`1`). Fixed with flexible deserializer.
 
-2. **Monetary Fields (CRITICAL):** OpenAPI specifies integer cents, but API returns floats:
+2. **Monetary Fields (RESOLVED):** OpenAPI specifies integer cents, but API returns floats. Changed types to f64:
    - Fund: `available`, `pending`, `reserved`, `total`
    - DisbursementEntry: `amount`, `fee`, `net`
 
-3. **Date Fields (CRITICAL):** OpenAPI specifies YYYYMMDD format, but API returns full datetimes:
+3. **Date Fields - Datetime (RESOLVED):** OpenAPI specifies YYYYMMDD format, but API returns full datetimes. Changed to String:
    - Disbursement: `scheduled`, `processed`
+
+4. **Date Fields - Integer (RESOLVED):** OpenAPI specifies string, but API returns integers:
+   - Transaction: `captured`, `settled`, `returned` - added flexible deserializer
+   - Entity: `tc_accept_date` - added flexible deserializer
+
+5. **Member.dob (RESOLVED):** OpenAPI specifies integer, but API returns string. Changed to String.
+
+6. **PayrixId Length (RESOLVED):** Some ID fields contain very short values (even 1 char). Relaxed validation.
+
+7. **FeeRuleType Case (RESOLVED):** API returns lowercase `method` instead of `METHOD`. Added case-insensitive alias.
+
+8. **BatchStatus (RESOLVED):** API returns `processed` which wasn't in OpenAPI. Added variant.
 
 ---
 
@@ -561,4 +610,4 @@ This appendix summarizes field coverage for major types.
 
 ---
 
-*Last updated: December 16, 2025 - Based on comprehensive OpenAPI vs Rust comparison and raw JSON API testing*
+*Last updated: December 17, 2025 - Based on comprehensive OpenAPI vs Rust comparison and raw JSON API testing*
