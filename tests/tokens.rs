@@ -234,21 +234,11 @@ async fn test_get_token_expanded() {
                 println!("  Payment: not expanded");
             }
 
-            // Check expanded customer if present
-            if let Some(ref customer) = token.customer {
-                println!("  Customer expanded:");
-                println!("    ID: {}", customer.id.as_str());
-                println!("    Name: {} {}",
-                    customer.first.as_deref().unwrap_or(""),
-                    customer.last.as_deref().unwrap_or(""));
-                println!("    Email: {:?}", customer.email);
-
-                // Test convenience method
-                if let Some(name) = token.customer_name() {
-                    println!("  customer_name(): {}", name);
-                }
+            // Check customer ID if present (not expanded - just an ID string)
+            if let Some(customer_id) = token.customer_id() {
+                println!("  Customer ID: {}", customer_id);
             } else {
-                println!("  Customer: not expanded (may not be present)");
+                println!("  Customer: not present");
             }
 
             println!("TokenExpanded test passed!");
@@ -401,23 +391,17 @@ async fn test_create_and_fetch_token_expanded() {
     assert_eq!(payment.method, Some(PaymentMethod::Visa));
     assert_eq!(payment.bin.as_deref(), Some("411111")); // Visa test card BIN
 
-    // Customer should be expanded
-    assert!(expanded.customer.is_some(), "Customer should be expanded");
-    let exp_customer = expanded.customer.as_ref().unwrap();
-    println!("Customer: {} {} ({})",
-        exp_customer.first.as_deref().unwrap_or(""),
-        exp_customer.last.as_deref().unwrap_or(""),
-        exp_customer.id.as_str());
+    // Customer should be present as an ID (API doesn't expand customer)
+    assert!(expanded.customer.is_some(), "Customer ID should be present");
+    let customer_id = expanded.customer_id().unwrap();
+    println!("Customer ID: {}", customer_id);
 
-    // Verify customer data matches what we created
-    assert_eq!(exp_customer.id.as_str(), customer.id.as_str());
-    assert_eq!(exp_customer.first.as_deref(), Some("TokenExpanded"));
-    assert_eq!(exp_customer.last.as_deref(), Some("TestCustomer"));
+    // Verify customer ID matches what we created
+    assert_eq!(customer_id, customer.id.as_str());
 
     // Test convenience methods
     assert_eq!(expanded.payment_method(), Some(PaymentMethod::Visa));
     assert!(expanded.card_display().is_some());
-    assert_eq!(expanded.customer_name(), Some("TokenExpanded TestCustomer".to_string()));
 
     // Cleanup
     ctx.cleanup().await;

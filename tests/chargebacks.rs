@@ -622,24 +622,17 @@ async fn test_get_chargeback_expanded() {
                 println!("  Transaction: NOT EXPANDED");
             }
 
-            // Verify expanded merchant
-            if let Some(ref merchant) = cb.merchant {
-                println!("  Merchant EXPANDED:");
-                println!("    ID: {}", merchant.id.as_str());
-                println!("    DBA: {:?}", merchant.dba);
-                println!("    Status: {:?}", merchant.status);
-
-                assert!(merchant.id.as_str().starts_with("t1_mer_"));
+            // Verify merchant ID (not expanded - just an ID)
+            if let Some(merchant_id) = cb.merchant_id() {
+                println!("  Merchant ID: {}", merchant_id);
+                assert!(merchant_id.starts_with("t1_mer_"));
             } else {
-                println!("  Merchant: NOT EXPANDED");
+                println!("  Merchant: NOT PRESENT");
             }
 
             // Test convenience methods
             if let Some(original) = cb.original_transaction_amount() {
                 println!("  original_transaction_amount(): ${:.2}", original);
-            }
-            if let Some(name) = cb.merchant_name() {
-                println!("  merchant_name(): {}", name);
             }
         }
         Ok(None) => println!("Chargeback not found"),
@@ -678,11 +671,9 @@ async fn test_chargeback_expanded_with_known_id() {
                     txn.total.unwrap_or(0) as f64 / 100.0);
             }
 
-            // Merchant should be expanded
-            if let Some(ref merchant) = cb.merchant {
-                println!("  Merchant: {} ({})",
-                    merchant.dba.as_deref().unwrap_or("N/A"),
-                    merchant.id.as_str());
+            // Merchant should be present as ID
+            if let Some(merchant_id) = cb.merchant_id() {
+                println!("  Merchant ID: {}", merchant_id);
             }
         }
         Ok(None) => println!("Chargeback not found (may have been deleted)"),
@@ -765,8 +756,8 @@ async fn test_chargeback_expanded_vs_raw_json() {
             println!("  txn.id: {}", txn.id.as_str());
             println!("  txn.total: {:?}", txn.total);
         }
-        if let Some(ref merchant) = cb.merchant {
-            println!("  merchant.dba: {:?}", merchant.dba);
+        if let Some(merchant_id) = cb.merchant_id() {
+            println!("  merchant ID: {}", merchant_id);
         }
     }
 }
@@ -795,15 +786,15 @@ async fn test_multiple_chargebacks_expanded() {
 
         match expanded {
             Ok(Some(cb)) => {
-                let merchant_name = cb.merchant_name().unwrap_or("Unknown");
+                let merchant_id = cb.merchant_id().unwrap_or("Unknown");
                 let txn_amount = cb.original_transaction_amount()
                     .map(|a| format!("${:.2}", a))
                     .unwrap_or_else(|| "N/A".to_string());
 
-                println!("  {} -> ${:.2} | Merchant: {} | Orig Txn: {} | Status: {:?}",
+                println!("  {} -> ${:.2} | Merchant ID: {} | Orig Txn: {} | Status: {:?}",
                     cb.id.as_str(),
                     cb.amount_dollars(),
-                    merchant_name,
+                    merchant_id,
                     txn_amount,
                     cb.status);
 

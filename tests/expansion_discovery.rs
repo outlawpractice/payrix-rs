@@ -594,17 +594,13 @@ async fn test_get_transaction_full() {
 
             if let Some(ref token) = txn.token {
                 println!("  Token: {}", token.token.as_deref().unwrap_or("N/A"));
-                if let Some(ref customer) = token.customer {
-                    println!("  Customer: {} {}",
-                        customer.first.as_deref().unwrap_or(""),
-                        customer.last.as_deref().unwrap_or(""));
+                if let Some(customer_id) = token.customer_id() {
+                    println!("  Customer ID: {}", customer_id);
                 }
             }
 
-            if let Some(ref merchant) = txn.merchant {
-                println!("  Merchant: {} ({})",
-                    merchant.dba.as_deref().unwrap_or("N/A"),
-                    merchant.id.as_str());
+            if let Some(merchant_id) = txn.merchant.as_ref().map(|m| m.as_str()) {
+                println!("  Merchant ID: {}", merchant_id);
             }
         }
         Ok(None) => println!("Transaction not found"),
@@ -645,11 +641,8 @@ async fn test_get_token_expanded() {
                 println!("  BIN: {}", payment.bin.as_deref().unwrap_or("N/A"));
             }
 
-            if let Some(ref customer) = token.customer {
-                println!("  Customer: {} {} ({})",
-                    customer.first.as_deref().unwrap_or(""),
-                    customer.last.as_deref().unwrap_or(""),
-                    customer.id.as_str());
+            if let Some(customer_id) = token.customer_id() {
+                println!("  Customer ID: {}", customer_id);
             }
         }
         Ok(None) => println!("Token not found"),
@@ -780,10 +773,9 @@ async fn test_get_plan_expanded() {
             println!("  Schedule: {:?}", plan.schedule);
             println!("  Type: {:?}", plan.plan_type);
 
+            // Merchant is an ID, not expanded
             if let Some(ref merchant) = plan.merchant {
-                println!("  Merchant expanded:");
-                println!("    ID: {}", merchant.id.as_str());
-                println!("    DBA: {:?}", merchant.dba);
+                println!("  Merchant ID: {}", merchant.as_str());
             }
 
             if let Some(ref subs) = plan.subscriptions {
@@ -834,8 +826,8 @@ async fn test_get_chargeback_expanded() {
                 println!("    Status: {:?}", txn.status);
             }
 
-            if let Some(name) = cb.merchant_name() {
-                println!("  Merchant: {}", name);
+            if let Some(merchant_id) = cb.merchant_id() {
+                println!("  Merchant ID: {}", merchant_id);
             }
 
             // Test convenience method
@@ -878,19 +870,14 @@ async fn test_get_batch_expanded() {
             println!("  Is Open: {}", batch.is_open());
             println!("  Reference: {:?}", batch.reference);
 
-            if let Some(ref merchant) = batch.merchant {
-                println!("  Merchant expanded:");
-                println!("    ID: {}", merchant.id.as_str());
-                println!("    DBA: {:?}", merchant.dba);
+            // Merchant is just an ID (not expanded)
+            if let Some(merchant_id) = batch.merchant_id() {
+                println!("  Merchant ID: {}", merchant_id);
             }
 
             if batch.txns.is_some() {
                 println!("  Transactions: {} total", batch.transaction_count());
                 println!("  Total amount: ${:.2}", batch.total_amount_dollars());
-            }
-
-            if let Some(name) = batch.merchant_name() {
-                println!("  merchant_name(): {}", name);
             }
         }
         Ok(None) => println!("Batch not found"),

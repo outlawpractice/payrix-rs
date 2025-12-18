@@ -10,8 +10,8 @@ mod common;
 
 use common::fixtures::{fixture_exists, load_fixture, load_single_fixture};
 use payrix::{
-    Batch, Chargeback, ChargebackMessage, ChargebackStatus, Customer, Member, Merchant,
-    Transaction,
+    Batch, Chargeback, ChargebackMessage, ChargebackStatus, Customer, CustomerExpanded, Member,
+    Merchant, Transaction, TransactionExpanded,
 };
 
 // =============================================================================
@@ -343,6 +343,149 @@ fn test_customers_reference_valid_merchant() {
     }
 
     println!("All customers reference the correct merchant");
+}
+
+// =============================================================================
+// Expanded Type Deserialization Tests
+// =============================================================================
+
+#[test]
+fn test_deserialize_transactions_expanded() {
+    if !fixture_exists("transactions_expanded") {
+        println!("SKIP: transactions_expanded.json not found");
+        println!("Run: cargo test --test collect_mock_data collect_transactions_expanded -- --ignored");
+        return;
+    }
+
+    let transactions: Vec<TransactionExpanded> = load_fixture("transactions_expanded");
+
+    assert!(!transactions.is_empty(), "Should have loaded expanded transactions");
+    println!(
+        "Successfully deserialized {} expanded transactions",
+        transactions.len()
+    );
+
+    for txn in &transactions {
+        assert!(
+            txn.id.as_str().starts_with("t1_txn_"),
+            "Transaction ID should have correct prefix: {}",
+            txn.id
+        );
+
+        // Test convenience methods work
+        let amount = txn.amount_dollars();
+        println!(
+            "  Transaction {}: ${:.2}, approved={}, payment={}",
+            txn.id,
+            amount,
+            txn.is_approved(),
+            txn.payment_display().unwrap_or_else(|| "N/A".to_string())
+        );
+
+        // Verify expanded payment field is an object (not just an ID)
+        if let Some(ref payment) = txn.payment {
+            // Payment should have been expanded - check it has method field
+            assert!(
+                payment.method.is_some(),
+                "Expanded payment should have method field"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_transaction_expanded_convenience_methods() {
+    if !fixture_exists("transactions_expanded") {
+        println!("SKIP: transactions_expanded.json not found");
+        return;
+    }
+
+    let txn: TransactionExpanded = load_single_fixture("transactions_expanded");
+
+    // Test all convenience methods don't panic
+    let _ = txn.amount_dollars();
+    let _ = txn.approved_dollars();
+    let _ = txn.payment_display();
+    let _ = txn.customer_name();
+    let _ = txn.customer_id();
+    let _ = txn.is_approved();
+
+    println!("All TransactionExpanded convenience methods work");
+}
+
+#[test]
+fn test_deserialize_customers_expanded() {
+    if !fixture_exists("customers_expanded") {
+        println!("SKIP: customers_expanded.json not found");
+        println!("Run: cargo test --test collect_mock_data collect_customers_expanded -- --ignored");
+        return;
+    }
+
+    let customers: Vec<CustomerExpanded> = load_fixture("customers_expanded");
+
+    assert!(!customers.is_empty(), "Should have loaded expanded customers");
+    println!(
+        "Successfully deserialized {} expanded customers",
+        customers.len()
+    );
+
+    for customer in &customers {
+        assert!(
+            customer.id.as_str().starts_with("t1_cus_"),
+            "Customer ID should have correct prefix: {}",
+            customer.id
+        );
+
+        // Check if tokens were expanded
+        let token_count = customer.tokens.as_ref().map(|t| t.len()).unwrap_or(0);
+        println!(
+            "  Customer {}: {} {}, {} tokens",
+            customer.id,
+            customer.first.as_deref().unwrap_or("?"),
+            customer.last.as_deref().unwrap_or("?"),
+            token_count
+        );
+    }
+}
+
+#[test]
+fn test_expanded_transactions_have_nested_expansions() {
+    if !fixture_exists("transactions_expanded") {
+        println!("SKIP: transactions_expanded.json not found");
+        return;
+    }
+
+    let transactions: Vec<TransactionExpanded> = load_fixture("transactions_expanded");
+
+    let mut has_payment = false;
+    let mut has_token = false;
+    let mut has_customer = false;
+
+    for txn in &transactions {
+        if txn.payment.is_some() {
+            has_payment = true;
+        }
+        if txn.token.is_some() {
+            has_token = true;
+            // Check nested customer in token
+            if let Some(ref token) = txn.token {
+                if token.customer.is_some() {
+                    has_customer = true;
+                }
+            }
+        }
+    }
+
+    println!(
+        "Expansion coverage: payment={}, token={}, nested_customer={}",
+        has_payment, has_token, has_customer
+    );
+
+    // At least payment should be expanded in most transactions
+    assert!(
+        has_payment,
+        "At least one transaction should have expanded payment"
+    );
 }
 
 // =============================================================================

@@ -454,16 +454,12 @@ async fn test_get_plan_expanded() {
             println!("  Type: {:?}", plan.plan_type);
             println!("  Inactive: {}", plan.inactive);
 
-            // Verify expanded merchant
+            // Verify merchant ID (not expanded - just an ID)
             if let Some(ref merchant) = plan.merchant {
-                println!("  Merchant EXPANDED:");
-                println!("    ID: {}", merchant.id.as_str());
-                println!("    DBA: {:?}", merchant.dba);
-                println!("    Status: {:?}", merchant.status);
-
-                assert!(merchant.id.as_str().starts_with("t1_mer_"));
+                println!("  Merchant ID: {}", merchant.as_str());
+                assert!(merchant.as_str().starts_with("t1_mer_"));
             } else {
-                println!("  Merchant: NOT EXPANDED");
+                println!("  Merchant: NOT PRESENT");
             }
 
             // Verify expanded subscriptions

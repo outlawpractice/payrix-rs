@@ -50,10 +50,10 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
-    batch::Platform, bool_from_int_default_false, BatchStatus, ChargebackCycle,
-    ChargebackPaymentMethod, ChargebackStatusValue, Customer, Member, Merchant, Payment,
-    PaymentMethod, PayrixId, Plan, PlanSchedule, PlanType, PlanUm, Subscription, SubscriptionOrigin,
-    TokenStatus, Transaction, TransactionStatus, TransactionType,
+    batch::Platform, bool_from_int_default_false, deserialize_optional_i32, deserialize_string_or_int,
+    BatchStatus, ChargebackCycle, ChargebackPaymentMethod, ChargebackStatusValue, Member,
+    Payment, PaymentMethod, PayrixId, Plan, PlanSchedule, PlanType, PlanUm, Subscription,
+    SubscriptionOrigin, TokenStatus, Transaction, TransactionStatus, TransactionType,
 };
 
 // =============================================================================
@@ -155,11 +155,12 @@ pub struct TokenExpanded {
     pub payment: Option<Payment>,
 
     /// Expanded customer.
+    /// Customer ID.
     ///
-    /// The full Customer object, not just the PayrixId.
-    /// Only populated when using nested expansion like `token|customer`.
+    /// Note: The API returns customer as an ID string even when using nested expansion.
+    /// Use `client.get_customer_expanded()` to fetch full customer details.
     #[serde(default)]
-    pub customer: Option<Customer>,
+    pub customer: Option<PayrixId>,
 }
 
 impl TokenExpanded {
@@ -173,13 +174,12 @@ impl TokenExpanded {
         self.payment.as_ref().map(|p| p.display())
     }
 
-    /// Returns the customer's full name if available.
-    pub fn customer_name(&self) -> Option<String> {
-        self.customer.as_ref().map(|c| {
-            let first = c.first.as_deref().unwrap_or("");
-            let last = c.last.as_deref().unwrap_or("");
-            format!("{} {}", first, last).trim().to_string()
-        })
+    /// Returns the customer ID if available.
+    ///
+    /// Note: Customer data is not expanded in token responses.
+    /// Use `client.get_customer_expanded()` to fetch full customer details.
+    pub fn customer_id(&self) -> Option<&str> {
+        self.customer.as_ref().map(|c| c.as_str())
     }
 }
 
@@ -328,20 +328,24 @@ pub struct TransactionExpanded {
     pub platform: Option<String>,
 
     // -------------------------------------------------------------------------
-    // Date Fields
+    // Date Fields (API sometimes returns these as integers in YYYYMMDD format)
     // -------------------------------------------------------------------------
 
     /// Date/time captured.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_int")]
     pub captured: Option<String>,
 
     /// Date/time settled.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_int")]
     pub settled: Option<String>,
 
     /// Date/time returned.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_int")]
     pub returned: Option<String>,
+
+    /// Date funded (integer in YYYYMMDD format).
+    #[serde(default, deserialize_with = "deserialize_optional_i32")]
+    pub funded: Option<i32>,
 
     // -------------------------------------------------------------------------
     // Customer Info (from transaction, not expanded customer)
@@ -443,9 +447,9 @@ pub struct TransactionExpanded {
     #[serde(default)]
     pub token: Option<TokenExpanded>,
 
-    /// Expanded merchant.
+    /// Merchant ID (not expanded - use separate query if full merchant data needed).
     #[serde(default)]
-    pub merchant: Option<Merchant>,
+    pub merchant: Option<PayrixId>,
 
     /// Expanded subscription.
     #[serde(default)]
@@ -468,14 +472,26 @@ impl TransactionExpanded {
         self.payment.as_ref().map(|p| p.display())
     }
 
-    /// Returns the customer name from the expanded token's customer.
+    /// Returns the customer name from the transaction's first/last fields.
+    ///
+    /// Note: Customer object is not expanded in transaction responses.
     pub fn customer_name(&self) -> Option<String> {
-        self.token.as_ref().and_then(|t| t.customer_name())
+        let first = self.first.as_deref().unwrap_or("");
+        let last = self.last.as_deref().unwrap_or("");
+        let name = format!("{} {}", first, last).trim().to_string();
+        if name.is_empty() {
+            None
+        } else {
+            Some(name)
+        }
     }
 
-    /// Returns the customer from the expanded token.
-    pub fn customer(&self) -> Option<&Customer> {
-        self.token.as_ref().and_then(|t| t.customer.as_ref())
+    /// Returns the customer ID from the expanded token.
+    ///
+    /// Note: Customer data is not expanded. Use `client.get_customer_expanded()`
+    /// to fetch full customer details.
+    pub fn customer_id(&self) -> Option<&str> {
+        self.token.as_ref().and_then(|t| t.customer_id())
     }
 
     /// Returns true if this transaction was approved.
@@ -760,9 +776,9 @@ pub struct PlanExpanded {
     // Expanded Relationships
     // -------------------------------------------------------------------------
 
-    /// Expanded merchant.
+    /// Merchant ID (not expanded - use separate query if full merchant data needed).
     #[serde(default)]
-    pub merchant: Option<Merchant>,
+    pub merchant: Option<PayrixId>,
 
     /// Expanded subscriptions.
     #[serde(default)]
@@ -932,9 +948,9 @@ pub struct ChargebackExpanded {
     #[serde(default)]
     pub txn: Option<Transaction>,
 
-    /// Expanded merchant.
+    /// Merchant ID (not expanded - use separate query if full merchant data needed).
     #[serde(default)]
-    pub merchant: Option<Merchant>,
+    pub merchant: Option<PayrixId>,
 }
 
 impl ChargebackExpanded {
@@ -953,9 +969,12 @@ impl ChargebackExpanded {
         self.actionable && matches!(self.status, Some(ChargebackStatusValue::Open))
     }
 
-    /// Returns the merchant DBA name if available.
-    pub fn merchant_name(&self) -> Option<&str> {
-        self.merchant.as_ref().and_then(|m| m.dba.as_deref())
+    /// Returns the merchant ID if available.
+    ///
+    /// Note: Merchant data is not expanded in chargeback responses.
+    /// Use `client.get_merchant_expanded()` to fetch full merchant details.
+    pub fn merchant_id(&self) -> Option<&str> {
+        self.merchant.as_ref().map(|m| m.as_str())
     }
 }
 
@@ -1040,9 +1059,9 @@ pub struct BatchExpanded {
     // Expanded Relationships
     // -------------------------------------------------------------------------
 
-    /// Expanded merchant.
+    /// Merchant ID (not expanded - use separate query if full merchant data needed).
     #[serde(default)]
-    pub merchant: Option<Merchant>,
+    pub merchant: Option<PayrixId>,
 
     /// Expanded transactions in this batch.
     #[serde(default)]
@@ -1069,9 +1088,12 @@ impl BatchExpanded {
         matches!(self.status, Some(BatchStatus::Open))
     }
 
-    /// Returns the merchant DBA name if available.
-    pub fn merchant_name(&self) -> Option<&str> {
-        self.merchant.as_ref().and_then(|m| m.dba.as_deref())
+    /// Returns the merchant ID if available.
+    ///
+    /// Note: Merchant data is not expanded in batch responses.
+    /// Use `client.get_merchant_expanded()` to fetch full merchant details.
+    pub fn merchant_id(&self) -> Option<&str> {
+        self.merchant.as_ref().map(|m| m.as_str())
     }
 }
 
@@ -1265,11 +1287,7 @@ mod tests {
                 "method": 2,
                 "number": "1111"
             },
-            "customer": {
-                "id": "t1_cus_694380e3086a60cfae6d1eb",
-                "first": "John",
-                "last": "Doe"
-            }
+            "customer": "t1_cus_694380e3086a60cfae6d1eb"
         });
 
         let token: TokenExpanded = serde_json::from_value(json).unwrap();
@@ -1286,14 +1304,13 @@ mod tests {
         assert_eq!(payment.method, Some(PaymentMethod::Visa));
         assert_eq!(payment.bin.as_deref(), Some("411111"));
 
-        // Customer expansion should be present
+        // Customer should be an ID (not expanded by API)
         assert!(token.customer.is_some());
-        let customer = token.customer.as_ref().unwrap();
-        assert!(customer.id.as_str().starts_with("t1_cus_"));
+        assert!(token.customer_id().unwrap().starts_with("t1_cus_"));
 
         // Convenience methods
         assert_eq!(token.payment_method(), Some(PaymentMethod::Visa));
-        assert!(token.customer_name().is_some());
+        assert!(token.customer_id().is_some());
     }
 
     #[test]
@@ -1351,16 +1368,9 @@ mod tests {
             "token": {
                 "id": "t1_tok_694380e35c8eca506eb3856",
                 "token": "abc123",
-                "customer": {
-                    "id": "t1_cus_694380e3086a60cfae6d1eb",
-                    "first": "John",
-                    "last": "Doe"
-                }
+                "customer": "t1_cus_694380e3086a60cfae6d1eb"
             },
-            "merchant": {
-                "id": "t1_mer_test123456789012345678",
-                "dba": "Test Merchant"
-            }
+            "merchant": "t1_mer_test123456789012345678"
         });
 
         let txn: TransactionExpanded = serde_json::from_value(json).unwrap();
@@ -1370,20 +1380,21 @@ mod tests {
         assert_eq!(txn.total, Some(1000));
         assert_eq!(txn.amount_dollars(), 10.0);
 
-        // Payment expansion
+        // Payment expansion (payment IS expanded as an object)
         assert!(txn.payment.is_some());
         assert_eq!(txn.payment.as_ref().unwrap().method, Some(PaymentMethod::Visa));
 
-        // Token expansion with nested customer
+        // Token expansion with nested customer ID
         assert!(txn.token.is_some());
         let token = txn.token.as_ref().unwrap();
         assert!(token.customer.is_some());
+        assert!(token.customer_id().unwrap().starts_with("t1_cus_"));
 
-        // Merchant expansion
+        // Merchant is an ID (not expanded by API)
         assert!(txn.merchant.is_some());
-        assert!(txn.merchant.as_ref().unwrap().dba.is_some());
+        assert!(txn.merchant.as_ref().unwrap().as_str().starts_with("t1_mer_"));
 
-        // Convenience methods
+        // Convenience methods (customer_name from first/last fields)
         assert_eq!(txn.customer_name(), Some("John Doe".to_string()));
         assert!(txn.payment_display().is_some());
     }

@@ -108,16 +108,11 @@ async fn test_get_batch_expanded() {
             assert!(!batch.id.as_str().is_empty());
             assert!(batch.id.as_str().starts_with("t1_bat_"));
 
-            // Check expanded merchant
-            if let Some(ref merchant) = batch.merchant {
-                println!("  Merchant (expanded):");
-                println!("    ID: {}", merchant.id.as_str());
-                println!("    DBA: {:?}", merchant.dba);
-                if let Some(name) = batch.merchant_name() {
-                    println!("    merchant_name(): {}", name);
-                }
+            // Check merchant ID (not expanded)
+            if let Some(merchant_id) = batch.merchant_id() {
+                println!("  Merchant ID: {}", merchant_id);
             } else {
-                println!("  Merchant: not expanded");
+                println!("  Merchant: not present");
             }
 
             // Check expanded transactions
@@ -187,20 +182,24 @@ async fn test_batch_expanded_vs_raw_json() {
             "IDs should match"
         );
 
-        // Compare merchant if present
+        // Compare merchant if present (merchant is always an ID, not expanded)
         if let Some(raw_merchant) = raw.get("merchant").filter(|v| !v.is_null()) {
-            if raw_merchant.is_object() {
-                assert!(
-                    typed.merchant.is_some(),
-                    "Typed merchant should be Some when JSON has object"
-                );
-                let typed_merchant = typed.merchant.as_ref().unwrap();
-                assert_eq!(
-                    raw_merchant["id"].as_str().unwrap(),
-                    typed_merchant.id.as_str(),
-                    "Merchant IDs should match"
-                );
-            }
+            let raw_merchant_id = if raw_merchant.is_object() {
+                raw_merchant["id"].as_str().unwrap()
+            } else {
+                raw_merchant.as_str().unwrap()
+            };
+
+            assert!(
+                typed.merchant.is_some(),
+                "Typed merchant should be Some when JSON has merchant"
+            );
+            let typed_merchant_id = typed.merchant_id().unwrap();
+            assert_eq!(
+                raw_merchant_id,
+                typed_merchant_id,
+                "Merchant IDs should match"
+            );
         }
 
         // Compare txns array if present
@@ -250,11 +249,11 @@ async fn test_multiple_batches_expanded() {
         match client.get_batch_expanded(batch_id).await {
             Ok(Some(batch)) => {
                 println!(
-                    "Batch {}: ${:.2}, {} txns, merchant: {}",
+                    "Batch {}: ${:.2}, {} txns, merchant ID: {}",
                     batch.id.as_str(),
                     batch.total_amount_dollars(),
                     batch.transaction_count(),
-                    batch.merchant_name().unwrap_or("N/A")
+                    batch.merchant_id().unwrap_or("N/A")
                 );
                 success_count += 1;
             }

@@ -322,25 +322,19 @@ async fn test_get_transaction_full() {
                 println!("  Token string: {:?}", token.token);
                 println!("  Token status: {:?}", token.status);
 
-                // Check nested customer
-                if let Some(ref customer) = token.customer {
-                    println!("  Customer (nested in token):");
-                    println!("    ID: {}", customer.id.as_str());
-                    println!("    Name: {} {}",
-                        customer.first.as_deref().unwrap_or(""),
-                        customer.last.as_deref().unwrap_or(""));
+                // Check nested customer ID (not expanded)
+                if let Some(customer_id) = token.customer_id() {
+                    println!("  Customer ID (nested in token): {}", customer_id);
                 } else {
-                    println!("  Customer: not expanded in token");
+                    println!("  Customer: not present in token");
                 }
             } else {
                 println!("  Token: not expanded (transaction may not have a token)");
             }
 
-            // Check expanded merchant
-            if let Some(ref merchant) = txn.merchant {
-                println!("  Merchant: {} ({})",
-                    merchant.dba.as_deref().unwrap_or("N/A"),
-                    merchant.id.as_str());
+            // Check merchant ID (not expanded)
+            if let Some(merchant_id) = txn.merchant.as_ref().map(|m| m.as_str()) {
+                println!("  Merchant ID: {}", merchant_id);
             }
 
             // Test convenience methods
@@ -533,16 +527,13 @@ async fn test_create_and_fetch_transaction_expanded() {
     let exp_token = expanded.token.as_ref().unwrap();
     println!("Token: {} - {:?}", exp_token.id.as_str(), exp_token.status);
 
-    // Customer should be nested in token
-    assert!(exp_token.customer.is_some(), "Customer should be nested in token");
-    let exp_customer = exp_token.customer.as_ref().unwrap();
-    println!("Customer: {} {} ({})",
-        exp_customer.first.as_deref().unwrap_or(""),
-        exp_customer.last.as_deref().unwrap_or(""),
-        exp_customer.id.as_str());
+    // Customer ID should be present in token (not expanded - just an ID)
+    assert!(exp_token.customer.is_some(), "Customer ID should be in token");
+    let customer_id = exp_token.customer_id().unwrap();
+    println!("Customer ID: {}", customer_id);
 
-    // Verify convenience methods
-    assert!(expanded.customer_name().is_some());
+    // Verify convenience methods (customer_name comes from txn.first/last fields)
+    assert!(expanded.customer_name().is_some(), "customer_name() should work from first/last fields");
     assert!(expanded.payment_display().is_some());
 
     // Cleanup

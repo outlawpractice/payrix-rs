@@ -502,7 +502,10 @@ impl PayrixClient {
         .await
     }
 
-    /// Get a token with expanded payment and customer.
+    /// Get a token with expanded payment and customer ID.
+    ///
+    /// Note: The customer field returns an ID (not expanded data). Use
+    /// `get_customer_expanded()` to fetch full customer details.
     ///
     /// # Example
     ///
@@ -519,10 +522,9 @@ impl PayrixClient {
     ///             payment.last4.as_deref().unwrap_or("****"));
     ///     }
     ///
-    ///     if let Some(ref customer) = token.customer {
-    ///         println!("Customer: {} {}",
-    ///             customer.first.as_deref().unwrap_or(""),
-    ///             customer.last.as_deref().unwrap_or(""));
+    ///     // Customer is an ID - use get_customer_expanded() for details
+    ///     if let Some(customer_id) = token.customer_id() {
+    ///         println!("Customer ID: {}", customer_id);
     ///     }
     /// }
     /// # Ok(())
