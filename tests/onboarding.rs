@@ -88,10 +88,10 @@ fn create_test_onboarding_request() -> OnboardMerchantRequest {
 ///
 /// **CAUTION**: This test creates real resources in Payrix!
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY - creates real resources in Payrix"]
+#[ignore = "requires TEST_PAYRIX_API_KEY - creates real resources in Payrix"]
 async fn test_merchant_onboarding_workflow() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
     println!("\n=== MERCHANT ONBOARDING WORKFLOW TEST ===\n");
@@ -187,7 +187,7 @@ async fn test_merchant_onboarding_workflow() {
 
 /// Test checking boarding status for an existing merchant.
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_check_boarding_status() {
     init_logging();
     let client = create_client();
@@ -232,10 +232,10 @@ async fn test_check_boarding_status() {
 
 /// Test onboarding with multiple accounts (trust + operating pattern).
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY - creates real resources in Payrix"]
+#[ignore = "requires TEST_PAYRIX_API_KEY - creates real resources in Payrix"]
 async fn test_merchant_onboarding_with_trust_account() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
     println!("\n=== MERCHANT ONBOARDING WITH TRUST ACCOUNT TEST ===\n");
@@ -305,10 +305,10 @@ async fn test_merchant_onboarding_with_trust_account() {
 
 /// Test onboarding with multiple members (beneficial owners).
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY - creates real resources in Payrix"]
+#[ignore = "requires TEST_PAYRIX_API_KEY - creates real resources in Payrix"]
 async fn test_merchant_onboarding_with_multiple_members() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
     println!("\n=== MERCHANT ONBOARDING WITH MULTIPLE MEMBERS TEST ===\n");

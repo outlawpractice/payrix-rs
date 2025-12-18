@@ -27,7 +27,7 @@
 //!
 //! # Environment Variables
 //!
-//! - `PAYRIX_API_KEY` - Your Payrix API key (required for setup/status/remove commands)
+//! - `TEST_PAYRIX_API_KEY` - Your Payrix API key (required for setup/status/remove commands)
 
 use std::net::SocketAddr;
 
@@ -355,8 +355,8 @@ async fn run_remove(test: bool, yes: bool) -> Result<(), Box<dyn std::error::Err
 }
 
 fn get_client(test: bool) -> Result<PayrixClient, Box<dyn std::error::Error>> {
-    let api_key = std::env::var("PAYRIX_API_KEY")
-        .map_err(|_| "PAYRIX_API_KEY environment variable not set")?;
+    let api_key = std::env::var("TEST_PAYRIX_API_KEY")
+        .map_err(|_| "TEST_PAYRIX_API_KEY environment variable not set")?;
 
     let env = if test {
         Environment::Test

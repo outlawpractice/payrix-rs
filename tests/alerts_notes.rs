@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{create_client, init_logging, TEST_ENTITY_ID};
+use common::{create_client, init_logging, test_entity_id};
 use payrix::{
     Alert, AlertAction, AlertTrigger, EntityType, Environment, Note, NoteDocument, PayrixClient,
     SearchBuilder,
@@ -11,7 +11,7 @@ use serde_json::json;
 use std::env;
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_alerts() {
     init_logging();
     let client = create_client();
@@ -30,7 +30,7 @@ async fn test_get_alerts() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_alert_actions() {
     init_logging();
     let client = create_client();
@@ -49,7 +49,7 @@ async fn test_get_alert_actions() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_alert_triggers() {
     init_logging();
     let client = create_client();
@@ -68,7 +68,7 @@ async fn test_get_alert_triggers() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_notes() {
     init_logging();
     let client = create_client();
@@ -88,7 +88,7 @@ async fn test_get_notes() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_note_documents() {
     init_logging();
     let client = create_client();
@@ -109,10 +109,10 @@ async fn test_get_note_documents() {
 
 /// Test Note CRUD operations.
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY - creates real resources"]
+#[ignore = "requires TEST_PAYRIX_API_KEY - creates real resources"]
 async fn test_note_crud() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
     let timestamp = std::time::SystemTime::now()
@@ -122,9 +122,10 @@ async fn test_note_crud() {
 
     println!("\n=== NOTE CRUD TEST ===\n");
 
+    let entity_id = test_entity_id();
     // CREATE note on our test entity
     let new_note = json!({
-        "entity": TEST_ENTITY_ID,
+        "entity": entity_id,
         "type": "note",
         "note": format!("Integration test note created at {}", timestamp)
     });
@@ -170,14 +171,14 @@ async fn test_note_crud() {
     println!("Updated note: {:?}", updated.note);
 
     // SEARCH notes by entity
-    let search = SearchBuilder::new().field("entity", TEST_ENTITY_ID).build();
+    let search = SearchBuilder::new().field("entity", &entity_id).build();
 
     let notes: Vec<Note> = client
         .search(EntityType::Notes, &search)
         .await
         .expect("Failed to search notes");
 
-    println!("Found {} notes for entity {}", notes.len(), TEST_ENTITY_ID);
+    println!("Found {} notes for entity {}", notes.len(), entity_id);
     assert!(
         notes.iter().any(|n| n.id.as_str() == note.id.as_str()),
         "Should find our note in search results"
@@ -197,10 +198,10 @@ async fn test_note_crud() {
 
 /// Test Alert, AlertAction, and AlertTrigger CRUD operations.
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY - creates real resources"]
+#[ignore = "requires TEST_PAYRIX_API_KEY - creates real resources"]
 async fn test_alert_crud() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
     let timestamp = std::time::SystemTime::now()

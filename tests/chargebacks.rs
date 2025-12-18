@@ -3,18 +3,19 @@
 mod common;
 
 use common::{
-    create_client, init_logging, TEST_CLOSED_CHARGEBACK_ID, TEST_OPEN_CHARGEBACK_ID,
+    create_client, init_logging, require_closed_chargeback_id, require_open_chargeback_id,
 };
 use payrix::types::ChargebackMessageType;
 use payrix::{
-    Chargeback, ChargebackDocument, ChargebackMessage, ChargebackMessageResult, ChargebackStatus,
-    ChargebackStatusValue, CreateChargebackMessage, EntityType, Environment, PayrixClient,
-    SearchBuilder,
+    Chargeback, ChargebackDocument, ChargebackExpanded, ChargebackMessage, ChargebackMessageResult,
+    ChargebackStatus, ChargebackStatusValue, CreateChargebackMessage, EntityType, Environment,
+    PayrixClient, SearchBuilder,
 };
+use serde_json::Value;
 use std::env;
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_chargebacks() {
     init_logging();
     let client = create_client();
@@ -35,7 +36,7 @@ async fn test_get_chargebacks() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_chargeback_messages() {
     init_logging();
     let client = create_client();
@@ -58,7 +59,7 @@ async fn test_get_chargeback_messages() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_chargeback_documents() {
     init_logging();
     let client = create_client();
@@ -81,7 +82,7 @@ async fn test_get_chargeback_documents() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_chargeback_message_results() {
     init_logging();
     let client = create_client();
@@ -103,7 +104,7 @@ async fn test_get_chargeback_message_results() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_chargeback_statuses() {
     init_logging();
     let client = create_client();
@@ -127,15 +128,16 @@ async fn test_get_chargeback_statuses() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_specific_chargeback() {
     // Test reading a specific chargeback by ID and validating response fields
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
+    let chargeback_id = require_open_chargeback_id();
     let chargeback: Option<Chargeback> = client
-        .get_one(EntityType::Chargebacks, TEST_OPEN_CHARGEBACK_ID)
+        .get_one(EntityType::Chargebacks, &chargeback_id)
         .await
         .expect("Failed to get chargeback");
 
@@ -159,22 +161,24 @@ async fn test_get_specific_chargeback() {
     println!("Payment Method: {:?}", cb.payment_method);
 
     // Validate the chargeback has expected fields populated
-    assert_eq!(cb.id.as_str(), TEST_OPEN_CHARGEBACK_ID);
+    assert_eq!(cb.id.as_str(), chargeback_id);
     assert!(cb.status.is_some(), "Status should be present");
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY - creates data in Payrix"]
+#[ignore = "requires TEST_PAYRIX_API_KEY - creates data in Payrix"]
 async fn test_create_chargeback_message() {
     // Test creating a message on an existing open chargeback.
     // NOTE: This creates real data in the test environment.
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let chargeback_id = require_open_chargeback_id();
 
     // First verify the chargeback exists and is open
     let chargeback: Option<Chargeback> = client
-        .get_one(EntityType::Chargebacks, TEST_OPEN_CHARGEBACK_ID)
+        .get_one(EntityType::Chargebacks, &chargeback_id)
         .await
         .expect("Failed to get chargeback");
 
@@ -188,7 +192,7 @@ async fn test_create_chargeback_message() {
     // Note: Some message types require specific chargeback states.
     // "notate" is generally safe for adding notes to any chargeback.
     let new_message = CreateChargebackMessage {
-        chargeback: TEST_OPEN_CHARGEBACK_ID.to_string(),
+        chargeback: chargeback_id,
         message_type: Some(ChargebackMessageType::Notate),
         subject: Some("Integration Test Note".to_string()),
         message: Some(format!(
@@ -228,16 +232,18 @@ async fn test_create_chargeback_message() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_chargeback_status_history() {
     // Test getting the status history for a specific chargeback
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let chargeback_id = require_closed_chargeback_id();
 
     // Get status records for the closed chargeback (should have status history)
     let search = SearchBuilder::new()
-        .field("chargeback", TEST_CLOSED_CHARGEBACK_ID)
+        .field("chargeback", &chargeback_id)
         .build();
 
     let statuses: Vec<ChargebackStatus> = client
@@ -247,7 +253,7 @@ async fn test_get_chargeback_status_history() {
 
     println!(
         "=== STATUS HISTORY FOR {} ===",
-        TEST_CLOSED_CHARGEBACK_ID
+        chargeback_id
     );
     println!("Found {} status records", statuses.len());
 
@@ -263,15 +269,16 @@ async fn test_get_chargeback_status_history() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_chargeback_messages_for_chargeback() {
     // Test getting messages for a specific chargeback
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
+    let chargeback_id = require_open_chargeback_id();
     let search = SearchBuilder::new()
-        .field("chargeback", TEST_OPEN_CHARGEBACK_ID)
+        .field("chargeback", &chargeback_id)
         .build();
 
     let messages: Vec<ChargebackMessage> = client
@@ -279,7 +286,7 @@ async fn test_get_chargeback_messages_for_chargeback() {
         .await
         .expect("Failed to get chargeback messages");
 
-    println!("=== MESSAGES FOR {} ===", TEST_OPEN_CHARGEBACK_ID);
+    println!("=== MESSAGES FOR {} ===", chargeback_id);
     println!("Found {} messages", messages.len());
 
     for msg in &messages {
@@ -294,15 +301,16 @@ async fn test_get_chargeback_messages_for_chargeback() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_chargeback_documents_for_chargeback() {
     // Test getting documents for a specific chargeback
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
+    let chargeback_id = require_open_chargeback_id();
     let search = SearchBuilder::new()
-        .field("chargeback", TEST_OPEN_CHARGEBACK_ID)
+        .field("chargeback", &chargeback_id)
         .build();
 
     let documents: Vec<ChargebackDocument> = client
@@ -310,7 +318,7 @@ async fn test_get_chargeback_documents_for_chargeback() {
         .await
         .expect("Failed to get chargeback documents");
 
-    println!("=== DOCUMENTS FOR {} ===", TEST_OPEN_CHARGEBACK_ID);
+    println!("=== DOCUMENTS FOR {} ===", chargeback_id);
     println!("Found {} documents", documents.len());
 
     for doc in &documents {
@@ -325,7 +333,7 @@ async fn test_get_chargeback_documents_for_chargeback() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_chargeback_outcomes_by_status() {
     // Test aggregating chargebacks by outcome status
     init_logging();
@@ -360,7 +368,7 @@ async fn test_chargeback_outcomes_by_status() {
 
 /// Comprehensive test to discover all ChargebackStatusValue variants in use.
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_discover_chargeback_status_values() {
     init_logging();
     let client = create_client();
@@ -428,10 +436,10 @@ async fn test_discover_chargeback_status_values() {
 
 /// Test to get raw JSON response for chargebacks to see exact status values.
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_chargeback_raw_json_status() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
 
     println!("\n=== RAW JSON CHARGEBACK STATUS CHECK ===\n");
 
@@ -481,10 +489,10 @@ async fn test_chargeback_raw_json_status() {
 
 /// Test to check chargeback status history for transitions.
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_chargeback_status_history_raw() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
 
     println!("\n=== RAW JSON CHARGEBACK STATUS HISTORY CHECK ===\n");
 
@@ -556,5 +564,301 @@ async fn test_chargeback_status_history_raw() {
                 }
             }
         }
+    }
+}
+
+// =============================================================================
+// Expanded Type Tests
+// =============================================================================
+
+/// Test `get_chargeback_expanded()` convenience method.
+#[tokio::test]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
+async fn test_get_chargeback_expanded() {
+    init_logging();
+    let client = create_client();
+
+    let chargebacks: Vec<Value> = client
+        .get_all(EntityType::Chargebacks)
+        .await
+        .expect("Failed to get chargebacks");
+
+    if chargebacks.is_empty() {
+        println!("No chargebacks available for testing");
+        return;
+    }
+
+    let cb_id = chargebacks[0]["id"].as_str().expect("Chargeback should have id");
+    println!("Testing get_chargeback_expanded with: {}", cb_id);
+
+    let result = client.get_chargeback_expanded(cb_id).await;
+
+    match result {
+        Ok(Some(cb)) => {
+            println!("Successfully fetched ChargebackExpanded:");
+            println!("  ID: {}", cb.id.as_str());
+            println!("  Total: ${:.2}", cb.amount_dollars());
+            println!("  Status: {:?}", cb.status);
+            println!("  Cycle: {:?}", cb.cycle);
+            println!("  Reason: {:?}", cb.reason);
+            println!("  Reason Code: {:?}", cb.reason_code);
+            println!("  Issued: {:?}", cb.issued);
+            println!("  Received: {:?}", cb.received);
+            println!("  Reply Deadline: {:?}", cb.reply);
+            println!("  Actionable: {}", cb.actionable);
+            println!("  is_actionable(): {}", cb.is_actionable());
+
+            // Verify expanded transaction
+            if let Some(ref txn) = cb.txn {
+                println!("  Transaction EXPANDED:");
+                println!("    ID: {}", txn.id.as_str());
+                println!("    Total: ${:.2}", txn.total.unwrap_or(0) as f64 / 100.0);
+                println!("    Status: {:?}", txn.status);
+                println!("    Type: {:?}", txn.txn_type);
+                println!("    Created: {:?}", txn.created);
+
+                assert!(txn.id.as_str().starts_with("t1_txn_"));
+            } else {
+                println!("  Transaction: NOT EXPANDED");
+            }
+
+            // Verify expanded merchant
+            if let Some(ref merchant) = cb.merchant {
+                println!("  Merchant EXPANDED:");
+                println!("    ID: {}", merchant.id.as_str());
+                println!("    DBA: {:?}", merchant.dba);
+                println!("    Status: {:?}", merchant.status);
+
+                assert!(merchant.id.as_str().starts_with("t1_mer_"));
+            } else {
+                println!("  Merchant: NOT EXPANDED");
+            }
+
+            // Test convenience methods
+            if let Some(original) = cb.original_transaction_amount() {
+                println!("  original_transaction_amount(): ${:.2}", original);
+            }
+            if let Some(name) = cb.merchant_name() {
+                println!("  merchant_name(): {}", name);
+            }
+        }
+        Ok(None) => println!("Chargeback not found"),
+        Err(e) => panic!("Failed to fetch chargeback: {:?}", e),
+    }
+}
+
+/// Test ChargebackExpanded with specific known chargeback.
+#[tokio::test]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
+async fn test_chargeback_expanded_with_known_id() {
+    init_logging();
+    let client = create_client();
+
+    let chargeback_id = require_open_chargeback_id();
+
+    // Use the test chargeback ID
+    println!("Testing get_chargeback_expanded with known ID: {}", chargeback_id);
+
+    let result = client.get_chargeback_expanded(&chargeback_id).await;
+
+    match result {
+        Ok(Some(cb)) => {
+            println!("Successfully fetched ChargebackExpanded:");
+            println!("  ID: {}", cb.id.as_str());
+            assert_eq!(cb.id.as_str(), chargeback_id);
+
+            println!("  Status: {:?}", cb.status);
+            println!("  Amount: ${:.2}", cb.amount_dollars());
+            println!("  Reason: {:?}", cb.reason);
+
+            // Transaction should be expanded
+            if let Some(ref txn) = cb.txn {
+                println!("  Transaction: {} (${:.2})",
+                    txn.id.as_str(),
+                    txn.total.unwrap_or(0) as f64 / 100.0);
+            }
+
+            // Merchant should be expanded
+            if let Some(ref merchant) = cb.merchant {
+                println!("  Merchant: {} ({})",
+                    merchant.dba.as_deref().unwrap_or("N/A"),
+                    merchant.id.as_str());
+            }
+        }
+        Ok(None) => println!("Chargeback not found (may have been deleted)"),
+        Err(e) => panic!("Failed to fetch chargeback: {:?}", e),
+    }
+}
+
+/// Test ChargebackExpanded deserialization with raw JSON comparison.
+#[tokio::test]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
+async fn test_chargeback_expanded_vs_raw_json() {
+    init_logging();
+    let client = create_client();
+
+    let chargebacks: Vec<Value> = client
+        .get_all(EntityType::Chargebacks)
+        .await
+        .expect("Failed to get chargebacks");
+
+    if chargebacks.is_empty() {
+        println!("No chargebacks available");
+        return;
+    }
+
+    let cb_id = chargebacks[0]["id"].as_str().expect("Chargeback should have id");
+
+    // Get raw JSON first
+    let raw: Option<Value> = client
+        .get_one_expanded(EntityType::Chargebacks, cb_id, &["txn", "merchant"])
+        .await
+        .expect("Failed to fetch raw");
+
+    if let Some(ref json) = raw {
+        println!("Raw JSON with txn and merchant expansion:");
+        println!("{}", serde_json::to_string_pretty(json).unwrap());
+
+        // Check txn field
+        if let Some(txn_value) = json.get("txn") {
+            println!("\nTransaction field:");
+            if txn_value.is_object() {
+                let obj = txn_value.as_object().unwrap();
+                println!("  -> Is an OBJECT with {} fields (expansion worked)", obj.len());
+                if let Some(id) = obj.get("id") {
+                    println!("  -> txn.id = {}", id);
+                }
+            } else if txn_value.is_string() {
+                println!("  -> Is a STRING: {} (not expanded)", txn_value.as_str().unwrap());
+            } else if txn_value.is_null() {
+                println!("  -> Is NULL");
+            }
+        }
+
+        // Check merchant field
+        if let Some(merchant_value) = json.get("merchant") {
+            println!("\nMerchant field:");
+            if merchant_value.is_object() {
+                let obj = merchant_value.as_object().unwrap();
+                println!("  -> Is an OBJECT with {} fields (expansion worked)", obj.len());
+                if let Some(dba) = obj.get("dba") {
+                    println!("  -> merchant.dba = {}", dba);
+                }
+            } else if merchant_value.is_string() {
+                println!("  -> Is a STRING: {} (not expanded)", merchant_value.as_str().unwrap());
+            }
+        }
+    }
+
+    // Deserialize to ChargebackExpanded
+    let expanded: Option<ChargebackExpanded> = client
+        .get_one_expanded(EntityType::Chargebacks, cb_id, &["txn", "merchant"])
+        .await
+        .expect("Failed to fetch expanded");
+
+    if let Some(cb) = expanded {
+        println!("\nDeserialized ChargebackExpanded:");
+        println!("  txn is_some: {}", cb.txn.is_some());
+        println!("  merchant is_some: {}", cb.merchant.is_some());
+
+        if let Some(ref txn) = cb.txn {
+            println!("  txn.id: {}", txn.id.as_str());
+            println!("  txn.total: {:?}", txn.total);
+        }
+        if let Some(ref merchant) = cb.merchant {
+            println!("  merchant.dba: {:?}", merchant.dba);
+        }
+    }
+}
+
+/// Test fetching multiple chargebacks expanded and summarizing.
+#[tokio::test]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
+async fn test_multiple_chargebacks_expanded() {
+    init_logging();
+    let client = create_client();
+
+    let chargebacks: Vec<Value> = client
+        .get_all(EntityType::Chargebacks)
+        .await
+        .expect("Failed to get chargebacks");
+
+    println!("Testing expansion on {} chargebacks", chargebacks.len().min(10));
+
+    let mut total_amount = 0.0;
+    let mut actionable_count = 0;
+
+    for cb_json in chargebacks.iter().take(10) {
+        let cb_id = cb_json["id"].as_str().expect("Chargeback should have id");
+
+        let expanded = client.get_chargeback_expanded(cb_id).await;
+
+        match expanded {
+            Ok(Some(cb)) => {
+                let merchant_name = cb.merchant_name().unwrap_or("Unknown");
+                let txn_amount = cb.original_transaction_amount()
+                    .map(|a| format!("${:.2}", a))
+                    .unwrap_or_else(|| "N/A".to_string());
+
+                println!("  {} -> ${:.2} | Merchant: {} | Orig Txn: {} | Status: {:?}",
+                    cb.id.as_str(),
+                    cb.amount_dollars(),
+                    merchant_name,
+                    txn_amount,
+                    cb.status);
+
+                total_amount += cb.amount_dollars();
+                if cb.is_actionable() {
+                    actionable_count += 1;
+                }
+            }
+            Ok(None) => println!("  {} -> Not found", cb_id),
+            Err(e) => println!("  {} -> Error: {:?}", cb_id, e),
+        }
+    }
+
+    println!("\nSummary:");
+    println!("  Total chargeback amount: ${:.2}", total_amount);
+    println!("  Actionable chargebacks: {}", actionable_count);
+}
+
+/// Test ChargebackExpanded is_actionable() logic.
+#[tokio::test]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
+async fn test_chargeback_expanded_actionable() {
+    init_logging();
+    let client = create_client();
+
+    // Get all chargebacks
+    let chargebacks: Vec<Chargeback> = client
+        .get_all(EntityType::Chargebacks)
+        .await
+        .expect("Failed to get chargebacks");
+
+    println!("Checking actionable status on {} chargebacks", chargebacks.len());
+
+    let mut actionable = vec![];
+    let mut non_actionable = vec![];
+
+    for cb in chargebacks.iter().take(20) {
+        let expanded = client.get_chargeback_expanded(cb.id.as_str()).await;
+
+        if let Ok(Some(exp_cb)) = expanded {
+            if exp_cb.is_actionable() {
+                actionable.push((exp_cb.id.clone(), exp_cb.status, exp_cb.actionable));
+            } else {
+                non_actionable.push((exp_cb.id.clone(), exp_cb.status, exp_cb.actionable));
+            }
+        }
+    }
+
+    println!("\nActionable chargebacks ({}):", actionable.len());
+    for (id, status, flag) in actionable.iter().take(5) {
+        println!("  {} - status: {:?}, actionable flag: {}", id.as_str(), status, flag);
+    }
+
+    println!("\nNon-actionable chargebacks ({}):", non_actionable.len());
+    for (id, status, flag) in non_actionable.iter().take(5) {
+        println!("  {} - status: {:?}, actionable flag: {}", id.as_str(), status, flag);
     }
 }

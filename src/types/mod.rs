@@ -40,6 +40,7 @@ mod note;
 mod org;
 mod org_entity;
 mod partition;
+mod payment;
 mod payout;
 mod plan;
 mod refund;
@@ -50,6 +51,9 @@ mod team_login;
 mod token;
 mod transaction;
 mod vendor;
+
+// Expanded types for API responses with expand[] query parameters
+mod expanded;
 
 pub use account::*;
 pub use account_verification::*;
@@ -77,6 +81,7 @@ pub use note::*;
 pub use org::*;
 pub use org_entity::*;
 pub use partition::*;
+pub use payment::*;
 pub use payout::*;
 pub use plan::*;
 pub use refund::*;
@@ -87,6 +92,9 @@ pub use team_login::*;
 pub use token::*;
 pub use transaction::*;
 pub use vendor::*;
+
+// Expanded types
+pub use expanded::*;
 
 // =============================================================================
 // FINANCIAL/REPORTING TYPES (requires 'financial' feature)

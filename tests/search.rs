@@ -10,10 +10,10 @@ use payrix::{
 use std::env;
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_search_with_pagination() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
     // Get first page
@@ -51,7 +51,7 @@ async fn test_search_with_pagination() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_error_handling() {
     init_logging();
     let client = create_client();
@@ -71,10 +71,10 @@ async fn test_error_handling() {
 
 /// Test bulk search and pagination across multiple entity types.
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_bulk_search_pagination() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
     println!("\n=== BULK SEARCH PAGINATION TEST ===\n");
@@ -170,10 +170,10 @@ async fn test_bulk_search_pagination() {
 
 /// Test searching entities with complex filters.
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_complex_search_filters() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
     println!("\n=== COMPLEX SEARCH FILTERS TEST ===\n");

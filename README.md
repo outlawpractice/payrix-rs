@@ -315,7 +315,7 @@ cargo test
 Run integration tests (requires API credentials):
 
 ```bash
-PAYRIX_API_KEY=your_key cargo test -- --ignored
+TEST_PAYRIX_API_KEY=your_key cargo test -- --ignored
 ```
 
 ## API Reference

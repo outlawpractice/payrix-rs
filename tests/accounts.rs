@@ -6,7 +6,7 @@ use common::{create_client, init_logging};
 use payrix::{Account, AccountVerification, EntityType};
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_accounts() {
     init_logging();
     let client = create_client();
@@ -25,7 +25,7 @@ async fn test_get_accounts() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_account_verifications() {
     init_logging();
     let client = create_client();

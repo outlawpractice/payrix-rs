@@ -138,6 +138,12 @@ pub use types::{
     UpdateCustomer,
 };
 
+// Re-export expanded types for convenience
+pub use types::{
+    BatchExpanded, ChargebackExpanded, CustomerExpanded, MerchantExpanded, Payment, PlanExpanded,
+    SubscriptionExpanded, TokenExpanded, TransactionExpanded,
+};
+
 // Re-export workflow types for convenience
 pub use workflows::merchant_onboarding::{
     check_boarding_status, onboard_merchant, Address, BankAccountInfo, BankAccountMethod,

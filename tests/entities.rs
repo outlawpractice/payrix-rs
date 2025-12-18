@@ -6,7 +6,7 @@ use common::{create_client, init_logging};
 use payrix::{Entity, EntityType, Login, Member, Merchant, TeamLogin};
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_entities() {
     init_logging();
     let client = create_client();
@@ -22,7 +22,7 @@ async fn test_get_entities() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_merchants() {
     init_logging();
     let client = create_client();
@@ -41,7 +41,7 @@ async fn test_get_merchants() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_logins() {
     init_logging();
     let client = create_client();
@@ -55,7 +55,7 @@ async fn test_get_logins() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_team_logins() {
     init_logging();
     let client = create_client();
@@ -76,7 +76,7 @@ async fn test_get_team_logins() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_members() {
     init_logging();
     let client = create_client();

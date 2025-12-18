@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{create_client, init_logging, TEST_MERCHANT_ID};
+use common::{create_client, init_logging, test_merchant_id};
 use payrix::{
     Adjustment, Batch, Disbursement, DisbursementEntry, EntityReserve, EntityType, Entry, Fee,
     FeeRule, Fund, PayrixClient, Payout, PendingEntry, Refund, Reserve, ReserveEntry,
@@ -12,7 +12,7 @@ use serde_json::json;
 use std::env;
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_batches() {
     init_logging();
     let client = create_client();
@@ -31,7 +31,7 @@ async fn test_get_batches() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_fees() {
     init_logging();
     let client = create_client();
@@ -50,7 +50,7 @@ async fn test_get_fees() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_fee_rules() {
     init_logging();
     let client = create_client();
@@ -69,7 +69,7 @@ async fn test_get_fee_rules() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_funds() {
     init_logging();
     let client = create_client();
@@ -88,7 +88,7 @@ async fn test_get_funds() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_payouts() {
     // NOTE: The test environment does NOT process payouts, so this endpoint
     // will always return empty results in test mode.
@@ -110,7 +110,7 @@ async fn test_get_payouts() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_disbursements() {
     init_logging();
     let client = create_client();
@@ -131,7 +131,7 @@ async fn test_get_disbursements() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_disbursement_entries() {
     init_logging();
     let client = create_client();
@@ -153,7 +153,7 @@ async fn test_get_disbursement_entries() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_entries() {
     init_logging();
     let client = create_client();
@@ -173,7 +173,7 @@ async fn test_get_entries() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_pending_entries() {
     init_logging();
     let client = create_client();
@@ -193,7 +193,7 @@ async fn test_get_pending_entries() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_reserves() {
     init_logging();
     let client = create_client();
@@ -213,7 +213,7 @@ async fn test_get_reserves() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_reserve_entries() {
     init_logging();
     let client = create_client();
@@ -233,7 +233,7 @@ async fn test_get_reserve_entries() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_entity_reserves() {
     init_logging();
     let client = create_client();
@@ -253,7 +253,7 @@ async fn test_get_entity_reserves() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_adjustments() {
     init_logging();
     let client = create_client();
@@ -273,7 +273,7 @@ async fn test_get_adjustments() {
 }
 
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY environment variable"]
+#[ignore = "requires TEST_PAYRIX_API_KEY environment variable"]
 async fn test_get_refunds() {
     init_logging();
     let client = create_client();
@@ -294,17 +294,17 @@ async fn test_get_refunds() {
 
 /// Test creating a refund for an existing transaction.
 #[tokio::test]
-#[ignore = "requires PAYRIX_API_KEY and a refundable transaction"]
+#[ignore = "requires TEST_PAYRIX_API_KEY and a refundable transaction"]
 async fn test_refund_creation() {
     init_logging();
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
 
     println!("\n=== REFUND CREATION TEST ===\n");
 
     // Search for a refundable transaction (settled, not fully refunded)
     let search = SearchBuilder::new()
-        .field("merchant", TEST_MERCHANT_ID)
+        .field("merchant", &test_merchant_id())
         .field("type", "1") // Sale transaction
         .build();
 

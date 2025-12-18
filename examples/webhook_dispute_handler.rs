@@ -22,7 +22,7 @@
 //!
 //! ```bash
 //! # Set your API key
-//! export PAYRIX_API_KEY="your-api-key"
+//! export TEST_PAYRIX_API_KEY="your-api-key"
 //!
 //! # Run the example
 //! cargo run --example webhook_dispute_handler --features webhooks
@@ -83,8 +83,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     // Get API key from environment
-    let api_key = std::env::var("PAYRIX_API_KEY").unwrap_or_else(|_| {
-        warn!("PAYRIX_API_KEY not set, using demo mode (no API calls)");
+    let api_key = std::env::var("TEST_PAYRIX_API_KEY").unwrap_or_else(|_| {
+        warn!("TEST_PAYRIX_API_KEY not set, using demo mode (no API calls)");
         "demo-key".to_string()
     });
 
