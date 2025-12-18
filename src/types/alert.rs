@@ -407,6 +407,277 @@ pub struct AlertTrigger {
 }
 
 // =============================================================================
+// NEW ALERT TYPES (for creation)
+// =============================================================================
+
+/// Options for the web alert action format.
+///
+/// Determines how the alert data is sent to the endpoint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum AlertActionOptions {
+    /// JSON format.
+    #[default]
+    Json,
+    /// XML format.
+    Xml,
+    /// SOAP format.
+    Soap,
+    /// Form-encoded format.
+    Form,
+}
+
+/// Request body for creating a new Alert.
+///
+/// At least one of `forlogin`, `team`, `division`, or `partition` must be set.
+///
+/// **OpenAPI schema:** `alertsRequest` (POST /alerts)
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewAlert {
+    /// The identifier of the Login that this Alert applies to.
+    ///
+    /// At least one of `forlogin`, `team`, `division`, or `partition` must be set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub forlogin: Option<String>,
+
+    /// The identifier of the Team that this Alert applies to.
+    ///
+    /// At least one of `forlogin`, `team`, `division`, or `partition` must be set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub team: Option<String>,
+
+    /// The identifier of the Division that this Alert applies to.
+    ///
+    /// At least one of `forlogin`, `team`, `division`, or `partition` must be set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub division: Option<String>,
+
+    /// The identifier of the Partition that this Alert applies to.
+    ///
+    /// At least one of `forlogin`, `team`, `division`, or `partition` must be set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+
+    /// The name of this Alert (1-100 characters).
+    ///
+    /// **Required.**
+    pub name: String,
+
+    /// Description of the Alert.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+impl NewAlert {
+    /// Create a new alert for a specific login.
+    pub fn for_login(login_id: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            forlogin: Some(login_id.into()),
+            name: name.into(),
+            ..Default::default()
+        }
+    }
+
+    /// Create a new alert for a specific team.
+    pub fn for_team(team_id: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            team: Some(team_id.into()),
+            name: name.into(),
+            ..Default::default()
+        }
+    }
+
+    /// Set the description.
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+}
+
+/// Request body for creating a new AlertAction.
+///
+/// **OpenAPI schema:** `alertActionsRequest` (POST /alertActions)
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewAlertAction {
+    /// The identifier of the Alert this action belongs to.
+    ///
+    /// **Required.**
+    pub alert: String,
+
+    /// The type of delivery mechanism.
+    ///
+    /// **Required.**
+    #[serde(rename = "type")]
+    pub action_type: AlertActionType,
+
+    /// The destination value (email address, URL, phone number, etc.).
+    ///
+    /// **Required.**
+    pub value: String,
+
+    /// Format for web-type actions (JSON, XML, SOAP, FORM).
+    ///
+    /// Only applicable when `action_type` is `Web`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options: Option<AlertActionOptions>,
+
+    /// Custom header name for authentication.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header_name: Option<String>,
+
+    /// Custom header value for authentication.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header_value: Option<String>,
+
+    /// Number of retry attempts on failure (web-type only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retries: Option<i32>,
+}
+
+impl NewAlertAction {
+    /// Create a new email alert action.
+    pub fn email(alert_id: impl Into<String>, email: impl Into<String>) -> Self {
+        Self {
+            alert: alert_id.into(),
+            action_type: AlertActionType::Email,
+            value: email.into(),
+            options: None,
+            header_name: None,
+            header_value: None,
+            retries: None,
+        }
+    }
+
+    /// Create a new webhook alert action.
+    pub fn webhook(alert_id: impl Into<String>, url: impl Into<String>) -> Self {
+        Self {
+            alert: alert_id.into(),
+            action_type: AlertActionType::Web,
+            value: url.into(),
+            options: Some(AlertActionOptions::Json),
+            header_name: None,
+            header_value: None,
+            retries: Some(3),
+        }
+    }
+
+    /// Create a new SMS alert action.
+    pub fn sms(alert_id: impl Into<String>, phone: impl Into<String>) -> Self {
+        Self {
+            alert: alert_id.into(),
+            action_type: AlertActionType::Sms,
+            value: phone.into(),
+            options: None,
+            header_name: None,
+            header_value: None,
+            retries: None,
+        }
+    }
+
+    /// Set authentication headers for webhook.
+    pub fn with_auth(mut self, header_name: impl Into<String>, header_value: impl Into<String>) -> Self {
+        self.header_name = Some(header_name.into());
+        self.header_value = Some(header_value.into());
+        self
+    }
+
+    /// Set the response format for webhook.
+    pub fn with_options(mut self, options: AlertActionOptions) -> Self {
+        self.options = Some(options);
+        self
+    }
+
+    /// Set the number of retries for webhook.
+    pub fn with_retries(mut self, retries: i32) -> Self {
+        self.retries = Some(retries);
+        self
+    }
+}
+
+/// Request body for creating a new AlertTrigger.
+///
+/// **OpenAPI schema:** `alertTriggersRequest` (POST /alertTriggers)
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewAlertTrigger {
+    /// The identifier of the Alert this trigger belongs to.
+    ///
+    /// **Required.**
+    pub alert: String,
+
+    /// The event that triggers the alert.
+    ///
+    /// Examples: `txn.created`, `chargeback.opened`, `merchant.boarded`
+    ///
+    /// **Required.**
+    pub event: String,
+
+    /// The resource type (integer code).
+    ///
+    /// Common values: 16 (txns), 9 (merchants), 3 (customers)
+    ///
+    /// **Required.**
+    pub resource: i32,
+
+    /// The name of this trigger (0-100 characters).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    /// Description of the trigger.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+impl NewAlertTrigger {
+    /// Create a new alert trigger.
+    pub fn new(alert_id: impl Into<String>, event: impl Into<String>, resource: i32) -> Self {
+        Self {
+            alert: alert_id.into(),
+            event: event.into(),
+            resource,
+            name: None,
+            description: None,
+        }
+    }
+
+    /// Create a transaction event trigger.
+    ///
+    /// Common events: `txn.created`, `txn.approved`, `txn.failed`, `txn.settled`
+    pub fn transaction(alert_id: impl Into<String>, event: impl Into<String>) -> Self {
+        Self::new(alert_id, event, 16) // 16 = txns resource
+    }
+
+    /// Create a chargeback event trigger.
+    ///
+    /// Common events: `chargeback.created`, `chargeback.opened`, `chargeback.closed`,
+    /// `chargeback.won`, `chargeback.lost`
+    pub fn chargeback(alert_id: impl Into<String>, event: impl Into<String>) -> Self {
+        Self::new(alert_id, event, 73) // 73 = chargebacks resource
+    }
+
+    /// Create a merchant event trigger.
+    ///
+    /// Common events: `merchant.created`, `merchant.boarded`, `merchant.held`
+    pub fn merchant(alert_id: impl Into<String>, event: impl Into<String>) -> Self {
+        Self::new(alert_id, event, 9) // 9 = merchants resource
+    }
+
+    /// Set the name.
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Set the description.
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+}
+
+// =============================================================================
 // TESTS
 // =============================================================================
 

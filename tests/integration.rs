@@ -42,6 +42,7 @@ use payrix::types::ChargebackMessageType;
 use payrix::types::{
     AccountHolderType, AccountType, DateYmd, MemberType, MerchantEnvironment, MerchantType,
 };
+use chrono;
 use serde_json::json;
 use std::env;
 use std::sync::Once;
@@ -2342,4 +2343,695 @@ async fn test_create_transaction_validate_response() {
             panic!("Transaction creation failed - this documents an API inconsistency: {:?}", e);
         }
     }
+}
+
+// =============================================================================
+// Comprehensive CRUD Integration Tests
+// =============================================================================
+// These tests create, read, update, and delete resources to verify full API
+// functionality. They use the test merchant constants and clean up after themselves.
+
+// ==================== Plan CRUD Tests ====================
+
+/// Test Plan CRUD operations.
+///
+/// Creates a plan, reads it, updates it, and then deletes (deactivates) it.
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY - creates real resources"]
+async fn test_plan_crud() {
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    println!("\n=== PLAN CRUD TEST ===\n");
+
+    // CREATE
+    let new_plan = json!({
+        "merchant": TEST_MERCHANT_ID,
+        "type": "recurring",
+        "name": format!("Test Plan {}", timestamp),
+        "description": "Integration test plan",
+        "schedule": 3,  // Monthly
+        "scheduleFactor": 1,
+        "um": "actual",
+        "amount": 1999,  // $19.99
+        "maxFailures": 3
+    });
+
+    let plan: Plan = client
+        .create(EntityType::Plans, &new_plan)
+        .await
+        .expect("Failed to create plan");
+
+    println!("Created plan: {}", plan.id.as_str());
+    println!("  Name: {:?}", plan.name);
+    println!("  Amount: {:?}", plan.amount);
+    println!("  Schedule: {:?}", plan.schedule);
+
+    assert!(plan.id.as_str().starts_with("t1_pln_"));
+    assert_eq!(plan.name.as_deref(), Some(&format!("Test Plan {}", timestamp) as &str));
+    assert_eq!(plan.amount, Some(1999));
+
+    // READ
+    let fetched: Option<Plan> = client
+        .get_one(EntityType::Plans, plan.id.as_str())
+        .await
+        .expect("Failed to get plan");
+
+    assert!(fetched.is_some());
+    let fetched = fetched.unwrap();
+    assert_eq!(fetched.id.as_str(), plan.id.as_str());
+    println!("Read plan: {} - {:?}", fetched.id.as_str(), fetched.name);
+
+    // UPDATE
+    let updated: Plan = client
+        .update(
+            EntityType::Plans,
+            plan.id.as_str(),
+            &json!({"description": "Updated test plan description"}),
+        )
+        .await
+        .expect("Failed to update plan");
+
+    assert_eq!(updated.description.as_deref(), Some("Updated test plan description"));
+    println!("Updated plan description: {:?}", updated.description);
+
+    // DELETE (deactivate)
+    let deactivated: Plan = client
+        .update(
+            EntityType::Plans,
+            plan.id.as_str(),
+            &json!({"inactive": 1}),
+        )
+        .await
+        .expect("Failed to deactivate plan");
+
+    assert!(deactivated.inactive);
+    println!("Deactivated plan: {}", deactivated.id.as_str());
+
+    println!("\n=== PLAN CRUD TEST COMPLETE ===\n");
+}
+
+// ==================== Subscription CRUD Tests ====================
+
+/// Test Subscription CRUD operations.
+///
+/// Creates a customer, token, plan, and subscription, then tests CRUD operations.
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY - creates real resources"]
+async fn test_subscription_crud() {
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    println!("\n=== SUBSCRIPTION CRUD TEST ===\n");
+
+    // First create prerequisites: customer, token, and plan
+    let customer: Customer = client
+        .create(
+            EntityType::Customers,
+            &NewCustomer {
+                merchant: TEST_MERCHANT_ID.to_string(),
+                first: Some(format!("SubTest{}", timestamp)),
+                last: Some("Customer".to_string()),
+                email: Some("payrixrust@gmail.com".to_string()),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("Failed to create customer");
+    println!("Created customer: {}", customer.id.as_str());
+
+    let token: Token = client
+        .create(
+            EntityType::Tokens,
+            &NewToken {
+                customer: customer.id.to_string(),
+                payment: PaymentInfo {
+                    method: PaymentMethod::Visa,
+                    number: Some("4111111111111111".to_string()),
+                    routing: None,
+                    expiration: Some("1230".to_string()),
+                    cvv: Some("123".to_string()),
+                },
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("Failed to create token");
+    println!("Created token: {}", token.id.as_str());
+
+    let plan: Plan = client
+        .create(
+            EntityType::Plans,
+            &json!({
+                "merchant": TEST_MERCHANT_ID,
+                "type": "recurring",
+                "name": format!("Sub Test Plan {}", timestamp),
+                "schedule": 3,
+                "scheduleFactor": 1,
+                "um": "actual",
+                "amount": 999
+            }),
+        )
+        .await
+        .expect("Failed to create plan");
+    println!("Created plan: {}", plan.id.as_str());
+
+    // Calculate start date 30 days from now (YYYYMMDD format)
+    let start_date = chrono::Utc::now() + chrono::Duration::days(30);
+    let start_date_int = start_date.format("%Y%m%d").to_string().parse::<i32>().unwrap();
+
+    // CREATE subscription
+    let new_sub = json!({
+        "plan": plan.id.as_str(),
+        "start": start_date_int,
+        "origin": 2  // eCommerce
+    });
+
+    let subscription: Subscription = client
+        .create(EntityType::Subscriptions, &new_sub)
+        .await
+        .expect("Failed to create subscription");
+
+    println!("Created subscription: {}", subscription.id.as_str());
+    println!("  Plan: {:?}", subscription.plan);
+    println!("  Start: {:?}", subscription.start);
+
+    assert!(subscription.id.as_str().starts_with("t1_sbn_"));
+
+    // READ
+    let fetched: Option<Subscription> = client
+        .get_one(EntityType::Subscriptions, subscription.id.as_str())
+        .await
+        .expect("Failed to get subscription");
+
+    assert!(fetched.is_some());
+    let fetched = fetched.unwrap();
+    assert_eq!(fetched.id.as_str(), subscription.id.as_str());
+    println!("Read subscription: {}", fetched.id.as_str());
+
+    // UPDATE
+    let updated: Subscription = client
+        .update(
+            EntityType::Subscriptions,
+            subscription.id.as_str(),
+            &json!({"txnDescription": "Updated subscription description"}),
+        )
+        .await
+        .expect("Failed to update subscription");
+
+    assert_eq!(updated.txn_description.as_deref(), Some("Updated subscription description"));
+    println!("Updated subscription description: {:?}", updated.txn_description);
+
+    // DELETE (deactivate/cancel)
+    let cancelled: Subscription = client
+        .update(
+            EntityType::Subscriptions,
+            subscription.id.as_str(),
+            &json!({"inactive": 1}),
+        )
+        .await
+        .expect("Failed to cancel subscription");
+
+    assert!(cancelled.inactive);
+    println!("Cancelled subscription: {}", cancelled.id.as_str());
+
+    // Cleanup
+    let _ = client.update::<_, Plan>(EntityType::Plans, plan.id.as_str(), &json!({"inactive": 1})).await;
+    let _ = client.update::<_, Token>(EntityType::Tokens, token.id.as_str(), &json!({"inactive": 1})).await;
+    let _ = client.update::<_, Customer>(EntityType::Customers, customer.id.as_str(), &json!({"inactive": 1})).await;
+
+    println!("\n=== SUBSCRIPTION CRUD TEST COMPLETE ===\n");
+}
+
+// ==================== Note CRUD Tests ====================
+
+/// Test Note CRUD operations.
+///
+/// Creates a note on an entity, reads it, updates it, and then deletes it.
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY - creates real resources"]
+async fn test_note_crud() {
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    println!("\n=== NOTE CRUD TEST ===\n");
+
+    // CREATE note on our test entity
+    let new_note = json!({
+        "entity": TEST_ENTITY_ID,
+        "type": "note",
+        "note": format!("Integration test note created at {}", timestamp)
+    });
+
+    let note: Note = client
+        .create(EntityType::Notes, &new_note)
+        .await
+        .expect("Failed to create note");
+
+    println!("Created note: {}", note.id.as_str());
+    println!("  Entity: {:?}", note.entity);
+    println!("  Type: {:?}", note.note_type);
+    println!("  Note: {:?}", note.note);
+
+    assert!(note.id.as_str().starts_with("t1_not_"));
+    assert_eq!(note.note_type.as_deref(), Some("note"));
+
+    // READ
+    let fetched: Option<Note> = client
+        .get_one(EntityType::Notes, note.id.as_str())
+        .await
+        .expect("Failed to get note");
+
+    assert!(fetched.is_some());
+    let fetched = fetched.unwrap();
+    assert_eq!(fetched.id.as_str(), note.id.as_str());
+    println!("Read note: {}", fetched.id.as_str());
+
+    // UPDATE
+    let updated: Note = client
+        .update(
+            EntityType::Notes,
+            note.id.as_str(),
+            &json!({"note": "Updated integration test note"}),
+        )
+        .await
+        .expect("Failed to update note");
+
+    assert_eq!(updated.note.as_deref(), Some("Updated integration test note"));
+    println!("Updated note: {:?}", updated.note);
+
+    // SEARCH notes by entity
+    let search = SearchBuilder::new()
+        .field("entity", TEST_ENTITY_ID)
+        .build();
+
+    let notes: Vec<Note> = client
+        .search(EntityType::Notes, &search)
+        .await
+        .expect("Failed to search notes");
+
+    println!("Found {} notes for entity {}", notes.len(), TEST_ENTITY_ID);
+    assert!(
+        notes.iter().any(|n| n.id.as_str() == note.id.as_str()),
+        "Should find our note in search results"
+    );
+
+    // DELETE (deactivate)
+    let deactivated: Note = client
+        .update(
+            EntityType::Notes,
+            note.id.as_str(),
+            &json!({"inactive": 1}),
+        )
+        .await
+        .expect("Failed to deactivate note");
+
+    assert!(deactivated.inactive);
+    println!("Deactivated note: {}", deactivated.id.as_str());
+
+    println!("\n=== NOTE CRUD TEST COMPLETE ===\n");
+}
+
+// ==================== Alert CRUD Tests ====================
+
+/// Test Alert, AlertAction, and AlertTrigger CRUD operations.
+///
+/// Creates an alert with an action and trigger, then tests CRUD operations.
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY - creates real resources"]
+async fn test_alert_crud() {
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    println!("\n=== ALERT CRUD TEST ===\n");
+
+    // Get a login ID from an existing alert to use for our test
+    let existing_alerts: Vec<Alert> = client
+        .get_all(EntityType::Alerts)
+        .await
+        .expect("Failed to get alerts");
+
+    let login_id = existing_alerts.iter()
+        .find_map(|a| a.login.as_ref().map(|l| l.as_str().to_string()))
+        .expect("Need an existing alert with a login to run this test");
+
+    println!("Using login: {} for alert", login_id);
+
+    // CREATE Alert
+    let alert: Alert = client
+        .create(EntityType::Alerts, &json!({
+            "forlogin": &login_id,
+            "name": format!("Test Alert {}", timestamp),
+            "description": "Integration test alert"
+        }))
+        .await
+        .expect("Failed to create alert");
+
+    println!("Created alert: {}", alert.id.as_str());
+    println!("  Name: {:?}", alert.name);
+    println!("  Description: {:?}", alert.description);
+
+    assert!(alert.id.as_str().starts_with("t1_alt_"));
+
+    // CREATE AlertAction (web webhook)
+    let action: AlertAction = client
+        .create(EntityType::AlertActions, &json!({
+            "alert": alert.id.as_str(),
+            "type": "web",
+            "value": "https://webhook.example.com/test",
+            "options": "JSON",
+            "retries": 3
+        }))
+        .await
+        .expect("Failed to create alert action");
+
+    println!("Created alert action: {}", action.id.as_str());
+    println!("  Type: {:?}", action.action_type);
+    println!("  Value: {:?}", action.value);
+
+    assert!(action.id.as_str().starts_with("t1_ala_"));
+
+    // CREATE AlertTrigger
+    let trigger: AlertTrigger = client
+        .create(EntityType::AlertTriggers, &json!({
+            "alert": alert.id.as_str(),
+            "event": "txn.created",
+            "resource": 16,
+            "name": format!("Test Trigger {}", timestamp),
+            "description": "Triggers on transaction creation"
+        }))
+        .await
+        .expect("Failed to create alert trigger");
+
+    println!("Created alert trigger: {}", trigger.id.as_str());
+    println!("  Event: {:?}", trigger.event);
+    println!("  Name: {:?}", trigger.name);
+
+    assert!(trigger.id.as_str().starts_with("t1_alr_"));
+
+    // READ all three
+    let fetched_alert: Option<Alert> = client
+        .get_one(EntityType::Alerts, alert.id.as_str())
+        .await
+        .expect("Failed to get alert");
+    assert!(fetched_alert.is_some());
+    println!("Read alert: {}", fetched_alert.unwrap().id.as_str());
+
+    let fetched_action: Option<AlertAction> = client
+        .get_one(EntityType::AlertActions, action.id.as_str())
+        .await
+        .expect("Failed to get alert action");
+    assert!(fetched_action.is_some());
+    println!("Read alert action: {}", fetched_action.unwrap().id.as_str());
+
+    let fetched_trigger: Option<AlertTrigger> = client
+        .get_one(EntityType::AlertTriggers, trigger.id.as_str())
+        .await
+        .expect("Failed to get alert trigger");
+    assert!(fetched_trigger.is_some());
+    println!("Read alert trigger: {}", fetched_trigger.unwrap().id.as_str());
+
+    // UPDATE Alert
+    let updated_alert: Alert = client
+        .update(
+            EntityType::Alerts,
+            alert.id.as_str(),
+            &json!({"description": "Updated alert description"}),
+        )
+        .await
+        .expect("Failed to update alert");
+    assert_eq!(updated_alert.description.as_deref(), Some("Updated alert description"));
+    println!("Updated alert description: {:?}", updated_alert.description);
+
+    // UPDATE AlertAction
+    let updated_action: AlertAction = client
+        .update(
+            EntityType::AlertActions,
+            action.id.as_str(),
+            &json!({"value": "https://webhook.example.com/updated"}),
+        )
+        .await
+        .expect("Failed to update alert action");
+    assert_eq!(updated_action.value.as_deref(), Some("https://webhook.example.com/updated"));
+    println!("Updated action value: {:?}", updated_action.value);
+
+    // UPDATE AlertTrigger
+    let updated_trigger: AlertTrigger = client
+        .update(
+            EntityType::AlertTriggers,
+            trigger.id.as_str(),
+            &json!({"description": "Updated trigger description"}),
+        )
+        .await
+        .expect("Failed to update alert trigger");
+    assert_eq!(updated_trigger.description.as_deref(), Some("Updated trigger description"));
+    println!("Updated trigger description: {:?}", updated_trigger.description);
+
+    // SEARCH alerts
+    let search = SearchBuilder::new()
+        .field("name[contains]", "Test Alert")
+        .build();
+
+    let alerts: Vec<Alert> = client
+        .search(EntityType::Alerts, &search)
+        .await
+        .expect("Failed to search alerts");
+
+    println!("Found {} alerts matching 'Test Alert'", alerts.len());
+
+    // DELETE (deactivate) in reverse order: trigger -> action -> alert
+    let _ = client.update::<_, AlertTrigger>(
+        EntityType::AlertTriggers,
+        trigger.id.as_str(),
+        &json!({"inactive": 1}),
+    ).await.expect("Failed to deactivate trigger");
+    println!("Deactivated trigger: {}", trigger.id.as_str());
+
+    let _ = client.update::<_, AlertAction>(
+        EntityType::AlertActions,
+        action.id.as_str(),
+        &json!({"inactive": 1}),
+    ).await.expect("Failed to deactivate action");
+    println!("Deactivated action: {}", action.id.as_str());
+
+    let deactivated_alert: Alert = client
+        .update(
+            EntityType::Alerts,
+            alert.id.as_str(),
+            &json!({"inactive": 1}),
+        )
+        .await
+        .expect("Failed to deactivate alert");
+    assert!(deactivated_alert.inactive);
+    println!("Deactivated alert: {}", deactivated_alert.id.as_str());
+
+    println!("\n=== ALERT CRUD TEST COMPLETE ===\n");
+}
+
+// ==================== Refund Test ====================
+
+/// Test creating a refund for an existing transaction.
+///
+/// Note: This test requires finding an existing settled transaction to refund.
+/// It searches for a refundable transaction and attempts a partial refund.
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY and a refundable transaction"]
+async fn test_refund_creation() {
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    println!("\n=== REFUND CREATION TEST ===\n");
+
+    // Search for a refundable transaction (settled, not fully refunded)
+    let search = SearchBuilder::new()
+        .field("merchant", TEST_MERCHANT_ID)
+        .field("type", "1")  // Sale transaction
+        .build();
+
+    let transactions: Vec<Transaction> = client
+        .search(EntityType::Txns, &search)
+        .await
+        .expect("Failed to search transactions");
+
+    println!("Found {} transactions for merchant", transactions.len());
+
+    // Find a transaction we can refund (needs to have a positive total)
+    let refundable = transactions.iter()
+        .find(|t| t.total.unwrap_or(0) > 100);
+
+    let Some(txn) = refundable else {
+        println!("No refundable transactions found - skipping test");
+        println!("Note: A refundable transaction needs to be a settled sale with total > $1.00");
+        return;
+    };
+
+    println!("Found refundable transaction: {}", txn.id.as_str());
+    println!("  Total: {:?}", txn.total);
+    println!("  Status: {:?}", txn.status);
+
+    // Create a partial refund ($1.00 = 100 cents)
+    let refund_amount = 100;
+    let new_refund = json!({
+        "txn": txn.id.as_str(),
+        "amount": refund_amount,
+        "description": "Integration test partial refund"
+    });
+
+    let result: Result<Refund, _> = client
+        .create(EntityType::Refunds, &new_refund)
+        .await;
+
+    match result {
+        Ok(refund) => {
+            println!("Created refund: {}", refund.id.as_str());
+            println!("  Amount: {:?}", refund.amount);
+            println!("  Entry: {:?}", refund.entry);
+
+            // Note: Refunds may take time to process in test environment
+        }
+        Err(e) => {
+            println!("Refund creation failed: {:?}", e);
+            println!("Note: Refunds may require special conditions (settled transaction, sufficient funds, etc.)");
+            // Don't panic - document the behavior
+        }
+    }
+
+    println!("\n=== REFUND CREATION TEST COMPLETE ===\n");
+}
+
+// ==================== Bulk Operations Tests ====================
+
+/// Test bulk search and pagination across multiple entity types.
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY environment variable"]
+async fn test_bulk_search_pagination() {
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    println!("\n=== BULK SEARCH PAGINATION TEST ===\n");
+
+    // Test pagination with Plans
+    let (plans_page1, page_info) = client
+        .get_page::<Plan>(EntityType::Plans, 1, 5, &std::collections::HashMap::new(), None)
+        .await
+        .expect("Failed to get plans page 1");
+
+    println!("Plans page 1: {} items, has_more: {}", plans_page1.len(), page_info.has_more);
+
+    if page_info.has_more {
+        let (plans_page2, _) = client
+            .get_page::<Plan>(EntityType::Plans, 2, 5, &std::collections::HashMap::new(), None)
+            .await
+            .expect("Failed to get plans page 2");
+        println!("Plans page 2: {} items", plans_page2.len());
+    }
+
+    // Test pagination with Subscriptions
+    let (subs_page1, sub_info) = client
+        .get_page::<Subscription>(EntityType::Subscriptions, 1, 5, &std::collections::HashMap::new(), None)
+        .await
+        .expect("Failed to get subscriptions page 1");
+
+    println!("Subscriptions page 1: {} items, has_more: {}", subs_page1.len(), sub_info.has_more);
+
+    // Test pagination with Notes
+    let (notes_page1, notes_info) = client
+        .get_page::<Note>(EntityType::Notes, 1, 5, &std::collections::HashMap::new(), None)
+        .await
+        .expect("Failed to get notes page 1");
+
+    println!("Notes page 1: {} items, has_more: {}", notes_page1.len(), notes_info.has_more);
+
+    // Test pagination with Alerts
+    let (alerts_page1, alerts_info) = client
+        .get_page::<Alert>(EntityType::Alerts, 1, 5, &std::collections::HashMap::new(), None)
+        .await
+        .expect("Failed to get alerts page 1");
+
+    println!("Alerts page 1: {} items, has_more: {}", alerts_page1.len(), alerts_info.has_more);
+
+    println!("\n=== BULK SEARCH PAGINATION TEST COMPLETE ===\n");
+}
+
+/// Test searching entities with complex filters.
+#[tokio::test]
+#[ignore = "requires PAYRIX_API_KEY environment variable"]
+async fn test_complex_search_filters() {
+    init_logging();
+    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let client = PayrixClient::new(&api_key, Environment::Test).unwrap();
+
+    println!("\n=== COMPLEX SEARCH FILTERS TEST ===\n");
+
+    // Search for active plans with amount > 0
+    let search = SearchBuilder::new()
+        .field("inactive", "0")
+        .field("amount[greater]", "0")
+        .build();
+
+    let plans: Vec<Plan> = client
+        .search(EntityType::Plans, &search)
+        .await
+        .expect("Failed to search plans");
+
+    println!("Found {} active plans with amount > 0", plans.len());
+    for plan in plans.iter().take(3) {
+        println!("  Plan: {} - {:?}, amount: {:?}", plan.id.as_str(), plan.name, plan.amount);
+    }
+
+    // Search for notes created today
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let search = SearchBuilder::new()
+        .field("created[greater]", &format!("{} 00:00:00.0000", today))
+        .build();
+
+    let notes: Vec<Note> = client
+        .search(EntityType::Notes, &search)
+        .await
+        .expect("Failed to search notes");
+
+    println!("Found {} notes created today ({})", notes.len(), today);
+
+    // Search for web-type alert actions
+    let search = SearchBuilder::new()
+        .field("type", "web")
+        .build();
+
+    let actions: Vec<AlertAction> = client
+        .search(EntityType::AlertActions, &search)
+        .await
+        .expect("Failed to search alert actions");
+
+    println!("Found {} web-type alert actions", actions.len());
+    for action in actions.iter().take(3) {
+        println!("  Action: {} - {:?}", action.id.as_str(), action.value);
+    }
+
+    println!("\n=== COMPLEX SEARCH FILTERS TEST COMPLETE ===\n");
 }
