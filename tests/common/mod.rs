@@ -2,6 +2,32 @@
 //!
 //! This module provides common utilities, constants, and helper functions
 //! used across all integration test files.
+//!
+//! ## Environment Variables
+//!
+//! Test data can be configured via environment variables. If not set, defaults are used.
+//!
+//! | Variable | Description | Default |
+//! |----------|-------------|---------|
+//! | `TEST_PAYRIX_API_KEY` | API key (required) | None |
+//! | `TEST_MERCHANT_ID` | Merchant for creating resources | `t1_mer_6941bf385591f9e279b1937` |
+//! | `TEST_ENTITY_ID` | Business entity ID | `t1_ent_6941bf37e9b488e9ff0392a` |
+//! | `TEST_OPEN_CHARGEBACK_ID` | Open chargeback for testing | `t1_chb_6616a9de06fd751e5ae91e5` |
+//! | `TEST_CLOSED_CHARGEBACK_ID` | Closed chargeback for testing | `t1_chb_6616a9f7c19a47bea938957` |
+//! | `TEST_WON_CHARGEBACK_ID` | Won chargeback for testing | `t1_chb_6615a4fbc5e0e79dac81419` |
+//!
+//! ## Fixture Loading
+//!
+//! For offline testing, use the `fixtures` module to load mock data:
+//!
+//! ```ignore
+//! use common::fixtures::{load_fixture, load_single_fixture};
+//!
+//! let chargebacks: Vec<Chargeback> = load_fixture("chargebacks");
+//! let chargeback: Chargeback = load_single_fixture("chargebacks");
+//! ```
+
+pub mod fixtures;
 
 use payrix::{Customer, Environment, EntityType, Merchant, PayrixClient, Token};
 use serde_json::json;
@@ -11,42 +37,111 @@ use std::sync::Once;
 static INIT: Once = Once::new();
 
 // =============================================================================
-// Test Merchant Constants
+// Default Test IDs (fallbacks when env vars not set)
 // =============================================================================
-// These IDs are from a merchant created via test_merchant_onboarding_with_trust_account
-// Use these for tests that create customers, tokens, transactions, etc.
 
-/// Test entity ID (the business entity)
+const DEFAULT_ENTITY_ID: &str = "t1_ent_6941bf37e9b488e9ff0392a";
+const DEFAULT_MERCHANT_ID: &str = "t1_mer_6941bf385591f9e279b1937";
+const DEFAULT_OPERATING_ACCOUNT_ID: &str = "t1_act_6941bf3803046cefe558296";
+const DEFAULT_TRUST_ACCOUNT_ID: &str = "t1_act_6941bf38481536ee5afca28";
+const DEFAULT_OPEN_CHARGEBACK_ID: &str = "t1_chb_6616a9de06fd751e5ae91e5";
+const DEFAULT_CLOSED_CHARGEBACK_ID: &str = "t1_chb_6616a9f7c19a47bea938957";
+const DEFAULT_WON_CHARGEBACK_ID: &str = "t1_chb_6615a4fbc5e0e79dac81419";
+
+// =============================================================================
+// Test Data Accessors (environment variable with fallback)
+// =============================================================================
+
+/// Get the test entity ID. Checks `TEST_ENTITY_ID` env var first.
 #[allow(dead_code)]
-pub const TEST_ENTITY_ID: &str = "t1_ent_6941bf37e9b488e9ff0392a";
+pub fn test_entity_id() -> String {
+    env::var("TEST_ENTITY_ID").unwrap_or_else(|_| DEFAULT_ENTITY_ID.to_string())
+}
 
-/// Test merchant ID (for creating customers, tokens)
-/// NOTE: This merchant currently has status=NotReady. Once it is approved through
+/// Get the test merchant ID. Checks `TEST_MERCHANT_ID` env var first.
+///
+/// NOTE: This merchant may have status=NotReady. Once approved through
 /// Payrix's underwriting process, it will have status=Boarded and can process transactions.
-pub const TEST_MERCHANT_ID: &str = "t1_mer_6941bf385591f9e279b1937";
+pub fn test_merchant_id() -> String {
+    env::var("TEST_MERCHANT_ID").unwrap_or_else(|_| DEFAULT_MERCHANT_ID.to_string())
+}
 
-/// Test operating account ID (type=All, primary=true)
+/// Get the test operating account ID. Checks `TEST_OPERATING_ACCOUNT_ID` env var first.
 #[allow(dead_code)]
-pub const TEST_OPERATING_ACCOUNT_ID: &str = "t1_act_6941bf3803046cefe558296";
+pub fn test_operating_account_id() -> String {
+    env::var("TEST_OPERATING_ACCOUNT_ID").unwrap_or_else(|_| DEFAULT_OPERATING_ACCOUNT_ID.to_string())
+}
 
-/// Test trust account ID (type=Credit, primary=false)
+/// Get the test trust account ID. Checks `TEST_TRUST_ACCOUNT_ID` env var first.
 #[allow(dead_code)]
-pub const TEST_TRUST_ACCOUNT_ID: &str = "t1_act_6941bf38481536ee5afca28";
+pub fn test_trust_account_id() -> String {
+    env::var("TEST_TRUST_ACCOUNT_ID").unwrap_or_else(|_| DEFAULT_TRUST_ACCOUNT_ID.to_string())
+}
+
+/// Get an open chargeback ID for testing. Checks `TEST_OPEN_CHARGEBACK_ID` env var first.
+///
+/// Returns `Some(id)` if available (from env or default), `None` if explicitly disabled.
+pub fn test_open_chargeback_id() -> Option<String> {
+    match env::var("TEST_OPEN_CHARGEBACK_ID") {
+        Ok(val) if val.is_empty() || val == "none" => None,
+        Ok(val) => Some(val),
+        Err(_) => Some(DEFAULT_OPEN_CHARGEBACK_ID.to_string()),
+    }
+}
+
+/// Get a closed chargeback ID for testing. Checks `TEST_CLOSED_CHARGEBACK_ID` env var first.
+pub fn test_closed_chargeback_id() -> Option<String> {
+    match env::var("TEST_CLOSED_CHARGEBACK_ID") {
+        Ok(val) if val.is_empty() || val == "none" => None,
+        Ok(val) => Some(val),
+        Err(_) => Some(DEFAULT_CLOSED_CHARGEBACK_ID.to_string()),
+    }
+}
+
+/// Get a won chargeback ID for testing. Checks `TEST_WON_CHARGEBACK_ID` env var first.
+#[allow(dead_code)]
+pub fn test_won_chargeback_id() -> Option<String> {
+    match env::var("TEST_WON_CHARGEBACK_ID") {
+        Ok(val) if val.is_empty() || val == "none" => None,
+        Ok(val) => Some(val),
+        Err(_) => Some(DEFAULT_WON_CHARGEBACK_ID.to_string()),
+    }
+}
+
+/// Require an open chargeback ID. Panics if not available.
+///
+/// Use this in tests that absolutely require a chargeback ID.
+#[allow(dead_code)]
+pub fn require_open_chargeback_id() -> String {
+    test_open_chargeback_id()
+        .expect("TEST_OPEN_CHARGEBACK_ID must be set (or use default) for this test")
+}
+
+/// Require a closed chargeback ID. Panics if not available.
+#[allow(dead_code)]
+pub fn require_closed_chargeback_id() -> String {
+    test_closed_chargeback_id()
+        .expect("TEST_CLOSED_CHARGEBACK_ID must be set (or use default) for this test")
+}
 
 // =============================================================================
-// Chargeback Test Constants
+// Legacy Constants (deprecated, use functions above)
 // =============================================================================
 
-/// Test constant: An open chargeback for read-only testing.
-/// Update this ID if the chargeback status changes or a new open chargeback is available.
-pub const TEST_OPEN_CHARGEBACK_ID: &str = "t1_chb_6616a9de06fd751e5ae91e5";
-
-/// Test constant: A closed chargeback for read-only testing.
-pub const TEST_CLOSED_CHARGEBACK_ID: &str = "t1_chb_6616a9f7c19a47bea938957";
-
-/// Test constant: A won chargeback for read-only testing.
+/// DEPRECATED: Use `test_merchant_id()` instead.
+#[deprecated(since = "0.2.0", note = "Use test_merchant_id() function instead")]
 #[allow(dead_code)]
-pub const TEST_WON_CHARGEBACK_ID: &str = "t1_chb_6615a4fbc5e0e79dac81419";
+pub const TEST_MERCHANT_ID: &str = DEFAULT_MERCHANT_ID;
+
+/// DEPRECATED: Use `test_open_chargeback_id()` instead.
+#[deprecated(since = "0.2.0", note = "Use test_open_chargeback_id() function instead")]
+#[allow(dead_code)]
+pub const TEST_OPEN_CHARGEBACK_ID: &str = DEFAULT_OPEN_CHARGEBACK_ID;
+
+/// DEPRECATED: Use `test_closed_chargeback_id()` instead.
+#[deprecated(since = "0.2.0", note = "Use test_closed_chargeback_id() function instead")]
+#[allow(dead_code)]
+pub const TEST_CLOSED_CHARGEBACK_ID: &str = DEFAULT_CLOSED_CHARGEBACK_ID;
 
 // =============================================================================
 // Test Context
@@ -67,7 +162,7 @@ impl TestContext {
     /// Note: Creating new merchants requires special permissions in Payrix.
     /// For testing, we use an existing merchant from the test account.
     pub async fn new() -> Result<Self, payrix::Error> {
-        let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+        let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
         let client = PayrixClient::new(&api_key, Environment::Test)?;
 
         // Find an existing merchant to use for testing
@@ -159,6 +254,6 @@ pub fn init_logging() {
 
 /// Create a PayrixClient from environment variable
 pub fn create_client() -> PayrixClient {
-    let api_key = env::var("PAYRIX_API_KEY").expect("PAYRIX_API_KEY must be set");
+    let api_key = env::var("TEST_PAYRIX_API_KEY").expect("TEST_PAYRIX_API_KEY must be set");
     PayrixClient::new(&api_key, Environment::Test).unwrap()
 }

@@ -225,6 +225,23 @@ impl PayrixClient {
                 return Err(Error::BadRequest(text));
             }
 
+            if status == StatusCode::FORBIDDEN {
+                return Err(Error::Unauthorized(
+                    "Access forbidden - check API key permissions".into(),
+                ));
+            }
+
+            if status == StatusCode::UNPROCESSABLE_ENTITY {
+                let text = response.text().await.unwrap_or_default();
+                return Err(Error::UnprocessableEntity(text));
+            }
+
+            if status == StatusCode::INTERNAL_SERVER_ERROR {
+                return Err(Error::ServiceUnavailable(
+                    "Payrix internal server error".into(),
+                ));
+            }
+
             // 4. Parse JSON response
             let query: PayrixQuery<T> = response.json().await?;
 
@@ -440,6 +457,261 @@ impl PayrixClient {
         let expand_query = build_expand_query(expand);
         let path = format!("{}/{}?{}", entity_type.as_str(), id, expand_query);
         self.get(&path).await
+    }
+
+    // =========================================================================
+    // Expanded Convenience Methods
+    // =========================================================================
+
+    /// Get a transaction with commonly expanded relationships.
+    ///
+    /// This expands: payment, token (with nested customer), and subscription.
+    /// It's more efficient than making separate API calls for each relationship.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use payrix::{PayrixClient, Environment, TransactionExpanded};
+    ///
+    /// # async fn example() -> payrix::Result<()> {
+    /// let client = PayrixClient::new("api-key", Environment::Test)?;
+    ///
+    /// if let Some(txn) = client.get_transaction_full("t1_txn_xxx").await? {
+    ///     println!("Amount: ${:.2}", txn.amount_dollars());
+    ///
+    ///     if let Some(ref payment) = txn.payment {
+    ///         println!("Card: {}", payment.display());
+    ///     }
+    ///
+    ///     if let Some(name) = txn.customer_name() {
+    ///         println!("Customer: {}", name);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_transaction_full(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::types::TransactionExpanded>> {
+        self.get_one_expanded(
+            EntityType::Txns,
+            id,
+            &["payment", "token|customer", "subscription", "merchant"],
+        )
+        .await
+    }
+
+    /// Get a token with expanded payment and customer.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use payrix::{PayrixClient, Environment, TokenExpanded};
+    ///
+    /// # async fn example() -> payrix::Result<()> {
+    /// let client = PayrixClient::new("api-key", Environment::Test)?;
+    ///
+    /// if let Some(token) = client.get_token_expanded("t1_tok_xxx").await? {
+    ///     if let Some(ref payment) = token.payment {
+    ///         println!("Card: {} ending in {}",
+    ///             payment.method.map(|m| format!("{:?}", m)).unwrap_or_default(),
+    ///             payment.last4.as_deref().unwrap_or("****"));
+    ///     }
+    ///
+    ///     if let Some(ref customer) = token.customer {
+    ///         println!("Customer: {} {}",
+    ///             customer.first.as_deref().unwrap_or(""),
+    ///             customer.last.as_deref().unwrap_or(""));
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_token_expanded(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::types::TokenExpanded>> {
+        self.get_one_expanded(EntityType::Tokens, id, &["payment", "customer"])
+            .await
+    }
+
+    /// Get a customer with expanded tokens.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use payrix::{PayrixClient, Environment, CustomerExpanded};
+    ///
+    /// # async fn example() -> payrix::Result<()> {
+    /// let client = PayrixClient::new("api-key", Environment::Test)?;
+    ///
+    /// if let Some(customer) = client.get_customer_expanded("t1_cus_xxx").await? {
+    ///     if let Some(ref tokens) = customer.tokens {
+    ///         println!("Customer has {} tokens", tokens.len());
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_customer_expanded(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::types::CustomerExpanded>> {
+        self.get_one_expanded(EntityType::Customers, id, &["tokens"])
+            .await
+    }
+
+    /// Get a subscription with plan expanded.
+    ///
+    /// Returns the subscription with full plan details including schedule,
+    /// amount, and billing terms.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use payrix::{PayrixClient, Environment, SubscriptionExpanded};
+    ///
+    /// # async fn example() -> payrix::Result<()> {
+    /// let client = PayrixClient::new("api-key", Environment::Test)?;
+    ///
+    /// if let Some(sub) = client.get_subscription_expanded("t1_sub_xxx").await? {
+    ///     if let Some(ref plan) = sub.plan {
+    ///         println!("Plan: {} - ${:.2}",
+    ///             plan.name.as_deref().unwrap_or("Unknown"),
+    ///             plan.amount.unwrap_or(0) as f64 / 100.0);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_subscription_expanded(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::types::SubscriptionExpanded>> {
+        self.get_one_expanded(EntityType::Subscriptions, id, &["plan"])
+            .await
+    }
+
+    /// Get a plan with merchant and subscriptions expanded.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use payrix::{PayrixClient, Environment, PlanExpanded};
+    ///
+    /// # async fn example() -> payrix::Result<()> {
+    /// let client = PayrixClient::new("api-key", Environment::Test)?;
+    ///
+    /// if let Some(plan) = client.get_plan_expanded("t1_pln_xxx").await? {
+    ///     println!("Plan: {} - ${:.2}",
+    ///         plan.name.as_deref().unwrap_or("Unknown"),
+    ///         plan.amount_dollars());
+    ///     println!("Active subscriptions: {}", plan.subscription_count());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_plan_expanded(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::types::PlanExpanded>> {
+        self.get_one_expanded(EntityType::Plans, id, &["merchant", "subscriptions"])
+            .await
+    }
+
+    /// Get a chargeback with transaction and merchant expanded.
+    ///
+    /// Returns the chargeback with full details of the original transaction
+    /// and merchant.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use payrix::{PayrixClient, Environment, ChargebackExpanded};
+    ///
+    /// # async fn example() -> payrix::Result<()> {
+    /// let client = PayrixClient::new("api-key", Environment::Test)?;
+    ///
+    /// if let Some(cb) = client.get_chargeback_expanded("t1_chb_xxx").await? {
+    ///     println!("Chargeback: ${:.2} - {:?}",
+    ///         cb.amount_dollars(),
+    ///         cb.status);
+    ///     if let Some(ref txn) = cb.txn {
+    ///         println!("Original txn: {} for ${:.2}",
+    ///             txn.id.as_str(),
+    ///             txn.total.unwrap_or(0) as f64 / 100.0);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_chargeback_expanded(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::types::ChargebackExpanded>> {
+        self.get_one_expanded(EntityType::Chargebacks, id, &["txn", "merchant"])
+            .await
+    }
+
+    /// Get a batch with merchant and transactions expanded.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use payrix::{PayrixClient, Environment, BatchExpanded};
+    ///
+    /// # async fn example() -> payrix::Result<()> {
+    /// let client = PayrixClient::new("api-key", Environment::Test)?;
+    ///
+    /// if let Some(batch) = client.get_batch_expanded("t1_bat_xxx").await? {
+    ///     println!("Batch: {} transactions, ${:.2} total",
+    ///         batch.transaction_count(),
+    ///         batch.total_amount_dollars());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_batch_expanded(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::types::BatchExpanded>> {
+        self.get_one_expanded(EntityType::Batches, id, &["merchant", "txns"])
+            .await
+    }
+
+    /// Get a merchant with members expanded.
+    ///
+    /// Returns the merchant with full details of beneficial owners and
+    /// control persons.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use payrix::{PayrixClient, Environment, MerchantExpanded};
+    ///
+    /// # async fn example() -> payrix::Result<()> {
+    /// let client = PayrixClient::new("api-key", Environment::Test)?;
+    ///
+    /// if let Some(merchant) = client.get_merchant_expanded("t1_mer_xxx").await? {
+    ///     println!("Merchant: {} has {} members",
+    ///         merchant.dba.as_deref().unwrap_or("Unknown"),
+    ///         merchant.member_count());
+    ///     if let Some(primary) = merchant.primary_member() {
+    ///         println!("Primary contact: {} {}",
+    ///             primary.first.as_deref().unwrap_or(""),
+    ///             primary.last.as_deref().unwrap_or(""));
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_merchant_expanded(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::types::MerchantExpanded>> {
+        self.get_one_expanded(EntityType::Merchants, id, &["members"])
+            .await
     }
 
     /// Get all entities of a type with pagination.
@@ -671,6 +943,38 @@ impl PayrixClient {
 
             if status == StatusCode::UNAUTHORIZED {
                 return Err(Error::Unauthorized("Invalid API key".into()));
+            }
+
+            if status == StatusCode::NOT_FOUND {
+                return Err(Error::NotFound(format!("Resource not found: {}", path)));
+            }
+
+            if status == StatusCode::SERVICE_UNAVAILABLE {
+                return Err(Error::ServiceUnavailable(
+                    "Payrix service is temporarily unavailable".into(),
+                ));
+            }
+
+            if status == StatusCode::BAD_REQUEST {
+                let text = response.text().await.unwrap_or_default();
+                return Err(Error::BadRequest(text));
+            }
+
+            if status == StatusCode::FORBIDDEN {
+                return Err(Error::Unauthorized(
+                    "Access forbidden - check API key permissions".into(),
+                ));
+            }
+
+            if status == StatusCode::UNPROCESSABLE_ENTITY {
+                let text = response.text().await.unwrap_or_default();
+                return Err(Error::UnprocessableEntity(text));
+            }
+
+            if status == StatusCode::INTERNAL_SERVER_ERROR {
+                return Err(Error::ServiceUnavailable(
+                    "Payrix internal server error".into(),
+                ));
             }
 
             let query: PayrixQuery<T> = response.json().await?;
