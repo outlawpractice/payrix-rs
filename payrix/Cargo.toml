@@ -1,0 +1,68 @@
+[package]
+name = "payrix"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Rust client for the Payrix payment processing API"
+documentation = "https://docs.rs/payrix"
+readme = "../README.md"
+keywords = ["payrix", "payments", "api", "worldpay", "payment-processing"]
+categories = ["api-bindings", "web-programming"]
+
+[features]
+default = []
+sqlx = ["dep:sqlx"]
+# Include financial/reporting types (settlements, statements, billing, profit shares, etc.)
+financial = []
+# Include terminal/physical device types (terminals, terminal transactions, etc.)
+terminal = []
+# Include all optional types
+full = ["financial", "terminal"]
+# Webhook server for receiving Payrix callbacks
+webhooks = ["dep:axum", "dep:tower", "dep:tower-http", "dep:ipnet", "dep:uuid", "dep:async-trait"]
+# CLI binary for webhook server management
+webhook-cli = ["webhooks", "dep:clap", "dep:tracing-subscriber", "tokio/full"]
+# Local entity cache for faster queries and offline resilience
+cache = ["sqlx", "dep:async-trait"]
+
+[dependencies]
+base64.workspace = true
+chrono.workspace = true
+payrix-macros.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_repr.workspace = true
+sqlx = { workspace = true, optional = true }
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+# Webhook server dependencies (optional)
+async-trait = { workspace = true, optional = true }
+axum = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
+tower-http = { workspace = true, optional = true }
+ipnet = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+tracing-subscriber = { workspace = true, optional = true }
+
+[[bin]]
+name = "payrix-webhooks"
+path = "src/bin/payrix-webhooks.rs"
+required-features = ["webhook-cli"]
+
+[[example]]
+name = "webhook_dispute_handler"
+required-features = ["webhooks"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tracing-subscriber.workspace = true
+wiremock.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

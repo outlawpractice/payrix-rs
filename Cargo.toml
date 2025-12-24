@@ -1,69 +1,40 @@
-[package]
-name = "payrix"
+[workspace]
+resolver = "2"
+members = ["payrix", "payrix-macros"]
+
+[workspace.package]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "MIT"
-description = "Rust client for the Payrix payment processing API"
 repository = "https://github.com/outlawpractice/payrix-rs"
-documentation = "https://docs.rs/payrix"
-readme = "README.md"
-keywords = ["payrix", "payments", "api", "worldpay", "payment-processing"]
-categories = ["api-bindings", "web-programming"]
-rust-version = "1.75"
 
-[features]
-default = []
-sqlx = ["dep:sqlx"]
-# Include financial/reporting types (settlements, statements, billing, profit shares, etc.)
-financial = []
-# Include terminal/physical device types (terminals, terminal transactions, etc.)
-terminal = []
-# Include all optional types
-full = ["financial", "terminal"]
-# Webhook server for receiving Payrix callbacks
-webhooks = ["dep:axum", "dep:tower", "dep:tower-http", "dep:ipnet", "dep:uuid", "dep:async-trait"]
-# CLI binary for webhook server management
-webhook-cli = ["webhooks", "dep:clap", "dep:tracing-subscriber", "tokio/full"]
-# Local entity cache for faster queries and offline resilience
-cache = ["sqlx", "dep:async-trait"]
-
-[dependencies]
+[workspace.dependencies]
+# Shared dependencies
+async-trait = "0.1"
+axum = "0.7"
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.5", features = ["derive"] }
+ipnet = "2.10"
 reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_repr = "0.1"
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono"], optional = true }
-thiserror = "2"
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono"] }
+thiserror = "1.0"
 tokio = { version = "1", features = ["rt", "time", "sync"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace"] }
 tracing = "0.1"
-payrix-macros = { path = "payrix-macros" }
-
-# Webhook server dependencies (optional)
-async-trait = { version = "0.1", optional = true }
-axum = { version = "0.7", optional = true }
-tower = { version = "0.5", optional = true }
-tower-http = { version = "0.6", features = ["trace"], optional = true }
-ipnet = { version = "2.10", optional = true }
-uuid = { version = "1.11", features = ["v4", "serde"], optional = true }
-clap = { version = "4.5", features = ["derive"], optional = true }
-tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
-
-[[bin]]
-name = "payrix-webhooks"
-path = "src/bin/payrix-webhooks.rs"
-required-features = ["webhook-cli"]
-
-[[example]]
-name = "webhook_dispute_handler"
-required-features = ["webhooks"]
-
-[dev-dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
 wiremock = "0.6"
 
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+# Proc-macro dependencies
+darling = "0.20"
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+
+# Internal crates
+payrix-macros = { version = "0.1", path = "payrix-macros" }

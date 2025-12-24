@@ -58,7 +58,7 @@
 //! let stats = cache.initial_sync().await?;
 //! println!("Synced {} chargebacks", stats.chargebacks);
 //!
-//! // Query from local cache (fast!)
+//! // Query from the local cache (fast!)
 //! let chargeback = cache.get_chargeback("t1_chb_123").await?;
 //!
 //! // Or fall back to API if not in cache
