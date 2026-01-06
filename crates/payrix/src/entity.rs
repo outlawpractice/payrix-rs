@@ -27,6 +27,8 @@ pub enum EntityType {
     Plans,
     /// Subscriptions
     Subscriptions,
+    /// Subscription tokens (links between subscriptions and payment tokens)
+    SubscriptionTokens,
     /// Team logins
     TeamLogins,
     /// Payment tokens
@@ -103,6 +105,7 @@ impl EntityType {
             EntityType::Payouts => "payouts",
             EntityType::Plans => "plans",
             EntityType::Subscriptions => "subscriptions",
+            EntityType::SubscriptionTokens => "subscriptionTokens",
             EntityType::TeamLogins => "team_logins",
             EntityType::Tokens => "tokens",
             EntityType::Txns => "txns",

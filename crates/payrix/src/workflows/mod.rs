@@ -13,6 +13,7 @@
 //! - [`merchant_onboarding`] - Onboard new merchants with business info, bank accounts, and owners
 //! - [`dispute_handling`] - Handle chargeback disputes with compile-time state enforcement
 //! - [`webhook_setup`] - Set up webhook alerts for real-time event notifications
+//! - [`subscription_management`] - Manage customer subscriptions to recurring payment plans
 //!
 //! # Example
 //!
@@ -34,6 +35,7 @@
 
 pub mod dispute_handling;
 pub mod merchant_onboarding;
+pub mod subscription_management;
 pub mod webhook_setup;
 
 // Re-export key types for convenience
@@ -56,4 +58,15 @@ pub use dispute_handling::{
 pub use webhook_setup::{
     get_webhook_status, remove_webhook_by_id, remove_webhooks, setup_webhooks,
     WebhookAlertInfo, WebhookConfig, WebhookEventType, WebhookSetupResult, WebhookStatus,
+};
+
+// Re-export subscription management types
+pub use subscription_management::{
+    add_plan_to_customer, calculate_subscription_revenue, cancel_subscription,
+    get_active_subscriptions_for_customer, get_subscribers_for_plan, get_subscription_status,
+    get_upcoming_payments, next_payment, pause_subscription, payments_to_date,
+    resume_subscription, retry_failed_payment, update_payment_method, BillingSchedule,
+    NextPayment, PaymentHistory, PlanConfig, PlanReference, SubscribeCustomerConfig,
+    SubscribeCustomerResult, SubscriptionError, SubscriptionResult, SubscriptionRevenue,
+    SubscriptionState, SubscriptionStatus, TokenConfig, TokenReference, UpcomingPayment,
 };

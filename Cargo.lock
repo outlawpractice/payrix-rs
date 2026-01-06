@@ -3122,3 +3122,51 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[patch.unused]]
+name = "connector-aws"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "connector-caldav"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "connector-payrix"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "connector-sdk"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "connector-smtp"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "connector-webdav"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "core-auth"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "core-crypto"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "core-db"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "core-http"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "core-sync"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "core-types"
+version = "0.1.0"

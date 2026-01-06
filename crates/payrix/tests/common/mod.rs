@@ -247,7 +247,11 @@ pub fn init_logging() {
     INIT.call_once(|| {
         // Set up basic logging if needed
         if env::var("RUST_LOG").is_err() {
-            env::set_var("RUST_LOG", "payrix=debug");
+            // SAFETY: This runs exactly once during test initialization via call_once,
+            // ensuring single-threaded access to the environment.
+            unsafe {
+                env::set_var("RUST_LOG", "payrix=debug");
+            }
         }
     });
 }
